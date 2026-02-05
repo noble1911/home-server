@@ -2,6 +2,8 @@
 
 Deploy qBittorrent (torrent client) and Prowlarr (indexer manager).
 
+> **Note:** This script also creates the shared `homeserver` Docker network used by all stacks for cross-container communication.
+
 ## Automated
 
 ```bash
@@ -110,10 +112,26 @@ lsof -i :8081
 
 ## What This Does
 
+- **Creates `homeserver` network:** A shared Docker network enabling all containers to communicate by hostname
 - **qBittorrent:** Downloads torrents to the external drive
 - **Prowlarr:** Manages indexers and syncs them to *arr apps
 
 The *arr apps (Radarr, Sonarr, etc.) will tell qBittorrent what to download and where to save it.
+
+## Shared Network
+
+All stacks join the `homeserver` network, allowing containers to communicate using their container names as hostnames:
+
+```
+radarr → qbittorrent:8081      (download client)
+prowlarr → radarr:7878         (indexer sync)
+nanobot → immich-postgres:5432 (memory storage)
+```
+
+If you need to manually create the network:
+```bash
+docker network create homeserver
+```
 
 ## Next Step
 
