@@ -100,6 +100,39 @@ bash scripts/01-homebrew.sh
 ls -la && git status
 ```
 
+## Open Design Questions
+
+### AI Butler Memory & Personalization
+Need to design and implement:
+
+1. **User Memory** - Remember facts about each user
+   - Names, preferences, routines
+   - Past requests and outcomes
+   - "Ron prefers audiobooks at 1.2x speed"
+
+2. **Multi-User Support** - Already in plan, but needs:
+   - User identification (JWT token from app)
+   - Per-user conversation history
+   - Per-user preferences
+
+3. **Soul/Personality per User** - Custom behavior settings
+   - Formality level (casual vs professional)
+   - Verbosity (brief vs detailed)
+   - Humor, tone, interaction style
+   - Custom instructions ("always suggest audiobooks")
+
+4. **Memory Storage Options**
+   - SQLite (simple, local)
+   - PostgreSQL (if we want Immich's DB)
+   - Redis (fast, but volatile)
+   - JSON files (simplest, but doesn't scale)
+
+### Questions to Resolve
+- Does Nanobot have built-in memory/persistence?
+- How to inject user context into Claude system prompt?
+- Where does "soul" config live? (JSON file? DB?)
+- Voice identification vs app-based user identification?
+
 ## Notes for Future Sessions
 
 - Ron prefers modular, DRY code - scripts should be reusable
@@ -107,3 +140,4 @@ ls -la && git status
 - Always commit and push after making changes
 - SSH setup is OPTIONAL - some users manage Mac Mini directly
 - The Mac Mini hasn't arrived yet - we're in planning/prep phase
+- **Memory/personalization is important** - Butler should know users

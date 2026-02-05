@@ -381,7 +381,14 @@ The system supports **N users** with individual settings and preferences.
       "start_mode": "push_to_talk",
       "devices": ["pixel_9a"],
       "tts_voice": "kokoro_male_1",
-      "permissions": ["media", "home", "calendar", "location"]
+      "permissions": ["media", "home", "calendar", "location"],
+      "soul": {
+        "personality": "friendly and efficient",
+        "formality": "casual",
+        "verbosity": "concise",
+        "humor": true,
+        "custom_instructions": "Ron prefers audiobooks at 1.2x speed. Suggest sci-fi when asked for recommendations."
+      }
     },
     {
       "id": "user_002",
@@ -390,7 +397,14 @@ The system supports **N users** with individual settings and preferences.
       "start_mode": "wake_word",
       "devices": ["iphone_17"],
       "tts_voice": "kokoro_female_1",
-      "permissions": ["media", "home", "calendar", "location"]
+      "permissions": ["media", "home", "calendar", "location"],
+      "soul": {
+        "personality": "warm and helpful",
+        "formality": "casual",
+        "verbosity": "detailed",
+        "humor": true,
+        "custom_instructions": "Prefers romance and thriller genres."
+      }
     }
   ]
 }
@@ -405,6 +419,123 @@ The system supports **N users** with individual settings and preferences.
 | **TTS voice** | Choose preferred voice for responses |
 | **Permissions** | Control what each user can access |
 | **Notification preferences** | Which WhatsApp updates to receive |
+| **Soul/Personality** | Custom interaction style per user |
+
+### Memory System
+
+The Butler remembers facts about users and learns from interactions.
+
+#### Memory Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         MEMORY LAYERS                                        │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  SESSION MEMORY (Claude built-in)                                   │   │
+│  │  Current conversation context - resets each session                 │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                              ▼                                              │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  SHORT-TERM MEMORY (SQLite - conversation_history table)            │   │
+│  │  Recent conversations, summaries, last 7 days                       │   │
+│  │  "Yesterday you asked about the Dune audiobook"                     │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                              ▼                                              │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  LONG-TERM MEMORY (SQLite - user_facts table)                       │   │
+│  │  Persistent facts, preferences, learned patterns                    │   │
+│  │  "Ron's favorite author is Brandon Sanderson"                       │   │
+│  │  "Partner doesn't like horror movies"                               │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                              ▼                                              │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  SOUL CONFIG (JSON file - per user)                                 │   │
+│  │  Personality settings, custom instructions                          │   │
+│  │  Loaded into system prompt at conversation start                    │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### Memory Database Schema
+
+```sql
+-- User facts (long-term memory)
+CREATE TABLE user_facts (
+    id INTEGER PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    fact TEXT NOT NULL,
+    category TEXT,  -- 'preference', 'routine', 'personal', 'media'
+    confidence REAL DEFAULT 1.0,
+    source TEXT,    -- 'explicit' (user said) or 'inferred'
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_referenced TIMESTAMP
+);
+
+-- Conversation history (short-term memory)
+CREATE TABLE conversation_history (
+    id INTEGER PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    role TEXT NOT NULL,  -- 'user' or 'assistant'
+    content TEXT NOT NULL,
+    summary TEXT,        -- AI-generated summary for context injection
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Indexes for fast retrieval
+CREATE INDEX idx_facts_user ON user_facts(user_id);
+CREATE INDEX idx_history_user ON conversation_history(user_id, created_at);
+```
+
+#### How Memory Works
+
+1. **On conversation start:**
+   - Load user's soul config into system prompt
+   - Retrieve recent conversation summaries (last 7 days)
+   - Fetch relevant long-term facts based on conversation context
+
+2. **During conversation:**
+   - Store each exchange in conversation_history
+   - Extract and store new facts ("I love sci-fi" → user_facts)
+
+3. **After conversation:**
+   - Generate summary of conversation
+   - Update fact confidence scores based on usage
+
+#### Example System Prompt Injection
+
+```
+You are a helpful home assistant. You're speaking with Ron.
+
+PERSONALITY:
+- Style: friendly and efficient
+- Formality: casual
+- Verbosity: concise
+- Humor: yes
+
+WHAT YOU KNOW ABOUT RON:
+- Prefers audiobooks at 1.2x speed
+- Favorite author: Brandon Sanderson
+- Listens to audiobooks during commute (8am, 6pm)
+- Recently asked about the Dune series
+
+RECENT CONTEXT:
+- Yesterday: Downloaded "The Way of Kings" audiobook
+- 3 days ago: Asked about smart home heating schedule
+```
+
+#### Memory MCP Server
+
+A custom MCP server handles memory operations:
+
+| Tool | Purpose |
+|------|---------|
+| `remember_fact` | Store a new fact about the user |
+| `recall_facts` | Retrieve relevant facts for context |
+| `get_recent_conversations` | Get conversation summaries |
+| `update_soul` | Modify user's personality settings |
 
 #### Adding New Users
 
