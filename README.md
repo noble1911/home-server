@@ -6,9 +6,28 @@ See [HOMESERVER_PLAN.md](./HOMESERVER_PLAN.md) for the complete architecture and
 
 ---
 
-## Quick Start (Mac Mini)
+## Remote Setup Guide
 
-On your new Mac Mini, open Terminal and run:
+This guide explains how to configure and manage the Mac Mini remotely from your MacBook Pro (or any other machine).
+
+### Prerequisites
+
+- Mac Mini M4 connected to your home network (ethernet recommended)
+- MacBook Pro (or any SSH client machine)
+- Both machines on the same network initially for setup
+
+### Two Setup Options
+
+| Option | Best For |
+|--------|----------|
+| **[Automated](#option-a-automated-bootstrap-script)** | Quick setup, run one command |
+| **[Manual](#option-b-manual-setup)** | Learning, customizing each step |
+
+---
+
+## Option A: Automated Bootstrap Script
+
+On your Mac Mini, open Terminal and run:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/noble1911/home-server/main/scripts/bootstrap.sh | bash
@@ -23,21 +42,13 @@ This will:
 
 Then follow the on-screen instructions to complete setup.
 
----
-
-## Manual Remote Setup Guide
-
-If you prefer to set things up manually, follow the steps below.
-
-This guide explains how to configure and manage the Mac Mini remotely from your MacBook Pro (or any other machine).
-
-### Prerequisites
-
-- Mac Mini M4 connected to your home network (ethernet recommended)
-- MacBook Pro (or any SSH client machine)
-- Both machines on the same network initially for setup
+**Skip to [Step 2: Set Up SSH Key Authentication](#step-2-set-up-ssh-key-authentication-recommended)** after running the script.
 
 ---
+
+## Option B: Manual Setup
+
+Follow the steps below to set up everything manually.
 
 ## Step 1: Enable SSH on Mac Mini
 
@@ -133,20 +144,39 @@ ssh macmini "system_profiler SPHardwareDataType | grep -E 'Model|Chip|Memory'"
 
 ---
 
-## Step 4: Remote Access Outside Home Network
+## Step 4: Install Homebrew & Tailscale
 
-### Option A: Tailscale (Recommended)
+### Install Homebrew (On Mac Mini)
+
+Homebrew is the package manager for macOS. Run on the Mac Mini:
+
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+
+After installation, add Homebrew to your PATH (Apple Silicon Macs):
+
+```bash
+echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile
+eval "$(/opt/homebrew/bin/brew shellenv)"
+```
+
+### Install Tailscale (On Mac Mini)
 
 Tailscale creates a secure mesh VPN - no port forwarding needed.
 
-**On Mac Mini:**
-1. Download from https://tailscale.com/download/mac
-2. Install and sign in
-3. Note the Tailscale IP (e.g., `100.x.y.z`) or MagicDNS name
+```bash
+brew install --cask tailscale
+```
+
+Then open Tailscale and sign in:
+```bash
+open -a Tailscale
+```
 
 **On MacBook:**
-1. Install Tailscale
-2. Sign in with same account
+1. Install Tailscale (same method or from https://tailscale.com/download/mac)
+2. Sign in with the same account
 3. Connect via Tailscale hostname:
    ```bash
    ssh ron@mac-mini  # MagicDNS name
@@ -163,7 +193,7 @@ Host macmini
   IdentitiesOnly yes
 ```
 
-### Option B: Port Forwarding (Not Recommended)
+### Port Forwarding (Not Recommended)
 
 Exposing SSH (port 22) to the internet is risky. If you must:
 - Change SSH to a non-standard port
@@ -191,6 +221,9 @@ The Mac Mini should stay awake for SSH access and server duties.
 
    # Enable wake on network
    sudo pmset -a womp 1
+
+   # Auto-restart after power failure
+   sudo pmset -a autorestart 1
 
    # Verify settings
    pmset -g
