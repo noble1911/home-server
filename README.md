@@ -6,26 +6,7 @@ See [HOMESERVER_PLAN.md](./HOMESERVER_PLAN.md) for the complete architecture and
 
 ---
 
-## Remote Setup Guide
-
-This guide explains how to configure and manage the Mac Mini remotely from your MacBook Pro (or any other machine).
-
-### Prerequisites
-
-- Mac Mini M4 connected to your home network (ethernet recommended)
-- MacBook Pro (or any SSH client machine)
-- Both machines on the same network initially for setup
-
-### Two Setup Options
-
-| Option | Best For |
-|--------|----------|
-| **[Automated](#option-a-automated-bootstrap-script)** | Quick setup, run one command |
-| **[Manual](#option-b-manual-setup)** | Learning, customizing each step |
-
----
-
-## Option A: Automated Bootstrap Script
+## Quick Start
 
 On your Mac Mini, open Terminal and run:
 
@@ -34,269 +15,204 @@ curl -fsSL https://raw.githubusercontent.com/noble1911/home-server/main/scripts/
 ```
 
 This will:
-- ✅ Enable SSH (Remote Login)
-- ✅ Install Homebrew
-- ✅ Install Tailscale
+- ✅ Install Homebrew (package manager)
+- ✅ Install Tailscale (secure remote access)
 - ✅ Configure Mac to stay awake 24/7
-- ✅ Prepare SSH directory for key authentication
+- ✅ Enable SSH for remote management
 
-Then follow the on-screen instructions to complete setup.
+**Skip SSH** if you'll manage the Mac Mini directly (keyboard + monitor):
 
-**Skip to [Step 2: Set Up SSH Key Authentication](#step-2-set-up-ssh-key-authentication-recommended)** after running the script.
+```bash
+curl -fsSL https://raw.githubusercontent.com/noble1911/home-server/main/scripts/bootstrap.sh | bash -s -- --no-ssh
+```
+
+Or follow the [manual setup](#manual-setup) instructions below.
 
 ---
 
-## Option B: Manual Setup
+## Manual Setup
 
-Follow the steps below to set up everything manually.
+### Step 1: Install Homebrew
 
-## Step 1: Enable SSH on Mac Mini
-
-On the **Mac Mini** (requires physical access or screen sharing for initial setup):
-
-1. **Open System Settings** → **General** → **Sharing**
-
-2. **Enable "Remote Login"** (this enables the SSH server)
-
-3. **Note the connection info** displayed, e.g.:
-   ```
-   ssh ron@192.168.1.100
-   ```
-   Or using the hostname:
-   ```
-   ssh ron@mac-mini.local
-   ```
-
-4. **Optional but recommended:** Click "Info" (ⓘ) next to Remote Login to configure:
-   - "Allow access for: Only these users" → Add your user
-   - This restricts SSH to specific accounts
-
-### Finding the Mac Mini's IP Address
-
-On the Mac Mini, run:
-```bash
-# Get local IP address
-ipconfig getifaddr en0    # Wi-Fi
-ipconfig getifaddr en1    # Ethernet (try both)
-
-# Or see all network interfaces
-ifconfig | grep "inet " | grep -v 127.0.0.1
-```
-
-Or check **System Settings** → **Network** → Select your connection → See IP address.
-
----
-
-## Step 2: Set Up SSH Key Authentication (Recommended)
-
-Password authentication works but key-based auth is more secure and convenient.
-
-### On your MacBook Pro:
-
-```bash
-# Generate a new SSH key (if you don't have one)
-ssh-keygen -t ed25519 -C "macbook-to-macmini"
-
-# When prompted:
-# - Save to: ~/.ssh/id_ed25519_macmini (or default)
-# - Passphrase: recommended for security
-
-# Copy your public key to the Mac Mini
-ssh-copy-id -i ~/.ssh/id_ed25519_macmini.pub ron@mac-mini.local
-
-# Or manually (if ssh-copy-id isn't available):
-cat ~/.ssh/id_ed25519_macmini.pub | ssh ron@mac-mini.local "mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys"
-```
-
-### Add SSH Config Entry
-
-Add to `~/.ssh/config` on your MacBook:
-
-```ssh-config
-# Home Server - Mac Mini M4
-Host macmini
-  HostName mac-mini.local          # Or use IP: 192.168.1.100
-  User ron
-  IdentityFile ~/.ssh/id_ed25519_macmini
-  IdentitiesOnly yes
-
-  # Optional: Keep connection alive
-  ServerAliveInterval 60
-  ServerAliveCountMax 3
-```
-
-Now you can simply run:
-```bash
-ssh macmini
-```
-
----
-
-## Step 3: Test the Connection
-
-```bash
-# Basic connection test
-ssh macmini "echo 'Connected to Mac Mini!' && hostname && uname -a"
-
-# Check system info
-ssh macmini "system_profiler SPHardwareDataType | grep -E 'Model|Chip|Memory'"
-```
-
----
-
-## Step 4: Install Homebrew & Tailscale
-
-### Install Homebrew (On Mac Mini)
-
-Homebrew is the package manager for macOS. Run on the Mac Mini:
+Homebrew is the package manager for macOS - you'll need it for most tools.
 
 ```bash
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 ```
 
-After installation, add Homebrew to your PATH (Apple Silicon Macs):
+After installation, add to your PATH (Apple Silicon Macs):
 
 ```bash
 echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile
 eval "$(/opt/homebrew/bin/brew shellenv)"
 ```
 
-### Install Tailscale (On Mac Mini)
+### Step 2: Install Tailscale
 
-Tailscale creates a secure mesh VPN - no port forwarding needed.
+Tailscale provides secure access to your server from anywhere (phone, laptop, etc.) without exposing ports to the internet.
 
 ```bash
 brew install --cask tailscale
-```
-
-Then open Tailscale and sign in:
-```bash
 open -a Tailscale
 ```
 
-**On MacBook:**
-1. Install Tailscale (same method or from https://tailscale.com/download/mac)
-2. Sign in with the same account
-3. Connect via Tailscale hostname:
-   ```bash
-   ssh ron@mac-mini  # MagicDNS name
-   # or
-   ssh ron@100.x.y.z  # Tailscale IP
-   ```
+Sign in with your Tailscale account (or create one - free tier is plenty).
 
-**Update your SSH config:**
+### Step 3: Configure Power Settings
+
+Keep the Mac Mini running 24/7:
+
+**Via System Settings:**
+1. **System Settings** → **Energy**
+2. Enable "Prevent automatic sleeping when display is off"
+3. Enable "Wake for network access"
+
+**Or via Terminal:**
+
+```bash
+# Prevent sleep
+sudo pmset -a sleep 0
+sudo pmset -a disksleep 0
+
+# Wake on network access
+sudo pmset -a womp 1
+
+# Auto-restart after power failure
+sudo pmset -a autorestart 1
+
+# Verify settings
+pmset -g
+```
+
+### Step 4: Clone This Repository
+
+```bash
+git clone https://github.com/noble1911/home-server.git
+cd home-server
+```
+
+Now follow [HOMESERVER_PLAN.md](./HOMESERVER_PLAN.md) to continue setup.
+
+---
+
+## Optional: Remote Management via SSH
+
+> **Skip this section** if you prefer to manage the Mac Mini directly (keyboard + monitor attached).
+
+SSH lets you manage the Mac Mini from another computer (e.g., your MacBook) without needing physical access.
+
+### Enable SSH on Mac Mini
+
+**Via System Settings:**
+1. **System Settings** → **General** → **Sharing**
+2. Enable **"Remote Login"**
+
+**Or via Terminal:**
+
+```bash
+sudo systemsetup -setremotelogin on
+```
+
+Verify it's enabled:
+```bash
+sudo systemsetup -getremotelogin
+# Should show: Remote Login: On
+```
+
+### Find Your Mac Mini's Address
+
+```bash
+# Get local IP
+ipconfig getifaddr en0    # Wi-Fi
+ipconfig getifaddr en1    # Ethernet
+
+# Or use hostname
+echo "$(hostname).local"
+```
+
+### Connect from Another Machine
+
+From your MacBook (or any SSH client):
+
+```bash
+ssh yourusername@mac-mini.local
+# or
+ssh yourusername@192.168.1.xxx
+```
+
+### Set Up SSH Key Authentication (Recommended)
+
+Keys are more secure and convenient than passwords.
+
+**On your MacBook:**
+
+```bash
+# Generate a key (if you don't have one)
+ssh-keygen -t ed25519 -C "macbook-to-macmini"
+# Save to: ~/.ssh/id_ed25519_macmini
+
+# Copy to Mac Mini
+ssh-copy-id -i ~/.ssh/id_ed25519_macmini.pub ron@mac-mini.local
+```
+
+**Add SSH config for easy access** (`~/.ssh/config` on MacBook):
+
 ```ssh-config
 Host macmini
-  HostName mac-mini              # Tailscale MagicDNS name
+  HostName mac-mini.local    # Or Tailscale IP: 100.x.y.z
   User ron
   IdentityFile ~/.ssh/id_ed25519_macmini
   IdentitiesOnly yes
+  ServerAliveInterval 60
 ```
 
-### Port Forwarding (Not Recommended)
+Now just run:
+```bash
+ssh macmini
+```
 
-Exposing SSH (port 22) to the internet is risky. If you must:
-- Change SSH to a non-standard port
-- Use fail2ban or similar
-- Require key-only authentication
-- Consider a VPN instead
-
----
-
-## Step 5: Keep Mac Mini Awake
-
-The Mac Mini should stay awake for SSH access and server duties.
-
-**On Mac Mini:**
-
-1. **System Settings** → **Energy**
-   - Enable "Prevent automatic sleeping when display is off"
-   - Enable "Wake for network access"
-
-2. **Or via Terminal:**
-   ```bash
-   # Prevent sleep entirely (run on Mac Mini)
-   sudo pmset -a sleep 0
-   sudo pmset -a disksleep 0
-
-   # Enable wake on network
-   sudo pmset -a womp 1
-
-   # Auto-restart after power failure
-   sudo pmset -a autorestart 1
-
-   # Verify settings
-   pmset -g
-   ```
-
----
-
-## Step 6: Useful Remote Commands
-
-Once SSH is set up, here are commands you'll use frequently:
+### Useful Remote Commands
 
 ```bash
 # Copy files to Mac Mini
-scp ./docker-compose.yml macmini:~/homeserver/
+scp ./docker-compose.yml macmini:~/home-server/
 
 # Copy files from Mac Mini
-scp macmini:~/homeserver/config.yml ./
+scp macmini:~/home-server/config.yml ./
 
-# Sync entire directory (rsync is better for large transfers)
-rsync -avz --progress ./configs/ macmini:~/homeserver/configs/
+# Sync directories
+rsync -avz --progress ./configs/ macmini:~/home-server/configs/
 
-# Run interactive shell
-ssh macmini
-
-# Run single command
-ssh macmini "docker ps"
-
-# Port forward (access Mac Mini's port 8096 on localhost:8096)
+# Port forward (access Mac Mini's Jellyfin on localhost:8096)
 ssh -L 8096:localhost:8096 macmini
-
-# Multiple port forwards
-ssh -L 8096:localhost:8096 -L 8123:localhost:8123 macmini
 ```
 
----
+### Troubleshooting SSH
 
-## Troubleshooting
+**"Connection refused"**
+- SSH not enabled: `sudo systemsetup -setremotelogin on`
+- Check firewall isn't blocking port 22
 
-### "Connection refused"
-- SSH not enabled on Mac Mini
-- Firewall blocking port 22
-- Wrong IP address
-
-```bash
-# Check if SSH is running on Mac Mini
-sudo launchctl list | grep ssh
-# Should show: com.openssh.sshd
-```
-
-### "Host key verification failed"
-The Mac Mini's host key changed (reinstall, new machine, etc.):
+**"Host key verification failed"**
 ```bash
 ssh-keygen -R mac-mini.local
-ssh-keygen -R 192.168.1.100  # if using IP
 ```
 
-### "Permission denied (publickey)"
-Key not copied correctly:
+**"Permission denied (publickey)"**
 ```bash
-# Verify key is on Mac Mini
+# Check key was copied correctly
 ssh ron@mac-mini.local "cat ~/.ssh/authorized_keys"
 
-# Check permissions on Mac Mini
-ssh ron@mac-mini.local "ls -la ~/.ssh"
-# Should be: drwx------ for .ssh, -rw------- for authorized_keys
+# Fix permissions on Mac Mini
+ssh ron@mac-mini.local "chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys"
 ```
 
-### Can't find Mac Mini on network
+**Can't find Mac Mini on network**
 ```bash
-# Discover devices using Bonjour
+# Discover via Bonjour
 dns-sd -B _ssh._tcp
 
-# Or scan local network (requires nmap)
+# Scan local network (requires nmap)
 nmap -sn 192.168.1.0/24
 ```
 
@@ -304,37 +220,22 @@ nmap -sn 192.168.1.0/24
 
 ## Security Checklist
 
-- [ ] SSH key authentication enabled
-- [ ] Password authentication disabled (optional, more secure)
-- [ ] Firewall enabled on Mac Mini
-- [ ] Tailscale for remote access (not port forwarding)
-- [ ] Regular macOS updates
-- [ ] Strong user account password (for local access)
-
-### Disable Password Authentication (Optional)
-
-After confirming key auth works:
-
-```bash
-# On Mac Mini, edit SSH config
-sudo nano /etc/ssh/sshd_config
-
-# Add or modify:
-PasswordAuthentication no
-ChallengeResponseAuthentication no
-
-# Restart SSH
-sudo launchctl unload /System/Library/LaunchDaemons/ssh.plist
-sudo launchctl load /System/Library/LaunchDaemons/ssh.plist
-```
+- [ ] Tailscale installed and signed in
+- [ ] Strong user account password
+- [ ] Regular macOS updates enabled
+- [ ] (If using SSH) Key authentication set up
+- [ ] (If using SSH) Consider disabling password auth:
+  ```bash
+  # On Mac Mini - only after confirming key auth works!
+  sudo sed -i '' 's/^#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
+  sudo launchctl unload /System/Library/LaunchDaemons/ssh.plist
+  sudo launchctl load /System/Library/LaunchDaemons/ssh.plist
+  ```
 
 ---
 
 ## Next Steps
 
-Once SSH is configured:
-
-1. [x] Clone this repo on Mac Mini: `git clone git@github.com:noble1911/home-server.git`
-2. [ ] Install OrbStack
-3. [ ] Install Homebrew
-4. [ ] Follow [HOMESERVER_PLAN.md](./HOMESERVER_PLAN.md) Phase 1
+1. [ ] Complete setup above
+2. [ ] Install OrbStack: `brew install --cask orbstack`
+3. [ ] Follow [HOMESERVER_PLAN.md](./HOMESERVER_PLAN.md) Phase 1

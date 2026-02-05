@@ -1,16 +1,32 @@
 #!/bin/bash
 #
 # Mac Mini Home Server Bootstrap Script
-# Run with: curl -fsSL https://raw.githubusercontent.com/noble1911/home-server/main/scripts/bootstrap.sh | bash
+#
+# Usage:
+#   curl -fsSL https://raw.githubusercontent.com/noble1911/home-server/main/scripts/bootstrap.sh | bash
+#
+# Options:
+#   --no-ssh    Skip SSH setup (if managing Mac Mini directly)
 #
 # This script:
-# 1. Enables SSH (Remote Login)
-# 2. Installs Homebrew
-# 3. Installs Tailscale
-# 4. Configures Mac to stay awake 24/7
+# 1. Installs Homebrew
+# 2. Installs Tailscale
+# 3. Configures Mac to stay awake 24/7
+# 4. Enables SSH (optional, for remote management)
 #
 
 set -e  # Exit on any error
+
+# Parse arguments
+ENABLE_SSH=true
+for arg in "$@"; do
+    case $arg in
+        --no-ssh)
+            ENABLE_SSH=false
+            shift
+            ;;
+    esac
+done
 
 # Colors for output
 RED='\033[0;31m'
@@ -51,31 +67,13 @@ echo -e "${NC}"
 CURRENT_USER=$(whoami)
 echo "Running as: ${CURRENT_USER}"
 echo "Hostname: $(hostname)"
-echo ""
-
-# ============================================================================
-# Step 1: Enable SSH (Remote Login)
-# ============================================================================
-print_step "Enabling SSH (Remote Login)..."
-
-# Check if SSH is already enabled
-if sudo systemsetup -getremotelogin 2>/dev/null | grep -q "On"; then
-    print_success "SSH is already enabled"
-else
-    # Enable Remote Login
-    sudo systemsetup -setremotelogin on
-    print_success "SSH enabled"
+if [[ "$ENABLE_SSH" == "false" ]]; then
+    echo "SSH: Skipped (--no-ssh flag)"
 fi
-
-# Show connection info
-LOCAL_IP=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || echo "unknown")
 echo ""
-echo "  You can now connect via:"
-echo "    ssh ${CURRENT_USER}@${LOCAL_IP}"
-echo "    ssh ${CURRENT_USER}@$(hostname).local"
 
 # ============================================================================
-# Step 2: Install Homebrew
+# Step 1: Install Homebrew
 # ============================================================================
 print_step "Checking Homebrew..."
 
@@ -102,7 +100,7 @@ if [[ -f "/opt/homebrew/bin/brew" ]]; then
 fi
 
 # ============================================================================
-# Step 3: Install Tailscale
+# Step 2: Install Tailscale
 # ============================================================================
 print_step "Installing Tailscale..."
 
@@ -115,7 +113,7 @@ else
 fi
 
 # ============================================================================
-# Step 4: Configure Mac to Stay Awake
+# Step 3: Configure Mac to Stay Awake
 # ============================================================================
 print_step "Configuring power settings (stay awake 24/7)..."
 
@@ -136,16 +134,34 @@ echo "  - Wake on network access enabled"
 echo "  - Auto-restart after power failure enabled"
 
 # ============================================================================
-# Step 5: Create SSH directory and set permissions
+# Step 4: Enable SSH (Optional)
 # ============================================================================
-print_step "Preparing SSH directory..."
+if [[ "$ENABLE_SSH" == "true" ]]; then
+    print_step "Enabling SSH (Remote Login)..."
 
-mkdir -p ~/.ssh
-chmod 700 ~/.ssh
-touch ~/.ssh/authorized_keys
-chmod 600 ~/.ssh/authorized_keys
+    # Check if SSH is already enabled
+    if sudo systemsetup -getremotelogin 2>/dev/null | grep -q "On"; then
+        print_success "SSH is already enabled"
+    else
+        sudo systemsetup -setremotelogin on
+        print_success "SSH enabled"
+    fi
 
-print_success "SSH directory ready for authorized keys"
+    # Prepare SSH directory
+    mkdir -p ~/.ssh
+    chmod 700 ~/.ssh
+    touch ~/.ssh/authorized_keys
+    chmod 600 ~/.ssh/authorized_keys
+    print_success "SSH directory ready for authorized keys"
+
+    LOCAL_IP=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || echo "unknown")
+    echo ""
+    echo "  Connect via: ssh ${CURRENT_USER}@${LOCAL_IP}"
+    echo "          or: ssh ${CURRENT_USER}@$(hostname).local"
+else
+    print_step "Skipping SSH setup (--no-ssh flag)"
+    print_warning "To enable SSH later, run: sudo systemsetup -setremotelogin on"
+fi
 
 # ============================================================================
 # Summary
@@ -160,31 +176,32 @@ echo -e "${NC}"
 echo "Next steps:"
 echo ""
 echo "  1. ${YELLOW}Start Tailscale:${NC}"
-echo "     Open Tailscale from Applications and sign in"
-echo "     Or: open -a Tailscale"
-echo ""
-echo "  2. ${YELLOW}From your MacBook, copy your SSH key:${NC}"
-echo "     ssh-copy-id -i ~/.ssh/id_ed25519_macmini.pub ${CURRENT_USER}@${LOCAL_IP}"
-echo ""
-echo "  3. ${YELLOW}Add to MacBook's ~/.ssh/config:${NC}"
-echo "     Host macmini"
-echo "       HostName $(hostname).local  # or Tailscale hostname after setup"
-echo "       User ${CURRENT_USER}"
-echo "       IdentityFile ~/.ssh/id_ed25519_macmini"
-echo ""
-echo "  4. ${YELLOW}Test SSH from MacBook:${NC}"
-echo "     ssh macmini"
-echo ""
-echo "  5. ${YELLOW}Clone the home-server repo:${NC}"
-echo "     git clone https://github.com/noble1911/home-server.git"
+echo "     open -a Tailscale"
+echo "     Then sign in to your Tailscale account"
 echo ""
 
-# Show IP addresses
+if [[ "$ENABLE_SSH" == "true" ]]; then
+    LOCAL_IP=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || echo "unknown")
+    echo "  2. ${YELLOW}(Optional) From another machine, copy your SSH key:${NC}"
+    echo "     ssh-copy-id ${CURRENT_USER}@${LOCAL_IP}"
+    echo ""
+    echo "  3. ${YELLOW}Clone the home-server repo:${NC}"
+else
+    echo "  2. ${YELLOW}Clone the home-server repo:${NC}"
+fi
+echo "     git clone https://github.com/noble1911/home-server.git"
+echo "     cd home-server"
+echo ""
+
+# Show connection info
 echo "Connection info:"
+LOCAL_IP=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || echo "unknown")
 echo "  Local IP: ${LOCAL_IP}"
 echo "  Hostname: $(hostname).local"
-if command -v tailscale &>/dev/null && tailscale status &>/dev/null; then
-    TAILSCALE_IP=$(tailscale ip -4 2>/dev/null || echo "not connected")
-    echo "  Tailscale IP: ${TAILSCALE_IP}"
+if command -v tailscale &>/dev/null && tailscale status &>/dev/null 2>&1; then
+    TAILSCALE_IP=$(tailscale ip -4 2>/dev/null || echo "not connected yet")
+    echo "  Tailscale: ${TAILSCALE_IP}"
+else
+    echo "  Tailscale: Open the app to connect"
 fi
 echo ""
