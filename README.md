@@ -7,13 +7,13 @@ Self-hosted media server with AI voice assistant on Mac Mini M4.
 Run everything at once:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/noble1911/home-server/main/scripts/bootstrap.sh | bash
+curl -fsSL https://raw.githubusercontent.com/noble1911/home-server/main/setup.sh | bash
 ```
 
 Skip SSH if managing Mac Mini directly:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/noble1911/home-server/main/scripts/bootstrap.sh | bash -s -- --no-ssh
+curl -fsSL https://raw.githubusercontent.com/noble1911/home-server/main/setup.sh | bash -s -- --no-ssh
 ```
 
 ---
@@ -65,8 +65,8 @@ Or follow the manual docs for step-by-step instructions.
 home-server/
 ├── README.md                 # This file
 ├── HOMESERVER_PLAN.md        # Complete architecture plan
+├── setup.sh                  # Run all setup steps
 ├── scripts/
-│   ├── bootstrap.sh          # Run all setup steps
 │   ├── 01-homebrew.sh        # Individual step scripts
 │   ├── 02-tailscale.sh
 │   ├── 03-power-settings.sh

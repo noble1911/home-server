@@ -1,9 +1,9 @@
 #!/bin/bash
 #
-# Mac Mini Home Server Bootstrap Script
+# Mac Mini Home Server Setup Script
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/noble1911/home-server/main/scripts/bootstrap.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/noble1911/home-server/main/setup.sh | bash
 #
 # Options:
 #   --no-ssh    Skip SSH setup (if managing Mac Mini directly)
@@ -30,7 +30,7 @@ NC='\033[0m'
 
 echo -e "${GREEN}"
 echo "╔═══════════════════════════════════════════════════════════╗"
-echo "║         Mac Mini Home Server Bootstrap Script             ║"
+echo "║            Mac Mini Home Server Setup                     ║"
 echo "╚═══════════════════════════════════════════════════════════╝"
 echo -e "${NC}"
 
