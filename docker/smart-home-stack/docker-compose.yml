@@ -9,6 +9,8 @@ services:
       - /etc/localtime:/etc/localtime:ro
     ports:
       - "8123:8123"
+    networks:
+      - homeserver
     restart: unless-stopped
 
   cloudflared:
@@ -17,9 +19,15 @@ services:
     command: tunnel --no-autoupdate run
     environment:
       - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN:-}
+    networks:
+      - homeserver
     restart: unless-stopped
     depends_on:
       - homeassistant
+
+networks:
+  homeserver:
+    external: true
 
 volumes:
   homeassistant-config:

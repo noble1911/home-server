@@ -29,6 +29,15 @@ fi
 # Export for docker-compose
 export DRIVE_PATH
 
+# Create shared network for cross-stack communication
+echo -e "${BLUE}==>${NC} Creating shared Docker network..."
+if docker network inspect homeserver &>/dev/null; then
+    echo -e "  ${GREEN}✓${NC} Network 'homeserver' already exists"
+else
+    docker network create homeserver
+    echo -e "  ${GREEN}✓${NC} Network 'homeserver' created"
+fi
+
 # Deploy containers
 echo -e "${BLUE}==>${NC} Starting containers..."
 cd "$COMPOSE_DIR"

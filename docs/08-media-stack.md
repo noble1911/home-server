@@ -159,13 +159,15 @@ docker compose up -d
 
 ### Radarr/Sonarr can't connect to qBittorrent
 
-Make sure containers are on the same Docker network:
+Make sure containers are on the shared `homeserver` network:
 ```bash
 docker network ls
-docker network inspect download-stack_default
+docker network inspect homeserver
 ```
 
 The *arr apps should use container names (`qbittorrent`) not `localhost`.
+
+> **Note:** The `homeserver` network is created by the download-stack script (Step 7). If it doesn't exist, create it manually: `docker network create homeserver`
 
 ### Jellyfin not seeing new media
 

@@ -12,6 +12,8 @@ services:
       - ${DRIVE_PATH:-/Volumes/HomeServer}/Media:/media:ro
     ports:
       - "8096:8096"
+    networks:
+      - homeserver
     restart: unless-stopped
 
   radarr:
@@ -27,6 +29,8 @@ services:
       - ${DRIVE_PATH:-/Volumes/HomeServer}/Downloads:/downloads
     ports:
       - "7878:7878"
+    networks:
+      - homeserver
     restart: unless-stopped
 
   sonarr:
@@ -42,6 +46,8 @@ services:
       - ${DRIVE_PATH:-/Volumes/HomeServer}/Downloads:/downloads
     ports:
       - "8989:8989"
+    networks:
+      - homeserver
     restart: unless-stopped
 
   bazarr:
@@ -57,7 +63,13 @@ services:
       - ${DRIVE_PATH:-/Volumes/HomeServer}/Media/TV:/tv
     ports:
       - "6767:6767"
+    networks:
+      - homeserver
     restart: unless-stopped
+
+networks:
+  homeserver:
+    external: true
 
 volumes:
   jellyfin-config:

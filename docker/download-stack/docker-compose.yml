@@ -14,6 +14,8 @@ services:
       - "8081:8081"
       - "6881:6881"
       - "6881:6881/udp"
+    networks:
+      - homeserver
     restart: unless-stopped
 
   prowlarr:
@@ -27,7 +29,13 @@ services:
       - prowlarr-config:/config
     ports:
       - "9696:9696"
+    networks:
+      - homeserver
     restart: unless-stopped
+
+networks:
+  homeserver:
+    external: true
 
 volumes:
   qbittorrent-config:

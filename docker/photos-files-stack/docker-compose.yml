@@ -13,6 +13,8 @@ services:
       - REDIS_HOSTNAME=immich-redis
     ports:
       - "2283:2283"
+    networks:
+      - homeserver
     depends_on:
       - immich-redis
       - immich-postgres
@@ -25,11 +27,15 @@ services:
       - immich-ml-cache:/cache
     environment:
       - TRANSFORMERS_CACHE=/cache
+    networks:
+      - homeserver
     restart: unless-stopped
 
   immich-redis:
     image: redis:alpine
     container_name: immich-redis
+    networks:
+      - homeserver
     restart: unless-stopped
 
   immich-postgres:
@@ -43,6 +49,8 @@ services:
       - immich-postgres-data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+    networks:
+      - homeserver
     restart: unless-stopped
 
   nextcloud:
@@ -61,9 +69,15 @@ services:
       - ${DRIVE_PATH:-/Volumes/HomeServer}/Documents/Nextcloud:/var/www/html/data
     ports:
       - "8080:80"
+    networks:
+      - homeserver
     depends_on:
       - immich-postgres
     restart: unless-stopped
+
+networks:
+  homeserver:
+    external: true
 
 volumes:
   immich-ml-cache:

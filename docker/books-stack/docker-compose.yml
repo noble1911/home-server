@@ -12,6 +12,8 @@ services:
       - ${DRIVE_PATH:-/Volumes/HomeServer}/Books/eBooks:/books
     ports:
       - "8083:8083"
+    networks:
+      - homeserver
     restart: unless-stopped
 
   audiobookshelf:
@@ -26,6 +28,8 @@ services:
       - ${DRIVE_PATH:-/Volumes/HomeServer}/Books/eBooks:/books
     ports:
       - "13378:80"
+    networks:
+      - homeserver
     restart: unless-stopped
 
   readarr:
@@ -41,7 +45,13 @@ services:
       - ${DRIVE_PATH:-/Volumes/HomeServer}/Downloads:/downloads
     ports:
       - "8787:8787"
+    networks:
+      - homeserver
     restart: unless-stopped
+
+networks:
+  homeserver:
+    external: true
 
 volumes:
   calibre-web-config:
