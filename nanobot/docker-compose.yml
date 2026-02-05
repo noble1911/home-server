@@ -1,0 +1,57 @@
+# Nanobot AI Agent
+# Connects to: PostgreSQL (memory), voice-stack, smart-home-stack
+
+services:
+  nanobot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nanobot
+    environment:
+      # LLM Configuration
+      - NANOBOT_AGENT_MODEL=anthropic/claude-sonnet-4-20250514
+      - NANOBOT_ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - NANOBOT_GATEWAY_PORT=8100
+      # Database (uses Immich's PostgreSQL)
+      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@immich-postgres:5432/immich
+      # Home Assistant integration
+      - HOME_ASSISTANT_URL=http://homeassistant:8123
+      - HOME_ASSISTANT_TOKEN=${HA_TOKEN:-}
+      # Telegram (optional)
+      - NANOBOT_TELEGRAM_ENABLED=${TELEGRAM_ENABLED:-false}
+      - NANOBOT_TELEGRAM_TOKEN=${TELEGRAM_TOKEN:-}
+      - NANOBOT_TELEGRAM_ALLOW_FROM=${TELEGRAM_ALLOW_FROM:-}
+      # WhatsApp (optional)
+      - NANOBOT_WHATSAPP_ENABLED=${WHATSAPP_ENABLED:-false}
+      - NANOBOT_WHATSAPP_TOKEN=${WHATSAPP_TOKEN:-}
+    volumes:
+      - nanobot-data:/root/.nanobot
+      - ./tools:/app/tools:ro
+      - ./skills:/app/skills:ro
+      - ./migrations:/app/migrations:ro
+    ports:
+      - "8100:8100"
+    networks:
+      - default
+      - voice-stack_default
+      - photos-files-stack_default
+      - smart-home-stack_default
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8100/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    command: gateway --port 8100 --verbose
+
+volumes:
+  nanobot-data:
+
+networks:
+  voice-stack_default:
+    external: true
+  photos-files-stack_default:
+    external: true
+  smart-home-stack_default:
+    external: true
