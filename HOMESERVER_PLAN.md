@@ -460,6 +460,8 @@ The Butler remembers facts about users and learns from interactions.
 ```
 
 > **Note:** We use the same PostgreSQL instance as Immich (already in our stack) with a separate `butler` schema. No additional database to manage.
+>
+> **Vector Search:** Immich's PostgreSQL image (`ghcr.io/immich-app/postgres`) includes **VectorChord**, **pgvector**, and **pgvecto.rs** extensions. We can use these for semantic memory search (e.g., "find facts similar to this question") without any extra setup.
 
 #### Memory Database Schema
 
@@ -490,7 +492,7 @@ CREATE TABLE butler.user_facts (
     source TEXT DEFAULT 'explicit',  -- 'explicit' (user said) or 'inferred'
     created_at TIMESTAMPTZ DEFAULT NOW(),
     last_referenced TIMESTAMPTZ,
-    embedding VECTOR(1536)  -- Optional: for semantic search with pgvector
+    embedding VECTOR(1536)  -- For semantic search (VectorChord/pgvector already installed)
 );
 
 -- Conversation history (short-term memory)
