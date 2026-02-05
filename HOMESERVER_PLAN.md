@@ -5,7 +5,9 @@
 > **Goal:** Self-hosted, privacy-focused media server with AI voice assistant + Alexa
 > **Hardware Cost:** ~£760 (Japan tax-free) vs ~£1,049 (UK) - **saving £289**
 > **Monthly Cost:** ~£7.21 (API + electricity) — backup optional, Alexa via free haaska
-> **Butler Engine:** [Nanobot](https://github.com/HKUDS/nanobot) (~4k lines, MCP-native)
+> **Butler Engine:** [Nanobot](https://github.com/HKUDS/nanobot) (~4k lines, skill-based)
+>
+> ⚠️ **Note (2026-02-05):** Nanobot uses a "skills" system (markdown instruction files), not MCP. Skills teach the agent how to use tools; the agent then calls built-in executors (shell, filesystem, web). Custom Python tools can also be registered. See TODO.md for details.
 
 ---
 
@@ -133,7 +135,7 @@ Ask at store: "このACアダプターは100-240V対応ですか？" (Does this 
 | Service | Homepage | Purpose | Run Method | RAM (Idle) | RAM (Peak) | Port |
 |---------|----------|---------|------------|------------|------------|------|
 | [**Nanobot**](https://github.com/HKUDS/nanobot) | [GitHub](https://github.com/HKUDS/nanobot) | Ultra-lightweight AI agent (~4k lines) | Docker container | 100MB | 300MB | 8100 |
-| Custom MCPs | Self-built | MCP servers for service integrations | Docker containers | ~50MB each | ~100MB each | Various |
+| Custom Skills/Tools | Self-built | Skills (markdown) + Tools (Python) for service integrations | Part of Nanobot | Included | Included | - |
 | [**APScheduler**](https://apscheduler.readthedocs.io/) | [Docs](https://apscheduler.readthedocs.io/) | Cron-style task scheduling | Part of Agent | Included | Included | - |
 
 > **Note:** The LLM (Claude) runs in the cloud to preserve local RAM. Voice processing (Whisper, Kokoro) runs locally for low latency.
@@ -551,9 +553,9 @@ RECENT CONTEXT:
 - 3 days ago: Asked about smart home heating schedule
 ```
 
-#### Memory MCP Server
+#### Memory Tools
 
-A custom MCP server handles memory operations:
+Custom Python tools extend Nanobot's built-in `memory.py` for memory operations:
 
 | Tool | Purpose |
 |------|---------|
@@ -651,7 +653,9 @@ A custom MCP server handles memory operations:
 - User settings & preferences
 - PWA install prompt
 
-### Integrations (Custom MCPs)
+### Integrations (Custom Skills & Tools)
+
+> **Note:** These are implemented as Nanobot skills (markdown instructions) or custom Python tools, not MCP servers. See TODO.md for implementation approach decisions.
 
 #### Read-Only Integrations
 
