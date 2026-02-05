@@ -438,20 +438,20 @@ The Butler remembers facts about users and learns from interactions.
 │  └─────────────────────────────────────────────────────────────────────┘   │
 │                              ▼                                              │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │  SHORT-TERM MEMORY (SQLite - conversation_history table)            │   │
+│  │  SHORT-TERM MEMORY (PostgreSQL - butler.conversation_history)       │   │
 │  │  Recent conversations, summaries, last 7 days                       │   │
 │  │  "Yesterday you asked about the Dune audiobook"                     │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
 │                              ▼                                              │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │  LONG-TERM MEMORY (SQLite - user_facts table)                       │   │
+│  │  LONG-TERM MEMORY (PostgreSQL - butler.user_facts)                  │   │
 │  │  Persistent facts, preferences, learned patterns                    │   │
 │  │  "Ron's favorite author is Brandon Sanderson"                       │   │
 │  │  "Partner doesn't like horror movies"                               │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
 │                              ▼                                              │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │  SOUL CONFIG (JSON file - per user)                                 │   │
+│  │  SOUL CONFIG (PostgreSQL - butler.users)                            │   │
 │  │  Personality settings, custom instructions                          │   │
 │  │  Loaded into system prompt at conversation start                    │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
@@ -459,34 +459,57 @@ The Butler remembers facts about users and learns from interactions.
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
+> **Note:** We use the same PostgreSQL instance as Immich (already in our stack) with a separate `butler` schema. No additional database to manage.
+
 #### Memory Database Schema
 
 ```sql
+-- Create butler schema (separate from Immich)
+CREATE SCHEMA IF NOT EXISTS butler;
+
+-- User configuration and soul settings
+CREATE TABLE butler.users (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    wake_word TEXT,
+    start_mode TEXT DEFAULT 'push_to_talk',
+    tts_voice TEXT DEFAULT 'kokoro_male_1',
+    permissions JSONB DEFAULT '["media", "home"]',
+    soul JSONB DEFAULT '{}',  -- personality, formality, verbosity, humor, custom_instructions
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- User facts (long-term memory)
-CREATE TABLE user_facts (
-    id INTEGER PRIMARY KEY,
-    user_id TEXT NOT NULL,
+CREATE TABLE butler.user_facts (
+    id SERIAL PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES butler.users(id),
     fact TEXT NOT NULL,
     category TEXT,  -- 'preference', 'routine', 'personal', 'media'
     confidence REAL DEFAULT 1.0,
-    source TEXT,    -- 'explicit' (user said) or 'inferred'
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    last_referenced TIMESTAMP
+    source TEXT DEFAULT 'explicit',  -- 'explicit' (user said) or 'inferred'
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    last_referenced TIMESTAMPTZ,
+    embedding VECTOR(1536)  -- Optional: for semantic search with pgvector
 );
 
 -- Conversation history (short-term memory)
-CREATE TABLE conversation_history (
-    id INTEGER PRIMARY KEY,
-    user_id TEXT NOT NULL,
+CREATE TABLE butler.conversation_history (
+    id SERIAL PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES butler.users(id),
     role TEXT NOT NULL,  -- 'user' or 'assistant'
     content TEXT NOT NULL,
     summary TEXT,        -- AI-generated summary for context injection
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Indexes for fast retrieval
-CREATE INDEX idx_facts_user ON user_facts(user_id);
-CREATE INDEX idx_history_user ON conversation_history(user_id, created_at);
+CREATE INDEX idx_facts_user ON butler.user_facts(user_id);
+CREATE INDEX idx_facts_category ON butler.user_facts(user_id, category);
+CREATE INDEX idx_history_user_date ON butler.conversation_history(user_id, created_at DESC);
+
+-- Auto-cleanup: delete conversation history older than 30 days
+-- (Run via pg_cron or application-level job)
 ```
 
 #### How Memory Works
