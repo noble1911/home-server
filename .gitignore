@@ -1,6 +1,9 @@
 # Claude Code project files
 .claude/
 
+# Development tracking (not for end users)
+TODO.md
+
 # macOS
 .DS_Store
 

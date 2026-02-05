@@ -17,15 +17,20 @@
 
 ## Current Progress
 
-> **See [TODO.md](TODO.md) for detailed implementation tracking**
+> **IMPORTANT: See [TODO.md](TODO.md) for what to work on next**
+>
+> TODO.md is gitignored (local only) - it tracks our development work.
 
-### Summary
-- ✅ Phase 1: Foundation scripts complete
-- ⏳ Phase 2: Docker infrastructure (next)
-- ⏳ Phase 3-7: Services, Butler, App, Backups
+### Development Approach
+We're building the software FIRST, then deploying to Mac Mini later:
+1. Build PWA (React app) - can develop/test locally
+2. Build MCP servers (Python) - can develop/test locally
+3. Create Docker Compose files - define the infrastructure
+4. Build custom Docker images - package our code
+5. Create setup scripts - automate deployment
 
 ### Blockers
-- Mac Mini hardware not yet arrived
+- Mac Mini hardware not yet arrived (but we can build software now!)
 
 ## Project Structure
 
