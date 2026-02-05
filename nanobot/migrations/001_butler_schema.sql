@@ -66,6 +66,19 @@ CREATE INDEX IF NOT EXISTS idx_user_facts_expires
     ON butler.user_facts(expires_at)
     WHERE expires_at IS NOT NULL;
 
+-- Composite index for queries filtering by user_id AND category
+-- More efficient than separate indexes for common access patterns
+CREATE INDEX IF NOT EXISTS idx_user_facts_user_category
+    ON butler.user_facts(user_id, category);
+
+-- Vector similarity search index (HNSW for fast approximate nearest neighbor)
+-- Uses cosine distance which works well for normalized embeddings
+-- Note: Only indexes non-null embeddings to save space for facts without embeddings
+CREATE INDEX IF NOT EXISTS idx_user_facts_embedding
+    ON butler.user_facts
+    USING hnsw (embedding vector_cosine_ops)
+    WHERE embedding IS NOT NULL;
+
 -- Conversation history queries
 CREATE INDEX IF NOT EXISTS idx_conversation_history_user_id
     ON butler.conversation_history(user_id);
