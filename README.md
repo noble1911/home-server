@@ -6,7 +6,28 @@ See [HOMESERVER_PLAN.md](./HOMESERVER_PLAN.md) for the complete architecture and
 
 ---
 
-## Remote Setup Guide
+## Quick Start (Mac Mini)
+
+On your new Mac Mini, open Terminal and run:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/noble1911/home-server/main/scripts/bootstrap.sh | bash
+```
+
+This will:
+- ✅ Enable SSH (Remote Login)
+- ✅ Install Homebrew
+- ✅ Install Tailscale
+- ✅ Configure Mac to stay awake 24/7
+- ✅ Prepare SSH directory for key authentication
+
+Then follow the on-screen instructions to complete setup.
+
+---
+
+## Manual Remote Setup Guide
+
+If you prefer to set things up manually, follow the steps below.
 
 This guide explains how to configure and manage the Mac Mini remotely from your MacBook Pro (or any other machine).
 
