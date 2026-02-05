@@ -8,7 +8,8 @@
 # Options:
 #   --no-ssh           Skip SSH setup (if managing Mac Mini directly)
 #   --drive-name=NAME  Use a different external drive name (default: HomeServer)
-#   --skip-voice       Skip voice stack (if not using AI assistant)
+#   --skip-voice       Skip voice stack (if not using voice features)
+#   --skip-nanobot     Skip Nanobot AI agent deployment
 #
 
 set -e
@@ -20,6 +21,7 @@ BASE_URL="https://raw.githubusercontent.com/noble1911/home-server/main/scripts"
 ENABLE_SSH=true
 DRIVE_NAME="HomeServer"
 SKIP_VOICE=false
+SKIP_NANOBOT=false
 
 for arg in "$@"; do
     case $arg in
@@ -31,6 +33,9 @@ for arg in "$@"; do
             ;;
         --skip-voice)
             SKIP_VOICE=true
+            ;;
+        --skip-nanobot)
+            SKIP_NANOBOT=true
             ;;
     esac
 done
@@ -92,6 +97,14 @@ else
     echo -e "\n${YELLOW}==>${NC} Skipping voice stack (--skip-voice flag)"
 fi
 
+# Phase 8: AI Agent
+if [[ "$SKIP_NANOBOT" == "false" ]]; then
+    echo -e "\n${GREEN}Phase 8: AI Agent (Nanobot)${NC}"
+    curl -fsSL "${BASE_URL}/13-nanobot.sh" | bash
+else
+    echo -e "\n${YELLOW}==>${NC} Skipping Nanobot (--skip-nanobot flag)"
+fi
+
 # Summary
 echo ""
 echo -e "${GREEN}"
@@ -129,6 +142,11 @@ echo "    - Whisper:         http://localhost:9000"
 echo "    - Kokoro TTS:      http://localhost:8880"
 echo ""
 fi
+if [[ "$SKIP_NANOBOT" == "false" ]]; then
+echo "  AI Agent:"
+echo "    - Nanobot:         http://localhost:8100"
+echo ""
+fi
 echo -e "${YELLOW}Next steps:${NC}"
 echo ""
 echo "  1. Open Tailscale and sign in:"
@@ -140,3 +158,10 @@ echo "  3. Set up Cloudflare Tunnel for Alexa (see docs/11-smart-home.md)"
 echo ""
 echo "  4. Install mobile apps (Jellyfin, Immich, Audiobookshelf)"
 echo ""
+if [[ "$SKIP_NANOBOT" == "false" ]]; then
+echo "  5. Access Butler PWA at http://localhost:3000 (after building)"
+if [[ "$SKIP_VOICE" == "false" ]]; then
+echo "     See docs/VOICE_ARCHITECTURE.md for voice integration details"
+fi
+echo ""
+fi
