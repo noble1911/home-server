@@ -1,7 +1,39 @@
 # Claude Context File
 
 > This file helps Claude understand the project and pick up where we left off.
-> **Multiple Claude agents work on this project in parallel** - check TODO.md before starting work.
+> **Multiple Claude agents work on this project in parallel.**
+
+## ⚡ START HERE: Task Workflow
+
+### When Starting a New Session
+
+```bash
+# 1. Check for available tasks
+gh issue list
+
+# 2. Claim an issue before starting work
+gh issue edit <number> --add-assignee @me
+
+# 3. Create a branch for your work
+git checkout -b ron875/issue-<number>-short-description
+```
+
+### When Creating a PR
+
+```bash
+# Reference the issue in PR body (auto-closes on merge)
+gh pr create --title "Build Home Assistant Tool" --body "Closes #4"
+```
+
+### Quick Commands
+```bash
+gh issue list                              # See all open issues
+gh issue list --assignee @me               # See your assigned issues
+gh issue view <number>                     # Read issue details
+gh issue edit <number> --add-assignee @me  # Claim an issue
+```
+
+---
 
 ## Project Overview
 
@@ -18,10 +50,9 @@
 
 ## Current Progress
 
-> **IMPORTANT: See [TODO.md](TODO.md) for what to work on next**
+> **Tasks are tracked in [GitHub Issues](https://github.com/noble1911/home-server/issues)**
 >
-> TODO.md is gitignored (local only) - it tracks our development work and task assignments.
-> **Always check TODO.md before starting work** to avoid duplicating effort.
+> See [TODO.md](TODO.md) for architecture context and decision log.
 
 ### Development Approach
 We're building the software FIRST, then deploying to Mac Mini later:
@@ -33,6 +64,8 @@ We're building the software FIRST, then deploying to Mac Mini later:
 
 ### Blockers
 - Mac Mini hardware not yet arrived (but we can build software now!)
+
+---
 
 ## Critical: Nanobot Architecture
 
@@ -85,6 +118,8 @@ class MyTool(Tool):
         # Actual implementation
 ```
 
+---
+
 ## Project Structure
 
 ```
@@ -92,7 +127,7 @@ home-server/
 ├── CLAUDE.md              # This file - context for Claude
 ├── README.md              # User-facing quick start
 ├── HOMESERVER_PLAN.md     # Complete architecture & plan
-├── TODO.md                # Task tracking (gitignored, local only)
+├── TODO.md                # Architecture decisions & context
 ├── setup.sh               # All-in-one setup (calls scripts/)
 ├── scripts/               # Individual setup scripts
 │   ├── 01-homebrew.sh
@@ -134,6 +169,7 @@ home-server/
 | AI agent | HKUDS/nanobot | Minimal codebase (~4k lines), WhatsApp built-in |
 | Agent extensions | Skills + Python Tools | Skills for simple, Tools for critical |
 | Memory storage | PostgreSQL (Immich's DB) | Already in stack, has vector extensions |
+| Task tracking | GitHub Issues | Avoids merge conflicts with parallel agents |
 | Remote access | Tailscale | No port forwarding, works everywhere |
 | SSH | Optional | Not everyone runs headless |
 
@@ -143,19 +179,6 @@ home-server/
 |--------|------|
 | No backup | ~£7.21 (Claude API + electricity) |
 | With iCloud 2TB | ~£14.20 |
-
-## Commands I Use Often
-
-```bash
-# Push to GitHub
-git add -A && git commit -m "message" && git push
-
-# Test a script locally
-bash scripts/01-homebrew.sh
-
-# Check what's in the repo
-ls -la && git status
-```
 
 ## Design Decisions Made (2026-02-05)
 
@@ -183,5 +206,6 @@ ls -la && git status
 - SSH setup is OPTIONAL - some users manage Mac Mini directly
 - The Mac Mini hasn't arrived yet - we're in planning/prep phase
 - **Memory/personalization is important** - Butler should know users
-- **Check TODO.md first** - other agents may be working on related tasks
-- **Update TODO.md** when you start/finish work to avoid conflicts
+- **Always check `gh issue list` first** before starting work
+- **Claim issues with `gh issue edit --add-assignee @me`** to avoid conflicts
+- **Use `Closes #N` in PR body** to auto-close issues on merge
