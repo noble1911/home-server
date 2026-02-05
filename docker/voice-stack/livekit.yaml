@@ -1,0 +1,28 @@
+# LiveKit Server Configuration
+# For local home server use
+
+port: 7880
+rtc:
+  port_range_start: 7882
+  port_range_end: 7892
+  use_external_ip: false
+  tcp_port: 7881
+
+keys:
+  # Generate new keys for production: https://docs.livekit.io/realtime/self-hosting/keys/
+  # These are development keys only!
+  devkey: secret
+
+logging:
+  level: info
+  json: false
+
+# Disable TURN for local network (not needed on LAN)
+turn:
+  enabled: false
+
+# Webhook configuration (optional, for Nanobot integration)
+# webhook:
+#   urls:
+#     - http://nanobot:8100/livekit/webhook
+#   api_key: devkey
