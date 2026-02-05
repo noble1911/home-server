@@ -43,6 +43,7 @@ Or follow the manual docs for step-by-step instructions.
 ## Documentation
 
 - **[HOMESERVER_PLAN.md](HOMESERVER_PLAN.md)** - Complete architecture and implementation plan
+- **[TODO.md](TODO.md)** - Implementation progress tracker
 - **[docs/](docs/)** - Step-by-step setup guides
 
 ---

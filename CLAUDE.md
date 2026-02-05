@@ -17,19 +17,15 @@
 
 ## Current Progress
 
-### Completed
-- [x] Master plan document (HOMESERVER_PLAN.md)
-- [x] Cost optimization: removed iCloud (optional) and HA Cloud (replaced with free haaska)
-- [x] Setup scripts for initial Mac Mini configuration
-- [x] Modular docs structure (scripts/ + docs/)
+> **See [TODO.md](TODO.md) for detailed implementation tracking**
 
-### In Progress
-- [ ] Waiting for Mac Mini hardware
+### Summary
+- ✅ Phase 1: Foundation scripts complete
+- ⏳ Phase 2: Docker infrastructure (next)
+- ⏳ Phase 3-7: Services, Butler, App, Backups
 
-### Next Steps (when hardware arrives)
-1. Run `setup.sh` on Mac Mini
-2. Create step 5: OrbStack installation
-3. Create step 6+: Docker containers for each service
+### Blockers
+- Mac Mini hardware not yet arrived
 
 ## Project Structure
 
