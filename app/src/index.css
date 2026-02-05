@@ -1,0 +1,58 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    @apply antialiased;
+  }
+
+  body {
+    @apply bg-butler-900 text-butler-100 min-h-screen;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Prevent pull-to-refresh on mobile */
+  html, body {
+    overscroll-behavior: none;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply px-4 py-2 rounded-lg font-medium transition-colors duration-200;
+  }
+
+  .btn-primary {
+    @apply bg-accent text-white hover:bg-accent-hover active:bg-blue-700;
+  }
+
+  .btn-secondary {
+    @apply bg-butler-700 text-butler-100 hover:bg-butler-600 active:bg-butler-500;
+  }
+
+  .btn-ghost {
+    @apply bg-transparent text-butler-300 hover:bg-butler-800 hover:text-butler-100;
+  }
+
+  .input {
+    @apply w-full px-4 py-3 bg-butler-800 border border-butler-700 rounded-lg
+           text-butler-100 placeholder-butler-500
+           focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent
+           transition-all duration-200;
+  }
+
+  .card {
+    @apply bg-butler-800 rounded-xl border border-butler-700;
+  }
+}
+
+@layer utilities {
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .safe-top {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+}
