@@ -72,11 +72,21 @@ docker compose ps
 
 This stack includes PostgreSQL with vector extensions (for Immich's ML features). The same database will be used for:
 
-| Database | Purpose |
-|----------|---------|
+| Database/Schema | Purpose |
+|-----------------|---------|
 | `immich` | Immich photo metadata |
 | `nextcloud` | Nextcloud file metadata |
-| `butler` schema | Butler AI memory (future - issue #12) |
+| `butler.*` | Butler AI memory (auto-initialized) |
+
+**Butler schema tables:**
+| Table | Purpose |
+|-------|---------|
+| `butler.users` | User profiles and soul/personality config |
+| `butler.user_facts` | Things Butler learns about users |
+| `butler.conversation_history` | Conversation context for continuity |
+| `butler.scheduled_tasks` | Reminders and automations |
+
+The Butler schema is automatically initialized when this script runs. It's idempotent (safe to run multiple times).
 
 **Connection details:**
 - Host: `localhost:5432` (from Mac) or `immich-postgres:5432` (from containers)
@@ -191,6 +201,22 @@ docker exec immich-postgres psql -U postgres -c "SELECT 1"
 
 # Check logs
 docker logs immich-postgres
+```
+
+### Butler schema issues
+
+```bash
+# Verify Butler schema exists
+docker exec immich-postgres psql -U postgres -d immich -c "\dn butler"
+
+# List Butler tables
+docker exec immich-postgres psql -U postgres -d immich -c "\dt butler.*"
+
+# Re-run initialization (safe, idempotent)
+./scripts/init-butler-schema.sh
+
+# Check default user exists
+docker exec immich-postgres psql -U postgres -d immich -c "SELECT * FROM butler.users;"
 ```
 
 ## Backup Considerations

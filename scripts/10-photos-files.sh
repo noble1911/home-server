@@ -60,6 +60,11 @@ else
     echo -e "  ${YELLOW}⚠${NC} PostgreSQL may still be starting..."
 fi
 
+# Initialize Butler schema for Nanobot memory
+echo ""
+echo -e "${BLUE}==>${NC} Setting up Butler schema for AI memory..."
+"$SCRIPT_DIR/init-butler-schema.sh"
+
 echo ""
 echo -e "${GREEN}✓${NC} Photos & Files stack deployed"
 echo ""
@@ -80,7 +85,7 @@ echo -e "${YELLOW}PostgreSQL shared database:${NC}"
 echo "  - Host: localhost:5432 or immich-postgres:5432 (from containers)"
 echo "  - Immich DB: immich"
 echo "  - Nextcloud DB: nextcloud"
-echo "  - Butler schema will be added later (issue #12)"
+echo "  - Butler schema: butler.* (users, user_facts, conversation_history, scheduled_tasks)"
 echo ""
 echo -e "${YELLOW}Next:${NC} Deploy smart home stack with:"
 echo "  ./scripts/11-smart-home.sh"
