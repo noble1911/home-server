@@ -18,12 +18,25 @@ gh issue edit <number> --add-assignee @me
 git checkout -b ron875/issue-<number>-short-description
 ```
 
-### When Creating a PR
+### When Completing a Task
 
+**Before creating a PR, always:**
+
+1. **Review HOMESERVER_PLAN.md** — Does anything need updating based on what you learned?
+   - Incorrect assumptions? Fix them.
+   - New decisions made? Document them.
+   - Architecture changed? Update the diagrams/tables.
+
+2. **Update if needed** — Keep the plan accurate for future agents.
+
+3. **Create the PR:**
 ```bash
 # Reference the issue in PR body (auto-closes on merge)
 gh pr create --title "Build Home Assistant Tool" --body "Closes #4"
 ```
+
+> **Example:** We discovered Nanobot uses "skills" not MCP — we updated the plan.
+> **Example:** We decided to use PostgreSQL directly instead of memory.py — we updated the issue.
 
 ### Quick Commands
 ```bash
@@ -209,3 +222,4 @@ home-server/
 - **Always check `gh issue list` first** before starting work
 - **Claim issues with `gh issue edit --add-assignee @me`** to avoid conflicts
 - **Use `Closes #N` in PR body** to auto-close issues on merge
+- **Review HOMESERVER_PLAN.md before PR** — update if you learned something new

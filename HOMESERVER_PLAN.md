@@ -555,7 +555,7 @@ RECENT CONTEXT:
 
 #### Memory Tools
 
-Custom Python tools extend Nanobot's built-in `memory.py` for memory operations:
+Custom Python tools interface directly with PostgreSQL (not Nanobot's built-in `memory.py`):
 
 | Tool | Purpose |
 |------|---------|
