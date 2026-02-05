@@ -92,6 +92,12 @@ else
     echo -e "\n${YELLOW}==>${NC} Skipping voice stack (--skip-voice flag)"
 fi
 
+# Phase 8: AI Agent
+if [[ "$SKIP_VOICE" == "false" ]]; then
+    echo -e "\n${GREEN}Phase 8: AI Agent (Nanobot)${NC}"
+    curl -fsSL "${BASE_URL}/13-nanobot.sh" | bash
+fi
+
 # Summary
 echo ""
 echo -e "${GREEN}"
@@ -128,6 +134,9 @@ echo "    - LiveKit:         ws://localhost:7880"
 echo "    - Whisper:         http://localhost:9000"
 echo "    - Kokoro TTS:      http://localhost:8880"
 echo ""
+echo "  AI Agent:"
+echo "    - Nanobot:         http://localhost:8100"
+echo ""
 fi
 echo -e "${YELLOW}Next steps:${NC}"
 echo ""
@@ -140,3 +149,8 @@ echo "  3. Set up Cloudflare Tunnel for Alexa (see docs/11-smart-home.md)"
 echo ""
 echo "  4. Install mobile apps (Jellyfin, Immich, Audiobookshelf)"
 echo ""
+if [[ "$SKIP_VOICE" == "false" ]]; then
+echo "  5. Access Butler PWA at http://localhost:3000 (after building)"
+echo "     See docs/VOICE_ARCHITECTURE.md for voice integration details"
+echo ""
+fi
