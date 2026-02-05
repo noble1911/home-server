@@ -9,6 +9,8 @@ services:
       - "7880:7880"
       - "7881:7881"
       - "7882:7882/udp"
+    networks:
+      - homeserver
     restart: unless-stopped
 
   whisper:
@@ -19,6 +21,8 @@ services:
       - ASR_ENGINE=openai_whisper
     ports:
       - "9000:9000"
+    networks:
+      - homeserver
     restart: unless-stopped
 
   kokoro-tts:
@@ -30,7 +34,13 @@ services:
       - kokoro-models:/app/models
     ports:
       - "8880:8880"
+    networks:
+      - homeserver
     restart: unless-stopped
+
+networks:
+  homeserver:
+    external: true
 
 volumes:
   kokoro-models:

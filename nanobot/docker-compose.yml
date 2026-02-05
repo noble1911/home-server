@@ -1,5 +1,6 @@
 # Nanobot AI Agent
 # Connects to: PostgreSQL (memory), voice-stack, smart-home-stack
+# All services share the 'homeserver' network for seamless communication
 
 services:
   nanobot:
@@ -32,10 +33,7 @@ services:
     ports:
       - "8100:8100"
     networks:
-      - default
-      - voice-stack_default
-      - photos-files-stack_default
-      - smart-home-stack_default
+      - homeserver
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8100/health"]
       interval: 30s
@@ -49,9 +47,5 @@ volumes:
   nanobot-data:
 
 networks:
-  voice-stack_default:
-    external: true
-  photos-files-stack_default:
-    external: true
-  smart-home-stack_default:
+  homeserver:
     external: true
