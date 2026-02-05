@@ -38,12 +38,8 @@ HA_TOKEN=your-long-lived-access-token
 
 ### 3. Run Database Migration
 
-```bash
-docker exec immich-postgres psql -U postgres -d immich \
-  -f /path/to/nanobot/migrations/001_butler_schema.sql
-```
+From the `nanobot/` directory, copy the migration file into the container and execute it:
 
-Or using the script:
 ```bash
 docker cp migrations/001_butler_schema.sql immich-postgres:/tmp/
 docker exec immich-postgres psql -U postgres -d immich -f /tmp/001_butler_schema.sql

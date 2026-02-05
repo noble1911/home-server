@@ -107,8 +107,18 @@ echo -e "${BLUE}==>${NC} Running database migration..."
 
 # Copy migration to postgres container and execute
 docker cp migrations/001_butler_schema.sql immich-postgres:/tmp/
-docker exec immich-postgres psql -U postgres -d immich -f /tmp/001_butler_schema.sql 2>/dev/null || true
-echo -e "  ${GREEN}✓${NC} Butler schema created"
+if ! docker exec immich-postgres psql -U postgres -d immich -f /tmp/001_butler_schema.sql 2>&1 | grep -v "already exists"; then
+    echo -e "${YELLOW}⚠${NC} Migration may have encountered issues"
+fi
+
+# Verify schema was created
+if docker exec immich-postgres psql -U postgres -d immich -c "SELECT 1 FROM butler.users LIMIT 0" &>/dev/null; then
+    echo -e "  ${GREEN}✓${NC} Butler schema verified"
+else
+    echo -e "${RED}✗${NC} Butler schema not found. Migration may have failed."
+    echo "   Check: docker exec immich-postgres psql -U postgres -d immich -c '\\dn'"
+    exit 1
+fi
 
 # Build and deploy
 echo ""
@@ -116,24 +126,30 @@ echo -e "${BLUE}==>${NC} Building and deploying Nanobot..."
 docker compose build
 docker compose up -d
 
-# Wait for startup
+# Wait for startup with health check retry loop
 echo -e "${BLUE}==>${NC} Waiting for Nanobot to start..."
-sleep 10
 
-# Health check
+HEALTH_OK=false
+for i in {1..30}; do
+    if curl -s http://localhost:8100/health 2>/dev/null | grep -q "ok"; then
+        HEALTH_OK=true
+        break
+    fi
+    echo -n "."
+    sleep 1
+done
+echo ""
+
+# Report health status
 echo ""
 echo -e "${BLUE}==>${NC} Checking health..."
 
-if curl -s http://localhost:8100/health &>/dev/null; then
+if [ "$HEALTH_OK" = true ]; then
     echo -e "  ${GREEN}✓${NC} Nanobot running at http://localhost:8100"
-else
-    echo -e "  ${YELLOW}⚠${NC} Nanobot may still be starting..."
-    echo "   Check logs with: docker logs nanobot"
-fi
-
-# Verify database connection
-if docker exec nanobot curl -s http://localhost:8100/health 2>/dev/null | grep -q "ok"; then
     echo -e "  ${GREEN}✓${NC} Health check passed"
+else
+    echo -e "  ${YELLOW}⚠${NC} Nanobot may still be starting (health check timed out after 30s)"
+    echo "   Check logs with: docker logs nanobot"
 fi
 
 echo ""
