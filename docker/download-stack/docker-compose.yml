@@ -1,0 +1,34 @@
+services:
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:latest
+    container_name: qbittorrent
+    environment:
+      - PUID=501
+      - PGID=20
+      - TZ=Europe/London
+      - WEBUI_PORT=8081
+    volumes:
+      - qbittorrent-config:/config
+      - ${DRIVE_PATH:-/Volumes/HomeServer}/Downloads:/downloads
+    ports:
+      - "8081:8081"
+      - "6881:6881"
+      - "6881:6881/udp"
+    restart: unless-stopped
+
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:latest
+    container_name: prowlarr
+    environment:
+      - PUID=501
+      - PGID=20
+      - TZ=Europe/London
+    volumes:
+      - prowlarr-config:/config
+    ports:
+      - "9696:9696"
+    restart: unless-stopped
+
+volumes:
+  qbittorrent-config:
+  prowlarr-config:

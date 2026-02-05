@@ -1,0 +1,36 @@
+services:
+  livekit:
+    image: livekit/livekit-server:latest
+    container_name: livekit
+    command: --config /etc/livekit.yaml
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml:ro
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "7882:7882/udp"
+    restart: unless-stopped
+
+  whisper:
+    image: onerahmet/openai-whisper-asr-webservice:latest
+    container_name: whisper
+    environment:
+      - ASR_MODEL=small
+      - ASR_ENGINE=openai_whisper
+    ports:
+      - "9000:9000"
+    restart: unless-stopped
+
+  kokoro-tts:
+    image: ghcr.io/remsky/kokoro-fastapi:latest
+    container_name: kokoro-tts
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - kokoro-models:/app/models
+    ports:
+      - "8880:8880"
+    restart: unless-stopped
+
+volumes:
+  kokoro-models:

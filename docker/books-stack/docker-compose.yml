@@ -1,0 +1,50 @@
+services:
+  calibre-web:
+    image: lscr.io/linuxserver/calibre-web:latest
+    container_name: calibre-web
+    environment:
+      - PUID=501
+      - PGID=20
+      - TZ=Europe/London
+      - DOCKER_MODS=linuxserver/mods:universal-calibre
+    volumes:
+      - calibre-web-config:/config
+      - ${DRIVE_PATH:-/Volumes/HomeServer}/Books/eBooks:/books
+    ports:
+      - "8083:8083"
+    restart: unless-stopped
+
+  audiobookshelf:
+    image: ghcr.io/advplyr/audiobookshelf:latest
+    container_name: audiobookshelf
+    environment:
+      - TZ=Europe/London
+    volumes:
+      - audiobookshelf-config:/config
+      - audiobookshelf-metadata:/metadata
+      - ${DRIVE_PATH:-/Volumes/HomeServer}/Books/Audiobooks:/audiobooks
+      - ${DRIVE_PATH:-/Volumes/HomeServer}/Books/eBooks:/books
+    ports:
+      - "13378:80"
+    restart: unless-stopped
+
+  readarr:
+    image: lscr.io/linuxserver/readarr:develop
+    container_name: readarr
+    environment:
+      - PUID=501
+      - PGID=20
+      - TZ=Europe/London
+    volumes:
+      - readarr-config:/config
+      - ${DRIVE_PATH:-/Volumes/HomeServer}/Books:/books
+      - ${DRIVE_PATH:-/Volumes/HomeServer}/Downloads:/downloads
+    ports:
+      - "8787:8787"
+    restart: unless-stopped
+
+volumes:
+  calibre-web-config:
+  audiobookshelf-config:
+  audiobookshelf-metadata:
+  readarr-config:

@@ -1,0 +1,67 @@
+services:
+  jellyfin:
+    image: jellyfin/jellyfin:latest
+    container_name: jellyfin
+    environment:
+      - PUID=501
+      - PGID=20
+      - TZ=Europe/London
+    volumes:
+      - jellyfin-config:/config
+      - jellyfin-cache:/cache
+      - ${DRIVE_PATH:-/Volumes/HomeServer}/Media:/media:ro
+    ports:
+      - "8096:8096"
+    restart: unless-stopped
+
+  radarr:
+    image: lscr.io/linuxserver/radarr:latest
+    container_name: radarr
+    environment:
+      - PUID=501
+      - PGID=20
+      - TZ=Europe/London
+    volumes:
+      - radarr-config:/config
+      - ${DRIVE_PATH:-/Volumes/HomeServer}/Media/Movies:/movies
+      - ${DRIVE_PATH:-/Volumes/HomeServer}/Downloads:/downloads
+    ports:
+      - "7878:7878"
+    restart: unless-stopped
+
+  sonarr:
+    image: lscr.io/linuxserver/sonarr:latest
+    container_name: sonarr
+    environment:
+      - PUID=501
+      - PGID=20
+      - TZ=Europe/London
+    volumes:
+      - sonarr-config:/config
+      - ${DRIVE_PATH:-/Volumes/HomeServer}/Media/TV:/tv
+      - ${DRIVE_PATH:-/Volumes/HomeServer}/Downloads:/downloads
+    ports:
+      - "8989:8989"
+    restart: unless-stopped
+
+  bazarr:
+    image: lscr.io/linuxserver/bazarr:latest
+    container_name: bazarr
+    environment:
+      - PUID=501
+      - PGID=20
+      - TZ=Europe/London
+    volumes:
+      - bazarr-config:/config
+      - ${DRIVE_PATH:-/Volumes/HomeServer}/Media/Movies:/movies
+      - ${DRIVE_PATH:-/Volumes/HomeServer}/Media/TV:/tv
+    ports:
+      - "6767:6767"
+    restart: unless-stopped
+
+volumes:
+  jellyfin-config:
+  jellyfin-cache:
+  radarr-config:
+  sonarr-config:
+  bazarr-config:
