@@ -38,6 +38,36 @@ gh pr create --title "Build Home Assistant Tool" --body "Closes #4"
 > **Example:** We discovered Nanobot uses "skills" not MCP — we updated the plan.
 > **Example:** We decided to use PostgreSQL directly instead of memory.py — we updated the issue.
 
+### When You Discover Undocumented Work
+
+During code review, exploration, or implementation, you may discover:
+- **Missing features** that aren't tracked (e.g., "vector search exists in schema but no tool uses it")
+- **Code quality issues** worth addressing later (e.g., "connection pools should be shared")
+- **Architectural decisions** that need to be made (e.g., "which embedding model to use?")
+- **Documentation gaps** where the plan doesn't match reality
+
+**Create GitHub issues to track these discoveries:**
+
+```bash
+# Create a new issue with full context
+gh issue create --title "Short descriptive title" --body "## Task
+Description of what needs to be done.
+
+## Context
+Why this matters, what you discovered.
+
+## Acceptance Criteria
+- [ ] Specific measurable outcomes"
+```
+
+**Why this matters:**
+- Future agents can pick up the work
+- Nothing gets lost between sessions
+- Avoids duplicate discovery effort
+- Builds a clear backlog of improvements
+
+> **Example:** During code review, we found memory tools don't use vector search despite the schema supporting it → Created Issue #25 to track implementing semantic search.
+
 ### Quick Commands
 ```bash
 gh issue list                              # See all open issues
@@ -223,3 +253,4 @@ home-server/
 - **Claim issues with `gh issue edit --add-assignee @me`** to avoid conflicts
 - **Use `Closes #N` in PR body** to auto-close issues on merge
 - **Review HOMESERVER_PLAN.md before PR** — update if you learned something new
+- **Create issues for discovered work** — don't let insights get lost between sessions

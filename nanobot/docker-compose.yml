@@ -13,7 +13,7 @@ services:
       - NANOBOT_ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - NANOBOT_GATEWAY_PORT=8100
       # Database (uses Immich's PostgreSQL)
-      - DATABASE_URL=postgresql://postgres:postgres@immich-postgres:5432/immich
+      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@immich-postgres:5432/immich
       # Home Assistant integration
       - HOME_ASSISTANT_URL=http://homeassistant:8123
       - HOME_ASSISTANT_TOKEN=${HA_TOKEN:-}
