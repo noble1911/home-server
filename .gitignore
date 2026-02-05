@@ -1,0 +1,15 @@
+# Claude Code project files
+.claude/
+
+# macOS
+.DS_Store
+
+# Environment files
+.env
+.env.local
+
+# Credentials (never commit)
+*.pem
+*.key
+credentials.json
+secrets.yaml
