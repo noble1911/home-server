@@ -7,6 +7,14 @@ Usage:
     The tool is automatically registered with Nanobot when the container starts.
     It requires HOME_ASSISTANT_URL and HOME_ASSISTANT_TOKEN environment variables.
 
+Example:
+    # Create and use the tool
+    tool = HomeAssistantTool()
+    result = await tool.execute(action="turn_on", entity_id="light.kitchen")
+
+    # When shutting down
+    await tool.close()
+
 API Reference:
     https://developers.home-assistant.io/docs/api/rest/
 """
@@ -15,35 +23,11 @@ from typing import Any
 import os
 import aiohttp
 
+from .base import Tool
 
-class Tool:
-    """Base class for Nanobot tools (compatible interface)."""
 
-    @property
-    def name(self) -> str:
-        raise NotImplementedError
-
-    @property
-    def description(self) -> str:
-        raise NotImplementedError
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        raise NotImplementedError
-
-    async def execute(self, **kwargs: Any) -> str:
-        raise NotImplementedError
-
-    def to_schema(self) -> dict[str, Any]:
-        """Convert to OpenAI function schema format."""
-        return {
-            "type": "function",
-            "function": {
-                "name": self.name,
-                "description": self.description,
-                "parameters": self.parameters,
-            }
-        }
+# Default timeout for HTTP requests (seconds)
+DEFAULT_TIMEOUT = 10
 
 
 class HomeAssistantTool(Tool):
@@ -51,22 +35,49 @@ class HomeAssistantTool(Tool):
 
     Supports turning devices on/off, getting device states,
     and calling arbitrary Home Assistant services.
+
+    The tool reuses HTTP sessions for better performance and
+    includes configurable timeouts for reliability.
     """
 
     def __init__(
         self,
         base_url: str | None = None,
         token: str | None = None,
+        timeout: int = DEFAULT_TIMEOUT,
     ):
+        """Initialize the Home Assistant tool.
+
+        Args:
+            base_url: Home Assistant URL (default: HOME_ASSISTANT_URL env var)
+            token: Long-lived access token (default: HOME_ASSISTANT_TOKEN env var)
+            timeout: HTTP request timeout in seconds (default: 10)
+        """
         self.base_url = (base_url or os.environ.get("HOME_ASSISTANT_URL", "")).rstrip("/")
         self.token = token or os.environ.get("HOME_ASSISTANT_TOKEN", "")
+        self.timeout = aiohttp.ClientTimeout(total=timeout)
+        self._session: aiohttp.ClientSession | None = None
 
-    def _get_headers(self) -> dict[str, str]:
-        """Get HTTP headers for HA API requests."""
-        return {
-            "Authorization": f"Bearer {self.token}",
-            "Content-Type": "application/json",
-        }
+    async def _get_session(self) -> aiohttp.ClientSession:
+        """Get or create the HTTP session."""
+        if self._session is None or self._session.closed:
+            self._session = aiohttp.ClientSession(
+                headers={
+                    "Authorization": f"Bearer {self.token}",
+                    "Content-Type": "application/json",
+                },
+                timeout=self.timeout,
+            )
+        return self._session
+
+    async def close(self) -> None:
+        """Close the HTTP session.
+
+        Should be called when shutting down to cleanly release connections.
+        """
+        if self._session and not self._session.closed:
+            await self._session.close()
+            self._session = None
 
     @property
     def name(self) -> str:
@@ -150,31 +161,34 @@ class HomeAssistantTool(Tool):
                 return f"Error: Unknown action '{action}'"
         except aiohttp.ClientError as e:
             return f"Error connecting to Home Assistant: {e}"
+        except TimeoutError:
+            return "Error: Home Assistant request timed out"
         except Exception as e:
             return f"Error: {e}"
 
     async def _get_state(self, entity_id: str | None) -> str:
         """Get the current state of an entity or list all entities."""
-        async with aiohttp.ClientSession() as session:
-            if entity_id:
-                url = f"{self.base_url}/api/states/{entity_id}"
-                async with session.get(url, headers=self._get_headers()) as resp:
-                    if resp.status == 404:
-                        return f"Entity '{entity_id}' not found."
-                    if resp.status != 200:
-                        return f"Error: HTTP {resp.status}"
+        session = await self._get_session()
 
-                    data = await resp.json()
-                    return self._format_entity_state(data)
-            else:
-                # List all entities (summarized)
-                url = f"{self.base_url}/api/states"
-                async with session.get(url, headers=self._get_headers()) as resp:
-                    if resp.status != 200:
-                        return f"Error: HTTP {resp.status}"
+        if entity_id:
+            url = f"{self.base_url}/api/states/{entity_id}"
+            async with session.get(url) as resp:
+                if resp.status == 404:
+                    return f"Entity '{entity_id}' not found."
+                if resp.status != 200:
+                    return f"Error: HTTP {resp.status}"
 
-                    entities = await resp.json()
-                    return self._format_entity_list(entities)
+                data = await resp.json()
+                return self._format_entity_state(data)
+        else:
+            # List all entities (summarized)
+            url = f"{self.base_url}/api/states"
+            async with session.get(url) as resp:
+                if resp.status != 200:
+                    return f"Error: HTTP {resp.status}"
+
+                entities = await resp.json()
+                return self._format_entity_list(entities)
 
     def _format_entity_state(self, entity: dict[str, Any]) -> str:
         """Format a single entity's state for display."""
@@ -225,7 +239,13 @@ class HomeAssistantTool(Tool):
 
         for domain in priority_domains:
             if domain in by_domain:
-                lines.append(f"\n{domain.replace('_', ' ').title()}s:")
+                count = len(by_domain[domain])
+                domain_label = domain.replace("_", " ").title()
+                # Proper pluralization
+                if count == 1:
+                    lines.append(f"\n{domain_label}:")
+                else:
+                    lines.append(f"\n{domain_label}s:")
                 for entity_id, name, state in sorted(by_domain[domain]):
                     lines.append(f"  - {name}: {state} ({entity_id})")
                 del by_domain[domain]
@@ -254,21 +274,21 @@ class HomeAssistantTool(Tool):
         # Merge entity_id into service_data
         data = {**service_data, "entity_id": entity_id}
 
-        async with aiohttp.ClientSession() as session:
-            url = f"{self.base_url}/api/services/{domain}/{action}"
-            async with session.post(url, headers=self._get_headers(), json=data) as resp:
-                if resp.status not in (200, 201):
-                    error_text = await resp.text()
-                    return f"Error: HTTP {resp.status} - {error_text}"
+        session = await self._get_session()
+        url = f"{self.base_url}/api/services/{domain}/{action}"
+        async with session.post(url, json=data) as resp:
+            if resp.status not in (200, 201):
+                error_text = await resp.text()
+                return f"Error: HTTP {resp.status} - {error_text}"
 
-                # Get friendly name for response
-                states = await resp.json()
-                if states and isinstance(states, list):
-                    name = states[0].get("attributes", {}).get("friendly_name", entity_id)
-                    new_state = states[0].get("state", "unknown")
-                    return f"{name}: {action.replace('_', ' ')} -> {new_state}"
+            # Get friendly name for response
+            states = await resp.json()
+            if states and isinstance(states, list):
+                name = states[0].get("attributes", {}).get("friendly_name", entity_id)
+                new_state = states[0].get("state", "unknown")
+                return f"{name}: {action.replace('_', ' ')} -> {new_state}"
 
-                return f"OK: {action} {entity_id}"
+            return f"OK: {action} {entity_id}"
 
     async def _call_service(
         self,
@@ -293,20 +313,20 @@ class HomeAssistantTool(Tool):
         if entity_id:
             data["entity_id"] = entity_id
 
-        async with aiohttp.ClientSession() as session:
-            url = f"{self.base_url}/api/services/{domain}/{service}"
-            async with session.post(url, headers=self._get_headers(), json=data) as resp:
-                if resp.status not in (200, 201):
-                    error_text = await resp.text()
-                    return f"Error: HTTP {resp.status} - {error_text}"
+        session = await self._get_session()
+        url = f"{self.base_url}/api/services/{domain}/{service}"
+        async with session.post(url, json=data) as resp:
+            if resp.status not in (200, 201):
+                error_text = await resp.text()
+                return f"Error: HTTP {resp.status} - {error_text}"
 
-                result = await resp.json()
-                if result and isinstance(result, list) and len(result) > 0:
-                    # Return info about affected entities
-                    affected = [e.get("entity_id", "?") for e in result[:5]]
-                    return f"OK: {domain}.{service} -> affected: {', '.join(affected)}"
+            result = await resp.json()
+            if result and isinstance(result, list) and len(result) > 0:
+                # Return info about affected entities
+                affected = [e.get("entity_id", "?") for e in result[:5]]
+                return f"OK: {domain}.{service} -> affected: {', '.join(affected)}"
 
-                return f"OK: {domain}.{service} called successfully"
+            return f"OK: {domain}.{service} called successfully"
 
 
 class ListEntitiesByDomainTool(Tool):
@@ -319,15 +339,37 @@ class ListEntitiesByDomainTool(Tool):
         self,
         base_url: str | None = None,
         token: str | None = None,
+        timeout: int = DEFAULT_TIMEOUT,
     ):
+        """Initialize the tool.
+
+        Args:
+            base_url: Home Assistant URL (default: HOME_ASSISTANT_URL env var)
+            token: Long-lived access token (default: HOME_ASSISTANT_TOKEN env var)
+            timeout: HTTP request timeout in seconds (default: 10)
+        """
         self.base_url = (base_url or os.environ.get("HOME_ASSISTANT_URL", "")).rstrip("/")
         self.token = token or os.environ.get("HOME_ASSISTANT_TOKEN", "")
+        self.timeout = aiohttp.ClientTimeout(total=timeout)
+        self._session: aiohttp.ClientSession | None = None
 
-    def _get_headers(self) -> dict[str, str]:
-        return {
-            "Authorization": f"Bearer {self.token}",
-            "Content-Type": "application/json",
-        }
+    async def _get_session(self) -> aiohttp.ClientSession:
+        """Get or create the HTTP session."""
+        if self._session is None or self._session.closed:
+            self._session = aiohttp.ClientSession(
+                headers={
+                    "Authorization": f"Bearer {self.token}",
+                    "Content-Type": "application/json",
+                },
+                timeout=self.timeout,
+            )
+        return self._session
+
+    async def close(self) -> None:
+        """Close the HTTP session."""
+        if self._session and not self._session.closed:
+            await self._session.close()
+            self._session = None
 
     @property
     def name(self) -> str:
@@ -364,44 +406,48 @@ class ListEntitiesByDomainTool(Tool):
             return "Error: HOME_ASSISTANT_URL and HOME_ASSISTANT_TOKEN must be configured."
 
         try:
-            async with aiohttp.ClientSession() as session:
-                url = f"{self.base_url}/api/states"
-                async with session.get(url, headers=self._get_headers()) as resp:
-                    if resp.status != 200:
-                        return f"Error: HTTP {resp.status}"
+            session = await self._get_session()
+            url = f"{self.base_url}/api/states"
+            async with session.get(url) as resp:
+                if resp.status != 200:
+                    return f"Error: HTTP {resp.status}"
 
-                    entities = await resp.json()
+                entities = await resp.json()
 
-                    if domain_filter:
-                        # Filter to specific domain
-                        filtered = [
-                            e for e in entities
-                            if e.get("entity_id", "").startswith(f"{domain_filter}.")
-                        ]
-                        if not filtered:
-                            return f"No entities found in domain '{domain_filter}'"
+                if domain_filter:
+                    # Filter to specific domain
+                    filtered = [
+                        e for e in entities
+                        if e.get("entity_id", "").startswith(f"{domain_filter}.")
+                    ]
+                    if not filtered:
+                        return f"No entities found in domain '{domain_filter}'"
 
-                        lines = [f"{domain_filter.title()} entities:"]
-                        for entity in sorted(filtered, key=lambda e: e.get("entity_id", "")):
-                            entity_id = entity.get("entity_id", "")
-                            state = entity.get("state", "unknown")
-                            name = entity.get("attributes", {}).get("friendly_name", entity_id)
-                            lines.append(f"  - {name}: {state} ({entity_id})")
-                        return "\n".join(lines)
-                    else:
-                        # Return domain summary
-                        domains: dict[str, int] = {}
-                        for entity in entities:
-                            entity_id = entity.get("entity_id", "")
-                            domain = entity_id.split(".")[0] if "." in entity_id else "other"
-                            domains[domain] = domains.get(domain, 0) + 1
+                    lines = [f"{domain_filter.title()} entities:"]
+                    for entity in sorted(filtered, key=lambda e: e.get("entity_id", "")):
+                        entity_id = entity.get("entity_id", "")
+                        state = entity.get("state", "unknown")
+                        name = entity.get("attributes", {}).get("friendly_name", entity_id)
+                        lines.append(f"  - {name}: {state} ({entity_id})")
+                    return "\n".join(lines)
+                else:
+                    # Return domain summary
+                    domains: dict[str, int] = {}
+                    for entity in entities:
+                        entity_id = entity.get("entity_id", "")
+                        domain = entity_id.split(".")[0] if "." in entity_id else "other"
+                        domains[domain] = domains.get(domain, 0) + 1
 
-                        lines = ["Available domains:"]
-                        for domain, count in sorted(domains.items()):
-                            lines.append(f"  - {domain}: {count} entities")
-                        return "\n".join(lines)
+                    lines = ["Available domains:"]
+                    for domain, count in sorted(domains.items()):
+                        # Proper pluralization
+                        entity_word = "entity" if count == 1 else "entities"
+                        lines.append(f"  - {domain}: {count} {entity_word}")
+                    return "\n".join(lines)
 
         except aiohttp.ClientError as e:
             return f"Error connecting to Home Assistant: {e}"
+        except TimeoutError:
+            return "Error: Home Assistant request timed out"
         except Exception as e:
             return f"Error: {e}"

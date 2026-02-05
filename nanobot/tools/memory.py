@@ -6,55 +6,119 @@ enabling personalized interactions across conversations.
 Usage:
     The tools are automatically registered with Nanobot when the container starts.
     They connect to Immich's PostgreSQL database using the butler schema.
+
+Example:
+    # Create a shared pool and initialize tools
+    pool = await DatabasePool.create("postgresql://...")
+    remember = RememberFactTool(pool)
+    recall = RecallFactsTool(pool)
+    get_user = GetUserTool(pool)
+
+    # When shutting down
+    await pool.close()
 """
 
 from typing import Any
 import os
 import asyncpg
 
-# Note: In production, import from nanobot.agent.tools
-# For now, we define a compatible base class
-class Tool:
-    """Base class for Nanobot tools (compatible interface)."""
+from .base import Tool
+
+
+class DatabasePool:
+    """Shared database connection pool manager.
+
+    This class manages a single connection pool that can be shared
+    across multiple tools, avoiding the overhead of creating separate
+    pools for each tool instance.
+
+    Example:
+        pool = await DatabasePool.create()
+        try:
+            # Use pool with tools
+            tool = RememberFactTool(pool)
+            await tool.execute(...)
+        finally:
+            await pool.close()
+    """
+
+    def __init__(self, pool: asyncpg.Pool):
+        self._pool = pool
+
+    @classmethod
+    async def create(
+        cls,
+        db_url: str | None = None,
+        min_size: int = 2,
+        max_size: int = 10,
+    ) -> "DatabasePool":
+        """Create a new database pool.
+
+        Args:
+            db_url: PostgreSQL connection URL. Defaults to DATABASE_URL env var.
+            min_size: Minimum number of connections to keep open.
+            max_size: Maximum number of connections allowed.
+
+        Returns:
+            DatabasePool instance ready to use.
+        """
+        url = db_url or os.environ.get("DATABASE_URL")
+        if not url:
+            raise ValueError("DATABASE_URL environment variable not set")
+
+        pool = await asyncpg.create_pool(
+            url,
+            min_size=min_size,
+            max_size=max_size,
+        )
+        return cls(pool)
 
     @property
-    def name(self) -> str:
-        raise NotImplementedError
+    def pool(self) -> asyncpg.Pool:
+        """Get the underlying asyncpg pool."""
+        return self._pool
 
-    @property
-    def description(self) -> str:
-        raise NotImplementedError
+    async def close(self) -> None:
+        """Close the connection pool.
 
-    @property
-    def parameters(self) -> dict[str, Any]:
-        raise NotImplementedError
+        Should be called when shutting down to cleanly release connections.
+        """
+        await self._pool.close()
 
-    async def execute(self, **kwargs: Any) -> str:
-        raise NotImplementedError
+    async def __aenter__(self) -> "DatabasePool":
+        return self
 
-    def to_schema(self) -> dict[str, Any]:
-        """Convert to OpenAI function schema format."""
-        return {
-            "type": "function",
-            "function": {
-                "name": self.name,
-                "description": self.description,
-                "parameters": self.parameters,
-            }
-        }
+    async def __aexit__(self, *args) -> None:
+        await self.close()
 
 
 class RememberFactTool(Tool):
     """Store a fact about a user for future reference."""
 
-    def __init__(self, db_url: str | None = None):
-        self.db_url = db_url or os.environ.get("DATABASE_URL")
-        self._pool: asyncpg.Pool | None = None
+    def __init__(self, db_pool: DatabasePool | None = None):
+        """Initialize the tool.
+
+        Args:
+            db_pool: Shared database pool. If not provided, creates one lazily.
+        """
+        self._db_pool = db_pool
+        self._owned_pool: DatabasePool | None = None  # Pool we created ourselves
 
     async def _get_pool(self) -> asyncpg.Pool:
-        if self._pool is None:
-            self._pool = await asyncpg.create_pool(self.db_url)
-        return self._pool
+        """Get the database connection pool, creating if needed."""
+        if self._db_pool:
+            return self._db_pool.pool
+
+        # Lazy initialization for backwards compatibility
+        if self._owned_pool is None:
+            self._owned_pool = await DatabasePool.create()
+        return self._owned_pool.pool
+
+    async def close(self) -> None:
+        """Close any pool we created ourselves."""
+        if self._owned_pool:
+            await self._owned_pool.close()
+            self._owned_pool = None
 
     @property
     def name(self) -> str:
@@ -129,14 +193,29 @@ class RememberFactTool(Tool):
 class RecallFactsTool(Tool):
     """Recall stored facts about a user."""
 
-    def __init__(self, db_url: str | None = None):
-        self.db_url = db_url or os.environ.get("DATABASE_URL")
-        self._pool: asyncpg.Pool | None = None
+    def __init__(self, db_pool: DatabasePool | None = None):
+        """Initialize the tool.
+
+        Args:
+            db_pool: Shared database pool. If not provided, creates one lazily.
+        """
+        self._db_pool = db_pool
+        self._owned_pool: DatabasePool | None = None
 
     async def _get_pool(self) -> asyncpg.Pool:
-        if self._pool is None:
-            self._pool = await asyncpg.create_pool(self.db_url)
-        return self._pool
+        """Get the database connection pool, creating if needed."""
+        if self._db_pool:
+            return self._db_pool.pool
+
+        if self._owned_pool is None:
+            self._owned_pool = await DatabasePool.create()
+        return self._owned_pool.pool
+
+    async def close(self) -> None:
+        """Close any pool we created ourselves."""
+        if self._owned_pool:
+            await self._owned_pool.close()
+            self._owned_pool = None
 
     @property
     def name(self) -> str:
@@ -228,14 +307,29 @@ class RecallFactsTool(Tool):
 class GetUserTool(Tool):
     """Get user profile including soul/personality configuration."""
 
-    def __init__(self, db_url: str | None = None):
-        self.db_url = db_url or os.environ.get("DATABASE_URL")
-        self._pool: asyncpg.Pool | None = None
+    def __init__(self, db_pool: DatabasePool | None = None):
+        """Initialize the tool.
+
+        Args:
+            db_pool: Shared database pool. If not provided, creates one lazily.
+        """
+        self._db_pool = db_pool
+        self._owned_pool: DatabasePool | None = None
 
     async def _get_pool(self) -> asyncpg.Pool:
-        if self._pool is None:
-            self._pool = await asyncpg.create_pool(self.db_url)
-        return self._pool
+        """Get the database connection pool, creating if needed."""
+        if self._db_pool:
+            return self._db_pool.pool
+
+        if self._owned_pool is None:
+            self._owned_pool = await DatabasePool.create()
+        return self._owned_pool.pool
+
+    async def close(self) -> None:
+        """Close any pool we created ourselves."""
+        if self._owned_pool:
+            await self._owned_pool.close()
+            self._owned_pool = None
 
     @property
     def name(self) -> str:
@@ -278,7 +372,7 @@ class GetUserTool(Tool):
         if not row:
             return f"User {user_id} not found. They may be new."
 
-        import json
+        # asyncpg automatically deserializes JSONB to dict
         soul = row["soul"] or {}
 
         lines = [

@@ -7,7 +7,8 @@ These tests use mocked responses - no real Home Assistant required.
 
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
-from home_assistant import HomeAssistantTool, ListEntitiesByDomainTool
+
+from .home_assistant import HomeAssistantTool, ListEntitiesByDomainTool
 
 
 @pytest.fixture
