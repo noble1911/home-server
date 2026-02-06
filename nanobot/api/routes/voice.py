@@ -57,6 +57,9 @@ async def process_voice(
         system_prompt=ctx.system_prompt,
         user_message=req.transcript,
         tools=all_tools,
+        db_pool=pool,
+        user_id=user_id,
+        channel="voice",
     )
 
     # Save conversation to history
@@ -116,6 +119,9 @@ async def stream_voice(
                 system_prompt=ctx.system_prompt,
                 user_message=req.transcript,
                 tools=all_tools,
+                db_pool=pool,
+                user_id=user_id,
+                channel="voice",
             ):
                 full_response_parts.append(chunk)
                 yield f"data: {json.dumps({'delta': chunk})}\n\n"

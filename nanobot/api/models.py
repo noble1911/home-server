@@ -172,3 +172,29 @@ class OAuthConnectionsResponse(BaseModel):
 
 class OAuthAuthorizeResponse(BaseModel):
     authorizeUrl: str
+
+
+# --- Tool Usage (system observability) ---
+
+
+class ToolUsageEntry(BaseModel):
+    id: int
+    userId: str | None
+    toolName: str
+    parameters: dict = Field(default_factory=dict)
+    resultSummary: str | None
+    error: str | None
+    durationMs: int
+    channel: str | None
+    createdAt: str
+
+
+class ToolUsageSummary(BaseModel):
+    totalCalls24h: int
+    errorCount24h: int
+    avgDurationMs: int
+
+
+class ToolUsageResponse(BaseModel):
+    entries: list[ToolUsageEntry]
+    summary: ToolUsageSummary
