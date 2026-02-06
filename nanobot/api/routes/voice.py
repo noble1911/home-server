@@ -18,7 +18,7 @@ from starlette.responses import StreamingResponse
 from tools import DatabasePool, Tool
 
 from ..context import load_user_context
-from ..deps import get_db_pool, get_internal_or_user, get_tools
+from ..deps import get_db_pool, get_internal_or_user, get_tools, get_user_tools
 from ..llm import chat_with_tools, stream_chat_with_tools
 from ..models import VoiceProcessRequest, VoiceProcessResponse
 
@@ -51,11 +51,12 @@ async def process_voice(
     user_id = caller_user_id or req.user_id
 
     ctx = await load_user_context(pool, user_id)
+    all_tools = get_user_tools(user_id, tools, pool)
 
     response_text = await chat_with_tools(
         system_prompt=ctx.system_prompt,
         user_message=req.transcript,
-        tools=tools,
+        tools=all_tools,
     )
 
     # Save conversation to history
@@ -106,6 +107,7 @@ async def stream_voice(
     """
     user_id = caller_user_id or req.user_id
     ctx = await load_user_context(pool, user_id)
+    all_tools = get_user_tools(user_id, tools, pool)
     full_response_parts: list[str] = []
 
     async def generate():
@@ -113,7 +115,7 @@ async def stream_voice(
             async for chunk in stream_chat_with_tools(
                 system_prompt=ctx.system_prompt,
                 user_message=req.transcript,
-                tools=tools,
+                tools=all_tools,
             ):
                 full_response_parts.append(chunk)
                 yield f"data: {json.dumps({'delta': chunk})}\n\n"

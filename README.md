@@ -55,6 +55,7 @@ Or follow the manual docs for step-by-step instructions.
 
 - **[HOMESERVER_PLAN.md](HOMESERVER_PLAN.md)** - Complete architecture and implementation plan
 - **[docs/](docs/)** - Step-by-step setup guides
+- **[docs/google-oauth-setup.md](docs/google-oauth-setup.md)** - Google OAuth setup for Calendar integration
 
 ---
 
@@ -109,6 +110,11 @@ Or follow the manual docs for step-by-step instructions.
 > **Voice setup:** Requires a free [Groq API key](https://console.groq.com/keys) for
 > speech-to-text. The setup script will prompt for this, or add `GROQ_API_KEY` to
 > `nanobot/.env` and `docker/voice-stack/.env` manually.
+
+### Integrations (optional)
+| Component | Purpose | Setup |
+|-----------|---------|-------|
+| Google Calendar | Calendar queries via Butler | [setup guide](docs/google-oauth-setup.md) |
 
 ---
 

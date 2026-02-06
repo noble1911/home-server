@@ -30,3 +30,10 @@ export interface AuthTokens {
   refreshToken: string
   expiresAt: number
 }
+
+export interface OAuthConnection {
+  provider: string
+  connected: boolean
+  accountId?: string
+  connectedAt?: string
+}

@@ -13,12 +13,14 @@ from fastapi import Depends, Header, HTTPException
 
 from tools import (
     DatabasePool,
+    GoogleCalendarTool,
     HomeAssistantTool,
     ListEntitiesByDomainTool,
     RecallFactsTool,
     RememberFactTool,
     GetUserTool,
     Tool,
+    WeatherTool,
 )
 
 from .auth import decode_user_jwt
@@ -49,6 +51,12 @@ async def init_resources() -> None:
         _tools["list_ha_entities"] = ListEntitiesByDomainTool(
             base_url=settings.home_assistant_url,
             token=settings.home_assistant_token,
+        )
+
+    # Only register weather tool if configured
+    if settings.openweathermap_api_key:
+        _tools["weather"] = WeatherTool(
+            api_key=settings.openweathermap_api_key,
         )
 
 
@@ -103,3 +111,20 @@ async def get_internal_or_user(
         return None  # Internal call; user_id is in request body
 
     return await get_current_user(authorization)
+
+
+def get_user_tools(
+    user_id: str,
+    global_tools: dict[str, Tool],
+    db_pool: DatabasePool,
+) -> dict[str, Tool]:
+    """Merge global tools with per-user tools (e.g., Google Calendar).
+
+    Per-user tools are created per-request because they depend on
+    the authenticated user's OAuth tokens. Only registered when
+    the corresponding service is configured.
+    """
+    user_tools = dict(global_tools)
+    if settings.google_client_id:
+        user_tools["google_calendar"] = GoogleCalendarTool(db_pool, user_id)
+    return user_tools

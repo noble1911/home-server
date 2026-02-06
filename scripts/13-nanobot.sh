@@ -131,6 +131,32 @@ if [ ! -f .env ]; then
         echo -e "  ${YELLOW}⚠${NC} Groq skipped — voice STT will not work until configured"
         echo "   Add GROQ_API_KEY to nanobot/.env and docker/voice-stack/.env later"
     fi
+
+    # Ask about Google Calendar
+    echo ""
+    echo -e "${YELLOW}Google Calendar Integration (optional)${NC}"
+    echo "Lets Butler check your calendar. Requires a Google Cloud OAuth app."
+    echo "See docs/google-oauth-setup.md for setup instructions."
+    echo ""
+    read -p "Do you have Google OAuth credentials? (y/N): " has_google
+    if [[ "$has_google" =~ ^[Yy]$ ]]; then
+        read -p "Enter Google Client ID: " google_client_id
+        read -p "Enter Google Client Secret: " google_client_secret
+        if [ -n "$google_client_id" ] && [ -n "$google_client_secret" ]; then
+            if [[ "$OSTYPE" == "darwin"* ]]; then
+                sed -i '' "s|^GOOGLE_CLIENT_ID=.*|GOOGLE_CLIENT_ID=${google_client_id}|" .env
+                sed -i '' "s|^GOOGLE_CLIENT_SECRET=.*|GOOGLE_CLIENT_SECRET=${google_client_secret}|" .env
+            else
+                sed -i "s|^GOOGLE_CLIENT_ID=.*|GOOGLE_CLIENT_ID=${google_client_id}|" .env
+                sed -i "s|^GOOGLE_CLIENT_SECRET=.*|GOOGLE_CLIENT_SECRET=${google_client_secret}|" .env
+            fi
+            echo -e "  ${GREEN}✓${NC} Google OAuth configured"
+        else
+            echo -e "  ${YELLOW}⚠${NC} Missing credentials, skipping Google OAuth"
+        fi
+    else
+        echo -e "  ${YELLOW}⚠${NC} Google Calendar skipped (can configure later in .env)"
+    fi
 else
     echo -e "  ${GREEN}✓${NC} Using existing .env configuration"
 fi
@@ -139,11 +165,14 @@ fi
 echo ""
 echo -e "${BLUE}==>${NC} Running database migration..."
 
-# Copy migration to postgres container and execute
-docker cp migrations/001_butler_schema.sql immich-postgres:/tmp/
-if ! docker exec immich-postgres psql -U postgres -d immich -f /tmp/001_butler_schema.sql 2>&1 | grep -v "already exists"; then
-    echo -e "${YELLOW}⚠${NC} Migration may have encountered issues"
-fi
+# Copy and run all migration files in order
+for migration in migrations/*.sql; do
+    migration_name=$(basename "$migration")
+    docker cp "$migration" "immich-postgres:/tmp/${migration_name}"
+    if ! docker exec immich-postgres psql -U postgres -d immich -f "/tmp/${migration_name}" 2>&1 | grep -v "already exists"; then
+        echo -e "${YELLOW}⚠${NC} Migration ${migration_name} may have encountered issues"
+    fi
+done
 
 # Verify schema was created
 if docker exec immich-postgres psql -U postgres -d immich -c "SELECT 1 FROM butler.users LIMIT 0" &>/dev/null; then
@@ -205,7 +234,7 @@ echo "    - Auth: POST /api/auth/redeem-invite"
 echo ""
 echo "  Database:"
 echo "    - Schema: butler (in Immich's PostgreSQL)"
-echo "    - Tables: users, user_facts, conversation_history, scheduled_tasks"
+echo "    - Tables: users, user_facts, conversation_history, scheduled_tasks, oauth_tokens"
 echo ""
 echo "  Custom Tools Loaded:"
 echo "    - RememberFactTool: Store facts about users"
@@ -213,6 +242,7 @@ echo "    - RecallFactsTool: Retrieve stored facts"
 echo "    - GetUserTool: Fetch user profile"
 echo "    - HomeAssistantTool: Control smart home"
 echo "    - ListEntitiesByDomainTool: List HA entities"
+echo "    - GoogleCalendarTool: Check user's calendar (requires OAuth setup)"
 echo ""
 echo -e "${YELLOW}Test Commands:${NC}"
 echo ""

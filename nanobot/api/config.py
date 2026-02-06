@@ -31,8 +31,17 @@ class Settings(BaseSettings):
     home_assistant_url: str = ""
     home_assistant_token: str = ""
 
+    # Weather (OpenWeatherMap)
+    openweathermap_api_key: str = ""
+
     # Service-to-service auth (LiveKit Agents -> butler-api)
     internal_api_key: str = ""
+
+    # Google OAuth (for Calendar, Gmail, etc.)
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    google_redirect_uri: str = "http://localhost:8000/api/oauth/google/callback"
+    oauth_frontend_url: str = "http://localhost:5173"
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

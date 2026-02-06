@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends
 from tools import DatabasePool, Tool
 
 from ..context import load_user_context
-from ..deps import get_current_user, get_db_pool, get_tools
+from ..deps import get_current_user, get_db_pool, get_tools, get_user_tools
 from ..llm import chat_with_tools
 from ..models import ChatRequest, ChatResponse
 
@@ -35,11 +35,12 @@ async def text_chat(
     track the response.
     """
     ctx = await load_user_context(pool, user_id)
+    all_tools = get_user_tools(user_id, tools, pool)
 
     response_text = await chat_with_tools(
         system_prompt=ctx.system_prompt,
         user_message=req.message,
-        tools=tools,
+        tools=all_tools,
     )
 
     message_id = str(uuid.uuid4())

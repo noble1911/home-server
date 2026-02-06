@@ -65,6 +65,11 @@ services:
       # Home Assistant
       - HOME_ASSISTANT_URL=http://homeassistant:8123
       - HOME_ASSISTANT_TOKEN=${HA_TOKEN:-}
+      # Google OAuth (for Calendar, Gmail, etc.)
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI:-http://localhost:8000/api/oauth/google/callback}
+      - OAUTH_FRONTEND_URL=${OAUTH_FRONTEND_URL:-http://localhost:5173}
     volumes:
       - ./api:/app/api:ro
       - ./tools:/app/tools:ro
