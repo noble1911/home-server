@@ -218,3 +218,60 @@ export function clearUserFacts(): Promise<void> {
 export function deleteUserAccount(): Promise<void> {
   return api.delete('/user/account')
 }
+
+// ── System monitoring ──────────────────────────────────────────────
+
+export interface ServiceStatus {
+  name: string
+  status: 'online' | 'offline'
+  stack: string
+  detail?: string
+}
+
+export interface SystemHealthResponse {
+  services: ServiceStatus[]
+  summary: { total: number; healthy: number }
+}
+
+export interface StorageVolume {
+  name: string
+  total: number
+  used: number
+  free: number
+  percent: number
+  totalFormatted: string
+  usedFormatted: string
+  freeFormatted: string
+  categories?: Record<string, { bytes: number; formatted: string }>
+}
+
+export interface SystemStorageResponse {
+  volumes: StorageVolume[]
+}
+
+export interface SystemStatsResponse {
+  platform: string
+  architecture: string
+  uptimeSeconds: number | null
+  uptimeFormatted: string | null
+  memory: {
+    total: number
+    used: number
+    available: number
+    percent: number
+    totalFormatted: string
+    usedFormatted: string
+  } | null
+}
+
+export function getSystemHealth(): Promise<SystemHealthResponse> {
+  return api.get<SystemHealthResponse>('/system/health')
+}
+
+export function getSystemStorage(): Promise<SystemStorageResponse> {
+  return api.get<SystemStorageResponse>('/system/storage')
+}
+
+export function getSystemStats(): Promise<SystemStatsResponse> {
+  return api.get<SystemStatsResponse>('/system/stats')
+}

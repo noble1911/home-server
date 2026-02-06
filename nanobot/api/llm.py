@@ -16,8 +16,9 @@ from collections.abc import AsyncGenerator
 
 import anthropic
 
-from tools import Tool
+from tools import DatabasePool, Tool
 
+from .audit import execute_and_log_tool
 from .config import settings
 
 logger = logging.getLogger(__name__)
@@ -53,6 +54,10 @@ async def chat_with_tools(
     user_message: str,
     tools: dict[str, Tool],
     max_tool_rounds: int = 5,
+    *,
+    db_pool: DatabasePool | None = None,
+    user_id: str | None = None,
+    channel: str | None = None,
 ) -> str:
     """Send a message to Claude, execute any tool calls, and return the response.
 
@@ -104,18 +109,10 @@ async def chat_with_tools(
         # Execute tools and collect results
         tool_results = []
         for block in tool_use_blocks:
-            tool_name = block.name
-            tool_input = block.input
-
-            if tool_name in tools:
-                try:
-                    result = await tools[tool_name].execute(**tool_input)
-                except Exception as e:
-                    logger.exception("Tool %s execution failed", tool_name)
-                    result = f"Error executing {tool_name}: {e}"
-            else:
-                result = f"Unknown tool: {tool_name}"
-
+            result = await execute_and_log_tool(
+                block.name, block.input, tools,
+                db_pool=db_pool, user_id=user_id, channel=channel,
+            )
             tool_results.append(
                 {
                     "type": "tool_result",
@@ -137,6 +134,10 @@ async def stream_chat_with_tools(
     user_message: str,
     tools: dict[str, Tool],
     max_tool_rounds: int = 5,
+    *,
+    db_pool: DatabasePool | None = None,
+    user_id: str | None = None,
+    channel: str | None = None,
 ) -> AsyncGenerator[str, None]:
     """Stream Claude's response text, executing any tool calls between rounds.
 
@@ -191,18 +192,10 @@ async def stream_chat_with_tools(
 
         tool_results = []
         for block in tool_use_blocks:
-            tool_name = block.name
-            tool_input = block.input
-
-            if tool_name in tools:
-                try:
-                    result = await tools[tool_name].execute(**tool_input)
-                except Exception as e:
-                    logger.exception("Tool %s execution failed", tool_name)
-                    result = f"Error executing {tool_name}: {e}"
-            else:
-                result = f"Unknown tool: {tool_name}"
-
+            result = await execute_and_log_tool(
+                block.name, block.input, tools,
+                db_pool=db_pool, user_id=user_id, channel=channel,
+            )
             tool_results.append(
                 {
                     "type": "tool_result",
@@ -223,6 +216,10 @@ async def stream_chat_with_events(
     user_message: str,
     tools: dict[str, Tool],
     max_tool_rounds: int = 5,
+    *,
+    db_pool: DatabasePool | None = None,
+    user_id: str | None = None,
+    channel: str | None = None,
 ) -> AsyncGenerator[dict, None]:
     """Stream Claude's response as structured events, including tool lifecycle.
 
@@ -267,21 +264,14 @@ async def stream_chat_with_events(
 
         tool_results = []
         for block in tool_use_blocks:
-            tool_name = block.name
-            tool_input = block.input
+            yield {"type": "tool_start", "tool": block.name}
 
-            yield {"type": "tool_start", "tool": tool_name}
+            result = await execute_and_log_tool(
+                block.name, block.input, tools,
+                db_pool=db_pool, user_id=user_id, channel=channel,
+            )
 
-            if tool_name in tools:
-                try:
-                    result = await tools[tool_name].execute(**tool_input)
-                except Exception as e:
-                    logger.exception("Tool %s execution failed", tool_name)
-                    result = f"Error executing {tool_name}: {e}"
-            else:
-                result = f"Unknown tool: {tool_name}"
-
-            yield {"type": "tool_end", "tool": tool_name}
+            yield {"type": "tool_end", "tool": block.name}
 
             tool_results.append(
                 {

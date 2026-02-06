@@ -172,3 +172,67 @@ class OAuthConnectionsResponse(BaseModel):
 
 class OAuthAuthorizeResponse(BaseModel):
     authorizeUrl: str
+
+
+# --- Scheduled Tasks ---
+
+
+class TaskAction(BaseModel):
+    type: str  # "reminder" | "automation" | "check"
+    message: str | None = None
+    tool: str | None = None
+    params: dict | None = None
+    category: str | None = None
+    notifyOn: str | None = None  # "warning" | "critical" | "always"
+
+
+class CreateTaskRequest(BaseModel):
+    name: str
+    cronExpression: str | None = None
+    action: TaskAction
+    enabled: bool = True
+
+
+class UpdateTaskRequest(BaseModel):
+    name: str | None = None
+    cronExpression: str | None = None
+    action: TaskAction | None = None
+    enabled: bool | None = None
+
+
+class ScheduledTaskResponse(BaseModel):
+    id: int
+    userId: str
+    name: str
+    cronExpression: str | None
+    action: TaskAction
+    enabled: bool
+    lastRun: str | None  # ISO8601
+    nextRun: str | None  # ISO8601
+    createdAt: str  # ISO8601
+
+
+# --- Tool Usage (system observability) ---
+
+
+class ToolUsageEntry(BaseModel):
+    id: int
+    userId: str | None
+    toolName: str
+    parameters: dict = Field(default_factory=dict)
+    resultSummary: str | None
+    error: str | None
+    durationMs: int
+    channel: str | None
+    createdAt: str
+
+
+class ToolUsageSummary(BaseModel):
+    totalCalls24h: int
+    errorCount24h: int
+    avgDurationMs: int
+
+
+class ToolUsageResponse(BaseModel):
+    entries: list[ToolUsageEntry]
+    summary: ToolUsageSummary
