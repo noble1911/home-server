@@ -27,6 +27,7 @@ from tools import (
     RecallFactsTool,
     RememberFactTool,
     GetUserTool,
+    ScheduleTaskTool,
     ServerHealthTool,
     SonarrTool,
     StorageMonitorTool,
@@ -35,17 +36,21 @@ from tools import (
     WhatsAppTool,
 )
 
+from .scheduler import TaskScheduler
+
 from .auth import decode_user_jwt
+from .cleanup import start_cleanup, stop_cleanup
 from .config import settings
 
 # Module-level state, set during lifespan startup
 _db_pool: DatabasePool | None = None
 _tools: dict[str, Tool] | None = None
+_scheduler: TaskScheduler | None = None
 
 
 async def init_resources() -> None:
     """Initialize database pool and tool instances. Called once at startup."""
-    global _db_pool, _tools
+    global _db_pool, _tools, _scheduler
     _db_pool = await DatabasePool.create(settings.database_url)
 
     # Embedding service for semantic memory search (optional)
@@ -153,10 +158,23 @@ async def init_resources() -> None:
         thresholds=thresholds,
     )
 
+    # Schedule task tool (always registered — uses DB only)
+    _tools["schedule_task"] = ScheduleTaskTool(_db_pool)
+
+    # Start background scheduler
+    _scheduler = TaskScheduler(db_pool=_db_pool, tools=_tools)
+    await _scheduler.start()
+
+    # Background cleanup for old conversations and expired facts
+    start_cleanup(_db_pool, settings.cleanup_retention_days)
+
 
 async def cleanup_resources() -> None:
     """Release resources on shutdown."""
-    global _db_pool, _tools
+    global _db_pool, _tools, _scheduler
+    if _scheduler:
+        await _scheduler.stop()
+    await stop_cleanup()
     if _tools:
         for tool in _tools.values():
             if hasattr(tool, "close"):
