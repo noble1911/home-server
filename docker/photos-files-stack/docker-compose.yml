@@ -1,6 +1,6 @@
 services:
   immich-server:
-    image: ghcr.io/immich-app/immich-server:release
+    image: ghcr.io/immich-app/immich-server:v2.5.3
     container_name: immich-server
     volumes:
       - ${DRIVE_PATH:-/Volumes/HomeServer}/Photos/Immich:/usr/src/app/upload
@@ -21,7 +21,7 @@ services:
     restart: unless-stopped
 
   immich-machine-learning:
-    image: ghcr.io/immich-app/immich-machine-learning:release
+    image: ghcr.io/immich-app/immich-machine-learning:v2.5.3
     container_name: immich-machine-learning
     volumes:
       - immich-ml-cache:/cache
@@ -32,7 +32,7 @@ services:
     restart: unless-stopped
 
   immich-redis:
-    image: redis:alpine
+    image: redis:7.4.7-alpine
     container_name: immich-redis
     networks:
       - homeserver
@@ -54,7 +54,7 @@ services:
     restart: unless-stopped
 
   nextcloud:
-    image: nextcloud:latest
+    image: nextcloud:32.0.5
     container_name: nextcloud
     environment:
       - PUID=501

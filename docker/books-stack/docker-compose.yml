@@ -1,6 +1,6 @@
 services:
   calibre-web:
-    image: lscr.io/linuxserver/calibre-web:latest
+    image: lscr.io/linuxserver/calibre-web:0.6.25
     container_name: calibre-web
     environment:
       - PUID=501
@@ -17,7 +17,7 @@ services:
     restart: unless-stopped
 
   audiobookshelf:
-    image: ghcr.io/advplyr/audiobookshelf:latest
+    image: ghcr.io/advplyr/audiobookshelf:v2.32.1
     container_name: audiobookshelf
     environment:
       - TZ=Europe/London
@@ -33,7 +33,7 @@ services:
     restart: unless-stopped
 
   readarr:
-    image: lscr.io/linuxserver/readarr:develop
+    image: lscr.io/linuxserver/readarr:0.4.18-develop
     container_name: readarr
     environment:
       - PUID=501
