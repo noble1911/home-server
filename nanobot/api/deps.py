@@ -17,6 +17,7 @@ from tools import (
     GmailTool,
     GoogleCalendarTool,
     HomeAssistantTool,
+    ImmichTool,
     JellyfinTool,
     ListEntitiesByDomainTool,
     RadarrTool,
@@ -80,6 +81,13 @@ async def init_resources() -> None:
         _tools["readarr"] = ReadarrTool(
             base_url=settings.readarr_url,
             api_key=settings.readarr_api_key,
+        )
+
+    # Only register Immich tool if configured
+    if settings.immich_url:
+        _tools["immich"] = ImmichTool(
+            base_url=settings.immich_url,
+            api_key=settings.immich_api_key,
         )
 
     # Only register Sonarr tool if configured

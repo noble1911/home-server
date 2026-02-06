@@ -35,6 +35,7 @@ from .jellyfin import JellyfinTool
 from .radarr import RadarrTool
 from .readarr import ReadarrTool
 from .sonarr import SonarrTool
+from .immich import ImmichTool
 from .weather import WeatherTool
 
 __all__ = [
@@ -67,6 +68,8 @@ __all__ = [
     "ReadarrTool",
     # Sonarr
     "SonarrTool",
+    # Immich
+    "ImmichTool",
     # Weather
     "WeatherTool",
 ]
