@@ -50,6 +50,10 @@ class Settings(BaseSettings):
     jellyfin_url: str = ""
     jellyfin_api_key: str = ""
 
+    # Immich (photo search, read-only)
+    immich_url: str = ""
+    immich_api_key: str = ""
+
     # Service-to-service auth (LiveKit Agents -> butler-api)
     internal_api_key: str = ""
 
