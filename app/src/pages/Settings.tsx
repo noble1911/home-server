@@ -1,11 +1,83 @@
+import { useEffect, useState } from 'react'
 import { useAuthStore } from '../stores/authStore'
 import { useUserStore } from '../stores/userStore'
 import { useSettingsStore } from '../stores/settingsStore'
+import { api } from '../services/api'
+import type { OAuthConnection } from '../types/user'
+
+interface ConnectionsResponse {
+  connections: OAuthConnection[]
+}
+
+interface AuthorizeResponse {
+  authorizeUrl: string
+}
 
 export default function Settings() {
   const { logout } = useAuthStore()
   const { profile, updateButlerName, updateSoul, isLoading } = useUserStore()
   const { voiceMode, setVoiceMode } = useSettingsStore()
+
+  const [connections, setConnections] = useState<OAuthConnection[]>([])
+  const [connectionsLoading, setConnectionsLoading] = useState(true)
+  const [oauthMessage, setOauthMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  // Fetch OAuth connections on mount
+  useEffect(() => {
+    fetchConnections()
+  }, [])
+
+  // Handle OAuth callback redirect params
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const oauthProvider = params.get('oauth')
+    const status = params.get('status')
+    if (oauthProvider && status) {
+      if (status === 'success') {
+        setOauthMessage({ type: 'success', text: `${oauthProvider} connected successfully!` })
+      } else {
+        const message = params.get('message') || 'Connection failed'
+        setOauthMessage({ type: 'error', text: `${oauthProvider}: ${message}` })
+      }
+      // Clean up URL params
+      window.history.replaceState({}, '', '/settings')
+      // Refresh connections
+      fetchConnections()
+    }
+  }, [])
+
+  async function fetchConnections() {
+    try {
+      const data = await api.get<ConnectionsResponse>('/oauth/connections')
+      setConnections(data.connections)
+    } catch {
+      // OAuth not configured or server error — silently show empty
+      setConnections([])
+    } finally {
+      setConnectionsLoading(false)
+    }
+  }
+
+  async function connectGoogle() {
+    try {
+      const data = await api.get<AuthorizeResponse>('/oauth/google/authorize')
+      window.location.href = data.authorizeUrl
+    } catch {
+      setOauthMessage({ type: 'error', text: 'Failed to start Google connection. Is OAuth configured?' })
+    }
+  }
+
+  async function disconnectProvider(provider: string) {
+    try {
+      await api.delete(`/oauth/${provider}`)
+      setConnections(prev => prev.filter(c => c.provider !== provider))
+      setOauthMessage({ type: 'success', text: 'Disconnected successfully.' })
+    } catch {
+      setOauthMessage({ type: 'error', text: 'Failed to disconnect.' })
+    }
+  }
+
+  const googleConnection = connections.find(c => c.provider === 'google_calendar')
 
   if (!profile) {
     return (
@@ -123,6 +195,59 @@ export default function Settings() {
                 </button>
               ))}
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Connected Services */}
+      <section className="card p-4">
+        <h2 className="text-sm font-medium text-butler-400 uppercase tracking-wide mb-4">
+          Connected Services
+          <span className="text-butler-600 ml-2 text-xs normal-case">synced</span>
+        </h2>
+
+        {oauthMessage && (
+          <div className={`text-sm mb-3 p-2 rounded ${
+            oauthMessage.type === 'success'
+              ? 'bg-green-900/30 text-green-300'
+              : 'bg-red-900/30 text-red-300'
+          }`}>
+            {oauthMessage.text}
+          </div>
+        )}
+
+        <div className="space-y-3">
+          {/* Google Calendar */}
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm text-butler-100">Google Calendar</div>
+              {connectionsLoading ? (
+                <div className="text-xs text-butler-500">Checking...</div>
+              ) : googleConnection ? (
+                <div className="text-xs text-butler-400">
+                  Connected{googleConnection.accountId ? ` as ${googleConnection.accountId}` : ''}
+                </div>
+              ) : (
+                <div className="text-xs text-butler-500">Not connected</div>
+              )}
+            </div>
+            {!connectionsLoading && (
+              googleConnection ? (
+                <button
+                  onClick={() => disconnectProvider('google_calendar')}
+                  className="px-3 py-1.5 rounded-lg text-xs bg-red-900/50 text-red-300 hover:bg-red-900 hover:text-red-200"
+                >
+                  Disconnect
+                </button>
+              ) : (
+                <button
+                  onClick={connectGoogle}
+                  className="px-3 py-1.5 rounded-lg text-xs bg-accent text-white hover:bg-accent/80"
+                >
+                  Connect
+                </button>
+              )
+            )}
           </div>
         </div>
       </section>

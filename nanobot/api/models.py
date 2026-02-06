@@ -108,3 +108,21 @@ class VoiceProcessRequest(BaseModel):
 class VoiceProcessResponse(BaseModel):
     response: str
     should_end_turn: bool
+
+
+# --- OAuth ---
+
+
+class OAuthConnection(BaseModel):
+    provider: str
+    connected: bool
+    accountId: str | None = None
+    connectedAt: str | None = None
+
+
+class OAuthConnectionsResponse(BaseModel):
+    connections: list[OAuthConnection]
+
+
+class OAuthAuthorizeResponse(BaseModel):
+    authorizeUrl: str

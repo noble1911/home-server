@@ -55,6 +55,7 @@ Or follow the manual docs for step-by-step instructions.
 
 - **[HOMESERVER_PLAN.md](HOMESERVER_PLAN.md)** - Complete architecture and implementation plan
 - **[docs/](docs/)** - Step-by-step setup guides
+- **[docs/google-oauth-setup.md](docs/google-oauth-setup.md)** - Google OAuth setup for Calendar integration
 
 ---
 
@@ -102,6 +103,11 @@ Or follow the manual docs for step-by-step instructions.
 | [LiveKit](https://livekit.io/) | WebRTC server | 7880 |
 | [Whisper](https://github.com/openai/whisper) | Speech-to-text | 9000 |
 | [Kokoro TTS](https://github.com/remsky/Kokoro-FastAPI) | Text-to-speech | 8880 |
+
+### Integrations (optional)
+| Component | Purpose | Setup |
+|-----------|---------|-------|
+| Google Calendar | Calendar queries via Butler | [setup guide](docs/google-oauth-setup.md) |
 
 ---
 
