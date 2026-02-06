@@ -1,0 +1,31 @@
+# Messaging Stack
+# WhatsApp gateway for outbound notifications
+# Connects to: butler-api (via homeserver network)
+#
+# First run: check logs with `docker logs whatsapp-gateway` and scan QR code
+# with your WhatsApp mobile app. Session is persisted — only needed once.
+
+services:
+  whatsapp-gateway:
+    build: ./whatsapp-gateway
+    container_name: whatsapp-gateway
+    volumes:
+      - whatsapp-data:/data
+    environment:
+      - PORT=${WHATSAPP_GATEWAY_PORT:-3000}
+    networks:
+      - homeserver
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+volumes:
+  whatsapp-data:
+
+networks:
+  homeserver:
+    external: true

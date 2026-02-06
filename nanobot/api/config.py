@@ -72,6 +72,9 @@ class Settings(BaseSettings):
     google_redirect_uri: str = "http://localhost:8000/api/oauth/google/callback"
     oauth_frontend_url: str = "http://localhost:5173"
 
+    # WhatsApp Gateway (outbound notifications)
+    whatsapp_gateway_url: str = ""
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
 

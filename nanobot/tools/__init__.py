@@ -40,6 +40,7 @@ from .weather import WeatherTool
 from .alerting import AlertStateManager, NotificationDispatcher
 from .server_health import ServerHealthTool
 from .storage_monitor import StorageMonitorTool
+from .whatsapp import WhatsAppTool
 
 __all__ = [
     # Base
@@ -82,4 +83,6 @@ __all__ = [
     "ServerHealthTool",
     # Storage monitoring
     "StorageMonitorTool",
+    # WhatsApp
+    "WhatsAppTool",
 ]
