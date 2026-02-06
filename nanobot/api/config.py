@@ -60,6 +60,12 @@ class Settings(BaseSettings):
     # Ollama (for local embeddings)
     ollama_url: str = ""
 
+    # Health & storage monitoring
+    external_drive_path: str = "/mnt/external"
+    storage_thresholds: str = "70,80,90"
+    health_check_timeout: int = 5
+    prowlarr_api_key: str = ""
+
     # Google OAuth (for Calendar, Gmail, etc.)
     google_client_id: str = ""
     google_client_secret: str = ""

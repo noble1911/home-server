@@ -12,6 +12,7 @@ import jwt as pyjwt
 from fastapi import Depends, Header, HTTPException
 
 from tools import (
+    AlertStateManager,
     DatabasePool,
     EmbeddingService,
     GmailTool,
@@ -25,7 +26,9 @@ from tools import (
     RecallFactsTool,
     RememberFactTool,
     GetUserTool,
+    ServerHealthTool,
     SonarrTool,
+    StorageMonitorTool,
     Tool,
     WeatherTool,
 )
@@ -103,6 +106,39 @@ async def init_resources() -> None:
             base_url=settings.jellyfin_url,
             api_key=settings.jellyfin_api_key,
         )
+
+    # Health & storage monitoring (always registered — degrade gracefully)
+    alert_manager = AlertStateManager(_db_pool)
+
+    # Collect API keys for services that need authenticated health checks
+    api_keys = {}
+    if settings.radarr_api_key:
+        api_keys["radarr_api_key"] = settings.radarr_api_key
+    if settings.sonarr_api_key:
+        api_keys["sonarr_api_key"] = settings.sonarr_api_key
+    if settings.readarr_api_key:
+        api_keys["readarr_api_key"] = settings.readarr_api_key
+    if settings.prowlarr_api_key:
+        api_keys["prowlarr_api_key"] = settings.prowlarr_api_key
+    if settings.home_assistant_token:
+        api_keys["ha_token"] = settings.home_assistant_token
+
+    thresholds = tuple(
+        int(t) for t in settings.storage_thresholds.split(",") if t.strip()
+    )
+
+    _tools["server_health"] = ServerHealthTool(
+        db_pool=_db_pool,
+        alert_manager=alert_manager,
+        api_keys=api_keys,
+        timeout=settings.health_check_timeout,
+    )
+    _tools["storage_monitor"] = StorageMonitorTool(
+        db_pool=_db_pool,
+        alert_manager=alert_manager,
+        external_drive_path=settings.external_drive_path,
+        thresholds=thresholds,
+    )
 
 
 async def cleanup_resources() -> None:
