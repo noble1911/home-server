@@ -6,10 +6,17 @@ These tests use mocked database responses - no real PostgreSQL required.
 """
 
 import pytest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from .memory import DatabasePool, RememberFactTool, RecallFactsTool, GetUserTool
+from .memory import (
+    DatabasePool,
+    RememberFactTool,
+    RecallFactsTool,
+    GetUserTool,
+    GetConversationsTool,
+    UpdateSoulTool,
+)
 
 
 @pytest.fixture
@@ -279,27 +286,265 @@ class TestGetUserTool:
         assert "verbosity: concise" in result
 
 
+class TestGetConversationsTool:
+    """Tests for GetConversationsTool."""
+
+    def test_tool_properties(self, mock_pool):
+        """Verify tool has required properties."""
+        tool = GetConversationsTool(mock_pool)
+
+        assert tool.name == "get_conversations"
+        assert "conversation history" in tool.description
+        assert "user_id" in tool.parameters["properties"]
+        assert "days" in tool.parameters["properties"]
+        assert "channel" in tool.parameters["properties"]
+        assert "limit" in tool.parameters["properties"]
+        assert tool.parameters["required"] == ["user_id"]
+
+    def test_to_schema(self, mock_pool):
+        """Verify OpenAI function schema format."""
+        tool = GetConversationsTool(mock_pool)
+        schema = tool.to_schema()
+
+        assert schema["type"] == "function"
+        assert schema["function"]["name"] == "get_conversations"
+        assert "parameters" in schema["function"]
+
+    @pytest.mark.asyncio
+    async def test_no_conversations(self, mock_pool):
+        """Test when user has no recent conversations."""
+        mock_pool.pool.fetch = AsyncMock(return_value=[])
+
+        tool = GetConversationsTool(mock_pool)
+        result = await tool.execute(user_id="silent_user")
+
+        assert "No recent conversations" in result
+        assert "silent_user" in result
+
+    @pytest.mark.asyncio
+    async def test_conversations_grouped_by_date(self, mock_pool):
+        """Test conversations are grouped by date in chronological order."""
+        now = datetime.now(timezone.utc)
+        yesterday = now - timedelta(days=1)
+        mock_rows = [
+            # Returned DESC from DB, so newest first
+            {"role": "assistant", "content": "The audiobook is great!", "channel": "whatsapp", "created_at": now},
+            {"role": "user", "content": "Tell me about the Dune audiobook", "channel": "whatsapp", "created_at": now - timedelta(minutes=1)},
+            {"role": "assistant", "content": "Good morning!", "channel": "whatsapp", "created_at": yesterday},
+        ]
+        mock_pool.pool.fetch = AsyncMock(return_value=mock_rows)
+
+        tool = GetConversationsTool(mock_pool)
+        result = await tool.execute(user_id="user123")
+
+        assert "Recent conversations for user123" in result
+        assert yesterday.strftime("%Y-%m-%d") in result
+        assert now.strftime("%Y-%m-%d") in result
+        assert "Dune audiobook" in result
+
+    @pytest.mark.asyncio
+    async def test_channel_filter(self, mock_pool):
+        """Test filtering by channel passes correct SQL."""
+        mock_pool.pool.fetch = AsyncMock(return_value=[])
+
+        tool = GetConversationsTool(mock_pool)
+        await tool.execute(user_id="user123", channel="voice")
+
+        call_args = mock_pool.pool.fetch.call_args
+        sql = call_args[0][0]
+        assert "channel = $2" in sql
+        assert call_args[0][1] == "user123"
+        assert call_args[0][2] == "voice"
+
+    @pytest.mark.asyncio
+    async def test_custom_days_and_limit(self, mock_pool):
+        """Test custom days and limit parameters are passed to query."""
+        mock_pool.pool.fetch = AsyncMock(return_value=[])
+
+        tool = GetConversationsTool(mock_pool)
+        await tool.execute(user_id="user123", days=30, limit=50)
+
+        call_args = mock_pool.pool.fetch.call_args
+        assert 30 in call_args[0]  # days
+        assert 50 in call_args[0]  # limit
+
+    @pytest.mark.asyncio
+    async def test_long_content_truncated(self, mock_pool):
+        """Test that long messages are truncated in output."""
+        long_content = "A" * 200
+        mock_rows = [
+            {"role": "user", "content": long_content, "channel": "pwa", "created_at": datetime.now(timezone.utc)},
+        ]
+        mock_pool.pool.fetch = AsyncMock(return_value=mock_rows)
+
+        tool = GetConversationsTool(mock_pool)
+        result = await tool.execute(user_id="user123")
+
+        assert "..." in result
+        assert long_content not in result  # full string should not appear
+
+    @pytest.mark.asyncio
+    async def test_default_parameters(self, mock_pool):
+        """Test default values for days (7) and limit (20)."""
+        mock_pool.pool.fetch = AsyncMock(return_value=[])
+
+        tool = GetConversationsTool(mock_pool)
+        await tool.execute(user_id="user123")
+
+        call_args = mock_pool.pool.fetch.call_args
+        # Without channel: args are (sql, user_id, days, limit)
+        assert call_args[0][1] == "user123"
+        assert call_args[0][2] == 7    # default days
+        assert call_args[0][3] == 20   # default limit
+
+
+class TestUpdateSoulTool:
+    """Tests for UpdateSoulTool."""
+
+    def test_tool_properties(self, mock_pool):
+        """Verify tool has required properties."""
+        tool = UpdateSoulTool(mock_pool)
+
+        assert tool.name == "update_soul"
+        assert "personality" in tool.description
+        assert "user_id" in tool.parameters["properties"]
+        assert "formality" in tool.parameters["properties"]
+        assert "verbosity" in tool.parameters["properties"]
+        assert "humor" in tool.parameters["properties"]
+        assert "custom_instructions" in tool.parameters["properties"]
+        assert tool.parameters["required"] == ["user_id"]
+
+    def test_to_schema(self, mock_pool):
+        """Verify OpenAI function schema format."""
+        tool = UpdateSoulTool(mock_pool)
+        schema = tool.to_schema()
+
+        assert schema["type"] == "function"
+        assert schema["function"]["name"] == "update_soul"
+        assert "parameters" in schema["function"]
+
+    @pytest.mark.asyncio
+    async def test_update_single_key(self, mock_pool):
+        """Test updating a single soul key."""
+        mock_pool.pool.fetchrow = AsyncMock(return_value={
+            "soul": {"formality": "casual", "verbosity": "concise"}
+        })
+
+        tool = UpdateSoulTool(mock_pool)
+        result = await tool.execute(user_id="user123", formality="casual")
+
+        assert "Updated soul for user123" in result
+        assert "formality" in result
+
+        # Verify SQL uses jsonb merge
+        call_args = mock_pool.pool.fetchrow.call_args
+        sql = call_args[0][0]
+        assert "||" in sql
+        assert "COALESCE" in sql
+
+    @pytest.mark.asyncio
+    async def test_update_multiple_keys(self, mock_pool):
+        """Test updating multiple soul keys at once."""
+        mock_pool.pool.fetchrow = AsyncMock(return_value={
+            "soul": {"formality": "formal", "humor": "light", "verbosity": "concise"}
+        })
+
+        tool = UpdateSoulTool(mock_pool)
+        result = await tool.execute(
+            user_id="user123",
+            formality="formal",
+            humor="light"
+        )
+
+        assert "Updated soul for user123" in result
+
+    @pytest.mark.asyncio
+    async def test_user_not_found(self, mock_pool):
+        """Test updating soul for non-existent user."""
+        mock_pool.pool.fetchrow = AsyncMock(return_value=None)
+
+        tool = UpdateSoulTool(mock_pool)
+        result = await tool.execute(user_id="ghost", formality="casual")
+
+        assert "not found" in result
+        assert "ghost" in result
+
+    @pytest.mark.asyncio
+    async def test_no_soul_keys_provided(self, mock_pool):
+        """Test error when no soul preferences given."""
+        tool = UpdateSoulTool(mock_pool)
+        result = await tool.execute(user_id="user123")
+
+        assert "No soul preferences" in result
+        # DB should NOT have been called
+        mock_pool.pool.fetchrow.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_ignores_invalid_keys(self, mock_pool):
+        """Test that unknown keys are not passed to the database."""
+        tool = UpdateSoulTool(mock_pool)
+        result = await tool.execute(user_id="user123", favorite_color="blue")
+
+        assert "No soul preferences" in result
+
+    @pytest.mark.asyncio
+    async def test_custom_instructions(self, mock_pool):
+        """Test setting custom_instructions."""
+        mock_pool.pool.fetchrow = AsyncMock(return_value={
+            "soul": {"custom_instructions": "Always greet me in Spanish"}
+        })
+
+        tool = UpdateSoulTool(mock_pool)
+        result = await tool.execute(
+            user_id="user123",
+            custom_instructions="Always greet me in Spanish"
+        )
+
+        assert "Updated soul for user123" in result
+        assert "custom_instructions" in result
+
+    @pytest.mark.asyncio
+    async def test_displays_full_soul_after_update(self, mock_pool):
+        """Test that response shows the complete merged soul config."""
+        mock_pool.pool.fetchrow = AsyncMock(return_value={
+            "soul": {
+                "personality": "warm",
+                "formality": "casual",
+                "verbosity": "concise",
+            }
+        })
+
+        tool = UpdateSoulTool(mock_pool)
+        result = await tool.execute(user_id="user123", formality="casual")
+
+        # Should show ALL soul keys, not just the updated one
+        assert "personality: warm" in result
+        assert "formality: casual" in result
+        assert "verbosity: concise" in result
+
+
 class TestToolCleanup:
     """Tests for tool resource cleanup."""
 
     @pytest.mark.asyncio
     async def test_close_owned_pool(self):
         """Test that tools clean up their own pools."""
-        with patch("asyncpg.create_pool", new_callable=AsyncMock) as mock_create:
-            mock_asyncpg_pool = AsyncMock()
-            mock_create.return_value = mock_asyncpg_pool
+        with patch.dict("os.environ", {"DATABASE_URL": "postgresql://test@localhost/db"}):
+            with patch("asyncpg.create_pool", new_callable=AsyncMock) as mock_create:
+                mock_asyncpg_pool = AsyncMock()
+                mock_create.return_value = mock_asyncpg_pool
 
-            # Create tool without shared pool (will create its own)
-            tool = RememberFactTool()
+                # Create tool without shared pool (will create its own)
+                tool = RememberFactTool()
 
-            # Trigger lazy pool creation
-            await tool._get_pool()
+                # Trigger lazy pool creation
+                await tool._get_pool()
 
-            # Close the tool
-            await tool.close()
+                # Close the tool
+                await tool.close()
 
-            # Verify pool was closed
-            mock_asyncpg_pool.close.assert_called_once()
+                # Verify pool was closed
+                mock_asyncpg_pool.close.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_no_close_shared_pool(self, mock_pool):
