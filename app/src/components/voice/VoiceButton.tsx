@@ -1,36 +1,41 @@
 import { useCallback } from 'react'
-import { useConversationStore } from '../../stores/conversationStore'
 import { useSettingsStore } from '../../stores/settingsStore'
 import type { VoiceStatus } from '../../types/conversation'
 
 interface VoiceButtonProps {
   status: VoiceStatus
   isRecording: boolean
+  onStartListening: () => void
+  onStopListening: () => void
+  connectionError?: string | null
 }
 
-export default function VoiceButton({ status, isRecording }: VoiceButtonProps) {
-  const { setRecording, setVoiceStatus } = useConversationStore()
+export default function VoiceButton({
+  status,
+  isRecording,
+  onStartListening,
+  onStopListening,
+  connectionError,
+}: VoiceButtonProps) {
   const { voiceMode } = useSettingsStore()
 
   const handlePress = useCallback(() => {
     if (voiceMode === 'push-to-talk') {
-      setRecording(true)
-      setVoiceStatus('listening')
+      onStartListening()
     } else {
-      // Tap to toggle
-      setRecording(!isRecording)
-      setVoiceStatus(isRecording ? 'idle' : 'listening')
+      if (isRecording) {
+        onStopListening()
+      } else {
+        onStartListening()
+      }
     }
-  }, [voiceMode, isRecording, setRecording, setVoiceStatus])
+  }, [voiceMode, isRecording, onStartListening, onStopListening])
 
   const handleRelease = useCallback(() => {
     if (voiceMode === 'push-to-talk') {
-      setRecording(false)
-      setVoiceStatus('processing')
-      // Simulate processing then idle
-      setTimeout(() => setVoiceStatus('idle'), 1500)
+      onStopListening()
     }
-  }, [voiceMode, setRecording, setVoiceStatus])
+  }, [voiceMode, onStopListening])
 
   const statusColors = {
     idle: 'bg-accent hover:bg-accent-hover',
@@ -64,6 +69,9 @@ export default function VoiceButton({ status, isRecording }: VoiceButtonProps) {
         <MicIcon className="w-10 h-10 text-white" isActive={isRecording} />
       </button>
       <span className="text-sm text-butler-400">{statusLabels[status]}</span>
+      {connectionError && (
+        <span className="text-xs text-red-400">Demo mode</span>
+      )}
     </div>
   )
 }
@@ -72,7 +80,6 @@ function MicIcon({ className, isActive }: { className?: string; isActive?: boole
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
       {isActive ? (
-        // Mic with waves
         <>
           <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
         </>

@@ -76,3 +76,14 @@ export const api = {
 }
 
 export { ApiError }
+
+/** LiveKit token response from POST /api/auth/token */
+export interface LiveKitTokenResponse {
+  livekit_token: string
+  room_name: string
+}
+
+/** Fetch a LiveKit room token for voice sessions */
+export function getLiveKitToken(): Promise<LiveKitTokenResponse> {
+  return api.post<LiveKitTokenResponse>('/auth/token')
+}
