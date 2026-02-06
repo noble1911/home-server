@@ -288,7 +288,7 @@ function VoiceAssistantUI() {
 
 1. **JWT tokens** - PWA authenticates, receives scoped LiveKit token
 2. **Internal network** - Whisper, Kokoro, Nanobot not exposed externally
-3. **Tailscale only** - LiveKit accessible via VPN, not public internet
+3. **Cloudflare Tunnel** - LiveKit accessible via tunnel, not directly on public internet
 4. **No stored audio** - Audio processed in-memory, not persisted
 
 ---

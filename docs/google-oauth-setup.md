@@ -44,7 +44,7 @@ This guide walks you through creating Google OAuth credentials so Butler can acc
 4. Name it `Butler Web`
 5. Under **Authorized redirect URIs**, add:
    - `http://localhost:8000/api/oauth/google/callback` (for local development)
-   - `https://YOUR-TAILSCALE-HOSTNAME:8000/api/oauth/google/callback` (for production)
+   - `https://YOUR-TUNNEL-DOMAIN/api/oauth/google/callback` (for production)
 6. Click **Create**
 7. Copy the **Client ID** and **Client Secret**
 
@@ -59,7 +59,7 @@ GOOGLE_REDIRECT_URI=http://localhost:8000/api/oauth/google/callback
 OAUTH_FRONTEND_URL=http://localhost:5173
 ```
 
-For production, update `GOOGLE_REDIRECT_URI` and `OAUTH_FRONTEND_URL` to your Tailscale hostname.
+For production, update `GOOGLE_REDIRECT_URI` and `OAUTH_FRONTEND_URL` to your Cloudflare Tunnel hostname.
 
 ## 6. Restart Butler
 

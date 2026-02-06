@@ -52,10 +52,10 @@
 │  └─────────────────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
-                                    ▼ (Tailscale VPN)
+                                    ▼ (Cloudflare Tunnel)
                         ┌───────────────────────┐
                         │   Remote Access       │
-                        │   Phone / Laptop      │
+                        │   Phone / Laptop / TV │
                         └───────────────────────┘
 ```
 
@@ -116,8 +116,7 @@ Ask at store: "このACアダプターは100-240V対応ですか？" (Does this 
 | Service | Homepage | Purpose | Run Method | RAM (Idle) | RAM (Peak) | Port |
 |---------|----------|---------|------------|------------|------------|------|
 | [**OrbStack**](https://orbstack.dev/) | [orbstack.dev](https://orbstack.dev/) | Docker engine optimized for Apple Silicon | Native macOS app | 500MB | 1GB | - |
-| [**Tailscale**](https://tailscale.com/) | [tailscale.com](https://tailscale.com/) | Mesh VPN for secure remote access | Native macOS app | 50MB | 100MB | - |
-| [**Cloudflare Tunnel**](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) | [cloudflare.com](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) | Secure tunnel for Alexa→HA (no public IP) | Docker (cloudflared) | 50MB | 100MB | - |
+| [**Cloudflare Tunnel**](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) | [cloudflare.com](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) | Primary remote access for all user-facing services (no public IP) | Docker (cloudflared) | 50MB | 100MB | - |
 | [**Homebrew**](https://brew.sh/) | [brew.sh](https://brew.sh/) | Package manager for CLI tools | Native macOS | - | - | - |
 
 ### Voice Assistant (Real-Time)
@@ -263,7 +262,7 @@ The Butler is built on **Nanobot with custom MCPs**, keeping the codebase minima
 |-----------|----------------|
 | **No external skills** | Skill download capability removed from codebase |
 | **Custom MCPs only** | All integrations built and audited by us |
-| **Network isolation** | Tailscale only - no public internet exposure |
+| **Network isolation** | Cloudflare Tunnel for remote access, admin services LAN-only |
 | **Read-only where possible** | Calendar, email, location = read-only access |
 | **Multi-user** | Supports both household members |
 
@@ -300,7 +299,8 @@ The Butler is built on **Nanobot with custom MCPs**, keeping the codebase minima
 │           │                    │          └────────┬────────┘               │
 │           │                    │                   │                        │
 │           │  WebRTC            │                   │ AWS Lambda (haaska)    │
-│           │  (Tailscale)       │                   │ + Cloudflare Tunnel    │
+│           │  (Cloudflare       │                   │ + Cloudflare Tunnel    │
+│           │   Tunnel)          │                   │                        │
 │           └──────────┬─────────┴───────────────────┘                        │
 │                      │                                                      │
 │                      ▼                                                      │
@@ -594,7 +594,7 @@ Custom Python tools interface directly with PostgreSQL (not Nanobot's built-in `
 │   │                        (no recording, no sending, no waiting)       │  │
 │   └─────────────────────────────────────────────────────────────────────┘  │
 │         │                                                    ▲              │
-│         │ WebRTC (via Tailscale)                            │              │
+│         │ WebRTC (via Cloudflare Tunnel)                     │              │
 │         ▼                                                    │              │
 │   ┌─────────────────────────────────────────────────────────────────────┐  │
 │   │                     MAC MINI SERVER                                 │  │
@@ -759,7 +759,7 @@ Nanobot is already minimal (~4k lines), but we further harden it:
 | Tool directory | ⚠️ Locked to our custom MCPs only |
 | Shell execution | ⚠️ Removed or restricted to allowlist |
 | File system access | ⚠️ Restricted to specific paths |
-| Network access | ⚠️ Tailscale only (no public ports) |
+| Network access | ⚠️ Cloudflare Tunnel (no public ports) |
 | LLM providers | ✅ Claude API only |
 | WhatsApp | ✅ WebSocket mode (no public IP) |
 | Telegram | ✅ Voice + text enabled |
@@ -1151,20 +1151,23 @@ This does NOT protect against: Mac Mini theft/fire (use cloud for that).
 
 | Port | Service | Access |
 |------|---------|--------|
-| 8096 | Jellyfin | LAN + Tailscale |
-| 8123 | Home Assistant | LAN + Tailscale |
-| 2283 | Immich | LAN + Tailscale |
-| 8080 | Nextcloud | LAN + Tailscale |
+| 3000 | Butler PWA | LAN + Cloudflare Tunnel |
+| 8000 | Butler API | LAN + Cloudflare Tunnel |
+| 8096 | Jellyfin | LAN + Cloudflare Tunnel |
+| 8123 | Home Assistant | LAN + Cloudflare Tunnel |
+| 2283 | Immich | LAN + Cloudflare Tunnel |
+| 8080 | Nextcloud | LAN + Cloudflare Tunnel |
+| 8083 | Calibre-Web | LAN + Cloudflare Tunnel |
+| 13378 | Audiobookshelf | LAN + Cloudflare Tunnel |
+| 7880 | LiveKit | LAN + Cloudflare Tunnel |
 | 7878 | Radarr | LAN only |
 | 8989 | Sonarr | LAN only |
 | 8787 | Readarr | LAN only |
 | 6767 | Bazarr | LAN only |
 | 9696 | Prowlarr | LAN only |
 | 8081 | qBittorrent | LAN only |
-| 8083 | Calibre-Web | LAN + Tailscale |
-| 13378 | Audiobookshelf | LAN + Tailscale |
 | 8100 | Butler Agent | LAN only |
-| 8200 | Kokoro TTS | LAN only |
+| 8880 | Kokoro TTS | LAN only |
 | 9000 | Whisper | LAN only |
 
 ### Service Communication
@@ -1202,7 +1205,7 @@ This does NOT protect against: Mac Mini theft/fire (use cloud for that).
 ### Phase 1: Foundation (Day 1)
 - [ ] Install OrbStack
 - [ ] Install Homebrew
-- [ ] Install Tailscale
+- [ ] Configure Cloudflare Tunnel (see [setup guide](docs/cloudflare-tunnel.md))
 - [ ] Configure external drive mount
 - [ ] Create directory structure
 
@@ -1255,7 +1258,7 @@ This does NOT protect against: Mac Mini theft/fire (use cloud for that).
 - [ ] Configure automatic backups
 - [ ] Set up monitoring/alerts
 - [ ] Document credentials securely
-- [ ] Test Tailscale remote access
+- [ ] Test Cloudflare Tunnel remote access
 
 ---
 
@@ -1287,9 +1290,8 @@ Purchased in Japan with tourist tax-free discount (10% off). Exchange rate: £1 
 |------|----------|-------|
 | [Claude API](https://www.anthropic.com/api) | ~£3.50 | Butler brain (~500 requests/month) |
 | Electricity | ~£3.70 | Mac Mini 24/7 (~15W avg × 730hrs × 34p/kWh) |
-| [Tailscale](https://tailscale.com/) | £0 | Free tier (up to 100 devices) |
 | [AWS Lambda](https://aws.amazon.com/lambda/) (haaska) | £0 | Free tier (1M requests/month) |
-| [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/) | £0 | Free tier |
+| [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/) | £0 | Free tier — primary remote access |
 | Voice (Whisper + Kokoro) | £0 | Runs locally on Mac Mini |
 | All software | £0 | Open source |
 | **Total Monthly (no backup)** | **~£7.21** | |
@@ -1346,8 +1348,7 @@ All software used in this project with links to official sources.
 | Software | Homepage | Purpose | License |
 |----------|----------|---------|---------|
 | [OrbStack](https://orbstack.dev/) | [orbstack.dev](https://orbstack.dev/) | Fast Docker & Linux on macOS (Apple Silicon optimized) | Freemium |
-| [Tailscale](https://tailscale.com/) | [tailscale.com](https://tailscale.com/) | Zero-config mesh VPN for secure remote access | Free tier |
-| [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) | [cloudflare.com](https://developers.cloudflare.com/cloudflare-one/) | Secure tunnel for Alexa→HA integration (no public IP) | Free tier |
+| [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) | [cloudflare.com](https://developers.cloudflare.com/cloudflare-one/) | Primary remote access for all user-facing services (no public IP) | Free tier |
 | [Homebrew](https://brew.sh/) | [brew.sh](https://brew.sh/) | Package manager for macOS CLI tools | Open Source |
 
 ### Voice & AI
@@ -1437,10 +1438,11 @@ All software used in this project with links to official sources.
 4. **Swap disabled** - macOS handles memory pressure well on Apple Silicon
 
 ### Security Considerations
-1. **Tailscale only** - No ports exposed to public internet
-2. **Strong passwords** - Use unique passwords for each service
-3. **Regular backups** - Automate database and config backups
-4. **Update schedule** - Keep containers updated for security patches
+1. **Cloudflare Tunnel** - No ports exposed to public internet; user-facing services accessible via Cloudflare-managed HTTPS
+2. **Admin services LAN-only** - *arr stack, qBittorrent, Prowlarr not exposed remotely
+3. **Strong passwords** - Use unique passwords for each service
+4. **Regular backups** - Automate database and config backups
+5. **Update schedule** - Keep containers updated for security patches
 
 ---
 
