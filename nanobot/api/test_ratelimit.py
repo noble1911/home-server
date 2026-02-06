@@ -6,6 +6,8 @@ Unit tests for SlidingWindowStore + integration tests using a minimal
 Starlette app with the RateLimitMiddleware.
 """
 
+from __future__ import annotations
+
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse

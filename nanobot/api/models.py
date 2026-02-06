@@ -236,3 +236,27 @@ class ToolUsageSummary(BaseModel):
 class ToolUsageResponse(BaseModel):
     entries: list[ToolUsageEntry]
     summary: ToolUsageSummary
+
+
+# --- Webhooks (Home Assistant) ---
+
+
+class HAWebhookEvent(BaseModel):
+    """Incoming Home Assistant webhook payload.
+
+    HA automations typically send ``state_changed`` events with entity details,
+    or ``automation_triggered`` events with the automation name.  Custom events
+    use an arbitrary ``event_type``.
+    """
+
+    event_type: str  # "state_changed", "automation_triggered", custom
+    entity_id: str | None = None
+    old_state: str | None = None
+    new_state: str | None = None
+    attributes: dict = Field(default_factory=dict)
+
+
+class HAWebhookResponse(BaseModel):
+    status: str  # "accepted", "ignored"
+    event_id: int | None = None
+    notification_sent: bool = False

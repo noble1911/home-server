@@ -86,6 +86,9 @@ class Settings(BaseSettings):
     # WhatsApp Gateway (outbound notifications)
     whatsapp_gateway_url: str = ""
 
+    # Home Assistant webhook authentication
+    ha_webhook_secret: str = ""
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
 
