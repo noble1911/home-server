@@ -21,6 +21,12 @@ secrets.yaml
 # haaska config (contains HA access token)
 haaska-config/
 
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
 # Node.js
 node_modules/
 npm-debug.log*

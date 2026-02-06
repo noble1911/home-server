@@ -41,6 +41,7 @@ from .scheduler import TaskScheduler
 from .auth import decode_user_jwt
 from .cleanup import start_cleanup, stop_cleanup
 from .config import settings
+from .ratelimit import start_ratelimit_cleanup, stop_ratelimit_cleanup
 
 # Module-level state, set during lifespan startup
 _db_pool: DatabasePool | None = None
@@ -168,12 +169,18 @@ async def init_resources() -> None:
     # Background cleanup for old conversations and expired facts
     start_cleanup(_db_pool, settings.cleanup_retention_days)
 
+    # Background cleanup for rate limit buckets
+    from .server import rate_limit_store  # lazy import to avoid circular dep
+
+    start_ratelimit_cleanup(rate_limit_store)
+
 
 async def cleanup_resources() -> None:
     """Release resources on shutdown."""
     global _db_pool, _tools, _scheduler
     if _scheduler:
         await _scheduler.stop()
+    await stop_ratelimit_cleanup()
     await stop_cleanup()
     if _tools:
         for tool in _tools.values():

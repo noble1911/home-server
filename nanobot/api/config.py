@@ -70,6 +70,13 @@ class Settings(BaseSettings):
     # Cleanup jobs
     cleanup_retention_days: int = 30
 
+    # Rate limiting (requests per minute per user/IP)
+    rate_limit_enabled: bool = True
+    rate_limit_auth: int = 5       # Auth endpoints (brute-force protection)
+    rate_limit_chat: int = 20      # Chat endpoints (Claude API cost control)
+    rate_limit_voice: int = 30     # Voice endpoints
+    rate_limit_default: int = 60   # All other endpoints
+
     # Google OAuth (for Calendar, Gmail, etc.)
     google_client_id: str = ""
     google_client_secret: str = ""
