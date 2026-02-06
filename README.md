@@ -2,6 +2,23 @@
 
 Self-hosted media server with AI voice assistant on Mac Mini M4.
 
+## Prerequisites
+
+- **macOS on Apple Silicon** (Mac Mini M4 recommended)
+- **8TB external drive** plugged in and formatted (APFS or Mac OS Extended)
+- **API keys** to have ready (the setup script will prompt for each):
+
+| Key | Required? | Where to get it |
+|-----|-----------|-----------------|
+| Anthropic API Key | **Yes** | [console.anthropic.com](https://console.anthropic.com/settings/keys) |
+| Groq API Key | Recommended | [console.groq.com](https://console.groq.com/keys) (free — for voice STT) |
+| OpenWeatherMap API Key | Optional | [openweathermap.org](https://openweathermap.org/api) (free tier) |
+| Home Assistant Token | Optional | Generated in HA after setup |
+| Google OAuth credentials | Optional | [Google Cloud Console](https://console.cloud.google.com/apis/credentials) — see [setup guide](docs/google-oauth-setup.md) |
+| Cloudflare Tunnel Token | Optional | [Cloudflare Zero Trust](https://dash.cloudflare.com) — for Alexa integration |
+
+> Security secrets (JWT, LiveKit keys, internal API key) are **auto-generated** during setup.
+
 ## Quick Start
 
 Run everything at once:
@@ -22,6 +39,15 @@ Use a different external drive name:
 curl -fsSL https://raw.githubusercontent.com/noble1911/home-server/main/setup.sh | bash -s -- --drive-name=MyDrive
 ```
 
+Other flags:
+
+| Flag | Description |
+|------|-------------|
+| `--no-ssh` | Skip SSH setup |
+| `--drive-name=NAME` | External drive name (default: `HomeServer`) |
+| `--skip-voice` | Skip voice stack deployment |
+| `--skip-nanobot` | Skip AI agent deployment |
+
 ---
 
 ## Setup Guide
@@ -40,6 +66,7 @@ curl -fsSL https://raw.githubusercontent.com/noble1911/home-server/main/setup.sh
 | 10 | [10-photos-files.sh](scripts/10-photos-files.sh) | [docs](docs/10-photos-files.md) | Deploy Immich + Nextcloud |
 | 11 | [11-smart-home.sh](scripts/11-smart-home.sh) | [docs](docs/11-smart-home.md) | Deploy Home Assistant + Cloudflare Tunnel |
 | 12 | [12-voice-stack.sh](scripts/12-voice-stack.sh) | [docs](docs/12-voice-stack.md) | Deploy LiveKit + Whisper + Kokoro TTS |
+| 13 | [13-nanobot.sh](scripts/13-nanobot.sh) | - | Deploy Butler AI agent + API (prompts for API keys) |
 
 Run individual steps:
 ```bash
@@ -48,6 +75,33 @@ curl -fsSL https://raw.githubusercontent.com/noble1911/home-server/main/scripts/
 ```
 
 Or follow the manual docs for step-by-step instructions.
+
+---
+
+## Configuration
+
+All environment variables live in `nanobot/.env` (created from `.env.example` during step 13). The setup script prompts for each value interactively.
+
+| Variable | Purpose | Auto-generated? |
+|----------|---------|-----------------|
+| `ANTHROPIC_API_KEY` | Claude API for Butler brain | No (prompted) |
+| `JWT_SECRET` | PWA user authentication | Yes |
+| `INTERNAL_API_KEY` | Service-to-service auth | Yes |
+| `LIVEKIT_API_KEY` | Voice stack authentication | Yes |
+| `LIVEKIT_API_SECRET` | Voice stack authentication | Yes |
+| `GROQ_API_KEY` | Cloud STT via Groq Whisper | No (prompted) |
+| `HA_TOKEN` | Home Assistant access | No (prompted) |
+| `OPENWEATHERMAP_API_KEY` | Weather queries | No (prompted) |
+| `GOOGLE_CLIENT_ID` | Google Calendar/Gmail OAuth | No (prompted) |
+| `GOOGLE_CLIENT_SECRET` | Google Calendar/Gmail OAuth | No (prompted) |
+| `CLOUDFLARE_TUNNEL_TOKEN` | Alexa → Home Assistant tunnel | No (prompted) |
+| `INVITE_CODES` | Household registration codes | Defaults to `BUTLER-001` |
+| `DB_USER` / `DB_PASSWORD` | PostgreSQL (shared with Immich) | Defaults to `postgres` |
+
+To reconfigure after setup, edit `nanobot/.env` and restart:
+```bash
+cd nanobot && docker compose down && docker compose up -d
+```
 
 ---
 
@@ -101,20 +155,25 @@ Or follow the manual docs for step-by-step instructions.
 | Component | Purpose | Port |
 |-----------|---------|------|
 | [LiveKit](https://livekit.io/) | WebRTC server | 7880 |
-| [Groq Whisper](https://console.groq.com/) | Speech-to-text (cloud, primary) | - |
+| [Groq Whisper](https://console.groq.com/) | Speech-to-text (cloud) | - |
 | [Whisper](https://github.com/openai/whisper) | Speech-to-text (local fallback) | 9000 |
 | LiveKit Agent | Voice pipeline orchestrator | - |
 | [Kokoro TTS](https://github.com/remsky/Kokoro-FastAPI) | Text-to-speech | 8880 |
-| Butler API | AI reasoning + tool execution | 8000 |
 
-> **Voice setup:** Requires a free [Groq API key](https://console.groq.com/keys) for
-> speech-to-text. The setup script will prompt for this, or add `GROQ_API_KEY` to
-> `nanobot/.env` and `docker/voice-stack/.env` manually.
+### AI Butler
+| Component | Purpose | Port |
+|-----------|---------|------|
+| [Nanobot](https://github.com/HKUDS/nanobot) | AI agent with custom tools | 8100 |
+| Butler API | FastAPI gateway (chat, voice, auth, OAuth) | 8000 |
+| Butler PWA | React web app (voice + chat interface) | 3000 |
 
-### Integrations (optional)
+### Integrations (configured via Butler tools)
 | Component | Purpose | Setup |
 |-----------|---------|-------|
-| Google Calendar | Calendar queries via Butler | [setup guide](docs/google-oauth-setup.md) |
+| Weather | Forecasts via OpenWeatherMap | API key in `.env` |
+| Google Calendar | Calendar queries via OAuth | [setup guide](docs/google-oauth-setup.md) |
+| Home Assistant | Smart home control | HA token in `.env` |
+| Memory | User facts & preferences in PostgreSQL | Automatic |
 
 ---
 
@@ -126,19 +185,27 @@ home-server/
 ├── HOMESERVER_PLAN.md        # Complete architecture plan
 ├── CLAUDE.md                 # Context for Claude agents
 ├── setup.sh                  # Run all setup steps
+├── app/                      # Butler PWA (React + Vite)
+│   ├── src/
+│   │   ├── pages/            # Dashboard, Home, Login, Settings, etc.
+│   │   ├── stores/           # Auth, user, conversation state
+│   │   └── services/         # API client
+│   ├── Dockerfile
+│   └── docker-compose.yml
+├── butler/                   # Voice agent
+│   └── livekit-agent/        # LiveKit Agents worker (STT → LLM → TTS)
+├── nanobot/                  # AI agent + Butler API
+│   ├── api/                  # FastAPI server (auth, chat, voice, OAuth)
+│   ├── tools/                # Custom Python tools (weather, calendar, HA, memory)
+│   ├── migrations/           # PostgreSQL schema migrations
+│   ├── .env.example          # All configuration variables
+│   ├── docker-compose.yml    # Nanobot + Butler API containers
+│   └── Dockerfile
 ├── scripts/
 │   ├── 01-homebrew.sh        # Foundation scripts
-│   ├── 02-tailscale.sh
-│   ├── 03-power-settings.sh
-│   ├── 04-ssh.sh
-│   ├── 05-orbstack.sh
-│   ├── 06-external-drive.sh
-│   ├── 07-download-stack.sh  # Docker deployment scripts
-│   ├── 08-media-stack.sh
-│   ├── 09-books-stack.sh
-│   ├── 10-photos-files.sh
-│   ├── 11-smart-home.sh
-│   └── 12-voice-stack.sh
+│   ├── ...
+│   ├── 12-voice-stack.sh
+│   └── 13-nanobot.sh         # AI agent setup (prompts for API keys)
 ├── docker/
 │   ├── download-stack/       # Docker Compose files
 │   ├── media-stack/
@@ -149,7 +216,7 @@ home-server/
 └── docs/
     ├── 01-homebrew.md        # Manual instructions for each step
     ├── ...
-    └── 12-voice-stack.md
+    └── google-oauth-setup.md
 ```
 
 ---
