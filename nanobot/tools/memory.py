@@ -26,7 +26,7 @@ import os
 import asyncpg
 
 from .base import Tool
-from .embeddings import EmbeddingService
+from .embeddings import EMBEDDING_DIM, EmbeddingService
 
 
 class DatabasePool:
@@ -197,6 +197,8 @@ class RememberFactTool(DatabaseTool):
         embedding = None
         if self._embedding_service:
             embedding = await self._embedding_service.embed(fact)
+            if embedding is not None and len(embedding) != EMBEDDING_DIM:
+                embedding = None  # dimension mismatch — skip vector storage
 
         if embedding is not None:
             # Store fact with vector embedding (cast text → vector for pgvector)
