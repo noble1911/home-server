@@ -19,6 +19,7 @@ from tools import (
     HomeAssistantTool,
     ListEntitiesByDomainTool,
     RadarrTool,
+    ReadarrTool,
     RecallFactsTool,
     RememberFactTool,
     GetUserTool,
@@ -71,6 +72,13 @@ async def init_resources() -> None:
         _tools["radarr"] = RadarrTool(
             base_url=settings.radarr_url,
             api_key=settings.radarr_api_key,
+        )
+
+    # Only register Readarr tool if configured
+    if settings.readarr_url:
+        _tools["readarr"] = ReadarrTool(
+            base_url=settings.readarr_url,
+            api_key=settings.readarr_api_key,
         )
 
     # Only register Sonarr tool if configured
