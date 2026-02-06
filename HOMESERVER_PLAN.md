@@ -135,6 +135,7 @@ Ask at store: "このACアダプターは100-240V対応ですか？" (Does this 
 | Service | Homepage | Purpose | Run Method | RAM (Idle) | RAM (Peak) | Port |
 |---------|----------|---------|------------|------------|------------|------|
 | [**Nanobot**](https://github.com/HKUDS/nanobot) | [GitHub](https://github.com/HKUDS/nanobot) | Ultra-lightweight AI agent (~4k lines) | Docker container | 100MB | 300MB | 8100 |
+| **Butler API** | Self-built | FastAPI gateway for PWA, voice, and chat (uses Claude API + tools) | Docker container | 50MB | 200MB | 8000 |
 | Custom Skills/Tools | Self-built | Skills (markdown) + Tools (Python) for service integrations | Part of Nanobot | Included | Included | - |
 | [**APScheduler**](https://apscheduler.readthedocs.io/) | [Docs](https://apscheduler.readthedocs.io/) | Cron-style task scheduling | Part of Agent | Included | Included | - |
 
