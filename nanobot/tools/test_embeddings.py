@@ -10,10 +10,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
 
-from .embeddings import EmbeddingService
+from .embeddings import EMBEDDING_DIM, EmbeddingService
 
 
-FAKE_EMBEDDING = [0.1] * 768
+FAKE_EMBEDDING = [0.1] * EMBEDDING_DIM
 
 
 class TestEmbeddingService:
@@ -87,6 +87,32 @@ class TestEmbeddingService:
         mock_resp = AsyncMock()
         mock_resp.status = 200
         mock_resp.json = AsyncMock(return_value={"embeddings": []})
+
+        mock_session = AsyncMock(spec=aiohttp.ClientSession)
+        mock_ctx = AsyncMock()
+        mock_ctx.__aenter__ = AsyncMock(return_value=mock_resp)
+        mock_ctx.__aexit__ = AsyncMock(return_value=False)
+        mock_session.post = MagicMock(return_value=mock_ctx)
+
+        mock_session_ctx = AsyncMock()
+        mock_session_ctx.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session_ctx.__aexit__ = AsyncMock(return_value=False)
+
+        with patch("aiohttp.ClientSession", return_value=mock_session_ctx):
+            result = await service.embed("test text")
+
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_embed_dimension_mismatch(self):
+        """Test that wrong-dimension vectors are rejected."""
+        service = EmbeddingService("http://ollama:11434")
+
+        wrong_dim_embedding = [0.1] * 1536  # OpenAI ada-002 size, not ours
+
+        mock_resp = AsyncMock()
+        mock_resp.status = 200
+        mock_resp.json = AsyncMock(return_value={"embeddings": [wrong_dim_embedding]})
 
         mock_session = AsyncMock(spec=aiohttp.ClientSession)
         mock_ctx = AsyncMock()
