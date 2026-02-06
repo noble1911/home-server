@@ -31,6 +31,7 @@ from tools import (
     StorageMonitorTool,
     Tool,
     WeatherTool,
+    WhatsAppTool,
 )
 
 from .auth import decode_user_jwt
@@ -105,6 +106,13 @@ async def init_resources() -> None:
         _tools["jellyfin"] = JellyfinTool(
             base_url=settings.jellyfin_url,
             api_key=settings.jellyfin_api_key,
+        )
+
+    # Only register WhatsApp tool if configured
+    if settings.whatsapp_gateway_url:
+        _tools["whatsapp"] = WhatsAppTool(
+            gateway_url=settings.whatsapp_gateway_url,
+            db_pool=_db_pool,
         )
 
     # Health & storage monitoring (always registered — degrade gracefully)

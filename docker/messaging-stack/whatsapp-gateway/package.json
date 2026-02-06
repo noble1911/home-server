@@ -1,0 +1,14 @@
+{
+  "name": "whatsapp-gateway",
+  "version": "1.0.0",
+  "private": true,
+  "description": "REST API gateway for outbound WhatsApp notifications via whatsapp-web.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "qrcode-terminal": "^0.12.0",
+    "whatsapp-web.js": "^1.26.0"
+  }
+}
