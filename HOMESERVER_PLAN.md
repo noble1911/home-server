@@ -156,9 +156,11 @@ Ask at store: "このACアダプターは100-240V対応ですか？" (Does this 
 
 | Service | Homepage | Purpose | Run Method | RAM (Idle) | RAM (Peak) | Port |
 |---------|----------|---------|------------|------------|------------|------|
-| [**Calibre-Web**](https://github.com/janeczku/calibre-web) | [GitHub](https://github.com/janeczku/calibre-web) | E-book library & Kindle sync | Docker container | 150MB | 300MB | 8083 |
-| [**Audiobookshelf**](https://www.audiobookshelf.org/) | [audiobookshelf.org](https://www.audiobookshelf.org/) | Audiobook streaming & progress sync | Docker container | 200MB | 400MB | 13378 |
+| [**Calibre-Web**](https://github.com/janeczku/calibre-web) | [GitHub](https://github.com/janeczku/calibre-web) | E-book library, OPDS feed, Kindle email delivery | Docker container | 150MB | 300MB | 8083 |
+| [**Audiobookshelf**](https://www.audiobookshelf.org/) | [audiobookshelf.org](https://www.audiobookshelf.org/) | Audiobook streaming & progress sync (native mobile apps) | Docker container | 200MB | 400MB | 13378 |
 | [**Readarr**](https://readarr.com/) | [readarr.com](https://readarr.com/) | Book & audiobook automation | Docker container | 300MB | 500MB | 8787 |
+
+> **Ebook Access Methods:** Calibre-Web serves ebooks via browser (built-in EPUB/PDF reader), OPDS catalog feed (for mobile apps like KOReader, Moon+ Reader, FBReader), Kindle email delivery (Send-to-Kindle), and direct download. See [Ebook Reading Guide](docs/ebook-reading-guide.md) for setup. Audiobookshelf has native iOS/Android apps with offline downloads.
 
 ### Photos & Files
 
@@ -1207,7 +1209,7 @@ This does NOT protect against: Mac Mini theft/fire (use cloud for that).
 ### Phase 2: Download Infrastructure (Day 1-2)
 - [ ] Deploy qBittorrent
 - [ ] Deploy Prowlarr
-- [ ] Configure indexers
+- [ ] Configure indexers (public & private trackers) — see [Prowlarr Indexer Setup Guide](docs/prowlarr-indexers.md) (#109)
 
 ### Phase 3: Media Stack (Day 2-3)
 - [ ] Deploy Jellyfin
@@ -1219,7 +1221,9 @@ This does NOT protect against: Mac Mini theft/fire (use cloud for that).
 - [ ] Deploy Calibre-Web
 - [ ] Deploy Audiobookshelf
 - [ ] Deploy Readarr
-- [ ] Configure Kindle sync
+- [ ] Configure OPDS catalog feed for mobile reading apps (#111)
+- [ ] Configure Kindle email delivery (Send-to-Kindle via SMTP) (#112)
+- [ ] Write ebook reading setup guide — browser, OPDS, Kindle, direct download (#110)
 
 ### Phase 5: Photos & Files (Day 4-5)
 - [ ] Deploy Immich
@@ -1372,7 +1376,7 @@ All software used in this project with links to official sources.
 
 | Software | Homepage | Purpose | License |
 |----------|----------|---------|---------|
-| [Calibre-Web](https://github.com/janeczku/calibre-web) | [GitHub](https://github.com/janeczku/calibre-web) | E-book library web interface with Kindle sync | GPL-3.0 |
+| [Calibre-Web](https://github.com/janeczku/calibre-web) | [GitHub](https://github.com/janeczku/calibre-web) | E-book library: browser reader, OPDS feed, Kindle email delivery | GPL-3.0 |
 | [Audiobookshelf](https://www.audiobookshelf.org/) | [audiobookshelf.org](https://www.audiobookshelf.org/) | Self-hosted audiobook streaming with progress sync | GPL-3.0 |
 | [Readarr](https://readarr.com/) | [readarr.com](https://readarr.com/) | Book & audiobook collection automation | GPL-3.0 |
 
@@ -1440,4 +1444,4 @@ All software used in this project with links to official sources.
 
 ---
 
-*Last Updated: 2026-02-05*
+*Last Updated: 2026-02-06*
