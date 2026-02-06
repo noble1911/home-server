@@ -20,6 +20,7 @@ from tools import (
     RecallFactsTool,
     RememberFactTool,
     GetUserTool,
+    SonarrTool,
     Tool,
     WeatherTool,
 )
@@ -65,6 +66,13 @@ async def init_resources() -> None:
         _tools["radarr"] = RadarrTool(
             base_url=settings.radarr_url,
             api_key=settings.radarr_api_key,
+        )
+
+    # Only register Sonarr tool if configured
+    if settings.sonarr_url:
+        _tools["sonarr"] = SonarrTool(
+            base_url=settings.sonarr_url,
+            api_key=settings.sonarr_api_key,
         )
 
 
