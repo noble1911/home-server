@@ -22,7 +22,8 @@ class Settings(BaseSettings):
     # JWT auth for PWA users
     jwt_secret: str = "change-me-in-production"
     jwt_algorithm: str = "HS256"
-    jwt_expire_hours: int = 720  # 30 days
+    jwt_expire_hours: int = 1  # Access token: 1 hour (auto-refreshed by PWA)
+    jwt_refresh_expire_hours: int = 4320  # Refresh token: 180 days
 
     # Invite codes (comma-separated, for household registration)
     invite_codes: str = "BUTLER-001"

@@ -39,7 +39,7 @@ async def _get_profile(user_id: str, pool: DatabasePool) -> UserProfile:
     db = pool.pool
 
     user = await db.fetchrow(
-        "SELECT id, name, soul, created_at FROM butler.users WHERE id = $1",
+        "SELECT id, name, soul, role, created_at FROM butler.users WHERE id = $1",
         user_id,
     )
     if not user:
@@ -60,6 +60,7 @@ async def _get_profile(user_id: str, pool: DatabasePool) -> UserProfile:
         id=user["id"],
         name=user["name"],
         butlerName=soul.get("butler_name", "Butler"),
+        role=user["role"],
         createdAt=user["created_at"].isoformat(),
         soul=SoulConfig(
             personality=soul.get("personality", "balanced"),

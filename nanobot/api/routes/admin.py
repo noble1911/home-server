@@ -1,0 +1,114 @@
+"""Admin routes: invite code management.
+
+POST   /api/admin/invite-codes      — Generate a new invite code
+GET    /api/admin/invite-codes      — List all codes and their status
+DELETE /api/admin/invite-codes/{code} — Revoke an unused code
+"""
+
+from __future__ import annotations
+
+import secrets
+import string
+from datetime import datetime, timedelta, timezone
+
+from fastapi import APIRouter, Depends, HTTPException, Response
+
+from tools import DatabasePool
+
+from ..deps import get_admin_user, get_db_pool
+from ..models import (
+    CreateInviteCodeRequest,
+    CreateInviteCodeResponse,
+    InviteCodeInfo,
+    InviteCodeListResponse,
+)
+
+router = APIRouter()
+
+# Exclude ambiguous characters: 0/O, 1/I/L
+_CODE_ALPHABET = "".join(
+    c
+    for c in string.ascii_uppercase + string.digits
+    if c not in "0OI1L"
+)
+
+
+def _generate_code(length: int = 6) -> str:
+    """Generate a random alphanumeric code (uppercase, no ambiguous chars)."""
+    return "".join(secrets.choice(_CODE_ALPHABET) for _ in range(length))
+
+
+@router.post("/invite-codes", response_model=CreateInviteCodeResponse, status_code=201)
+async def create_invite_code(
+    req: CreateInviteCodeRequest = CreateInviteCodeRequest(),
+    admin_id: str = Depends(get_admin_user),
+    pool: DatabasePool = Depends(get_db_pool),
+):
+    """Generate a new invite code. Admin only."""
+    db = pool.pool
+    expires_at = datetime.now(timezone.utc) + timedelta(days=req.expiresInDays)
+
+    # Retry on collision (extremely unlikely with 6 chars from 31-char alphabet)
+    for _ in range(10):
+        code = _generate_code()
+        existing = await db.fetchval(
+            "SELECT 1 FROM butler.invite_codes WHERE code = $1", code
+        )
+        if not existing:
+            await db.execute(
+                """INSERT INTO butler.invite_codes (code, created_by, expires_at)
+                   VALUES ($1, $2, $3)""",
+                code,
+                admin_id,
+                expires_at,
+            )
+            return CreateInviteCodeResponse(
+                code=code, expiresAt=expires_at.isoformat()
+            )
+
+    raise HTTPException(500, "Failed to generate unique code")
+
+
+@router.get("/invite-codes", response_model=InviteCodeListResponse)
+async def list_invite_codes(
+    admin_id: str = Depends(get_admin_user),
+    pool: DatabasePool = Depends(get_db_pool),
+):
+    """List all invite codes with their status. Admin only."""
+    db = pool.pool
+    rows = await db.fetch(
+        """SELECT code, created_by, used_by, expires_at, created_at, used_at
+           FROM butler.invite_codes ORDER BY created_at DESC"""
+    )
+    now = datetime.now(timezone.utc)
+    codes = [
+        InviteCodeInfo(
+            code=r["code"],
+            createdBy=r["created_by"],
+            usedBy=r["used_by"],
+            expiresAt=r["expires_at"].isoformat(),
+            createdAt=r["created_at"].isoformat(),
+            usedAt=r["used_at"].isoformat() if r["used_at"] else None,
+            isExpired=r["expires_at"] < now,
+            isUsed=r["used_by"] is not None,
+        )
+        for r in rows
+    ]
+    return InviteCodeListResponse(codes=codes)
+
+
+@router.delete("/invite-codes/{code}", status_code=204)
+async def revoke_invite_code(
+    code: str,
+    admin_id: str = Depends(get_admin_user),
+    pool: DatabasePool = Depends(get_db_pool),
+):
+    """Revoke an unused invite code. Admin only."""
+    db = pool.pool
+    result = await db.execute(
+        "DELETE FROM butler.invite_codes WHERE code = $1 AND used_by IS NULL",
+        code.upper(),
+    )
+    if result == "DELETE 0":
+        raise HTTPException(404, "Code not found or already used")
+    return Response(status_code=204)

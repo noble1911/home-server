@@ -95,7 +95,7 @@ All environment variables live in `nanobot/.env` (created from `.env.example` du
 | `GOOGLE_CLIENT_ID` | Google Calendar/Gmail OAuth | No (prompted) |
 | `GOOGLE_CLIENT_SECRET` | Google Calendar/Gmail OAuth | No (prompted) |
 | `CLOUDFLARE_TUNNEL_TOKEN` | Alexa → Home Assistant tunnel | No (prompted) |
-| `INVITE_CODES` | Household registration codes | Defaults to `BUTLER-001` |
+| `INVITE_CODES` | Admin bootstrap invite code | Defaults to `BUTLER-001` |
 | `DB_USER` / `DB_PASSWORD` | PostgreSQL (shared with Immich) | Defaults to `postgres` |
 
 To reconfigure after setup, edit `nanobot/.env` and restart:
@@ -111,17 +111,26 @@ Once `setup.sh` finishes, every service needs its own first-time setup. Open eac
 
 ### Butler (AI Assistant)
 
-The Butler PWA uses **invite codes** instead of traditional accounts. As the admin, you control who can access Butler.
+Butler uses **invite codes** for registration. The first person to log in becomes the **admin**.
 
-1. **During setup**, you chose an invite code (default: `BUTLER-001`)
+**First-time setup (admin):**
+1. During `setup.sh`, you chose an admin invite code (default: `BUTLER-001`)
 2. Open the PWA at `http://<server-ip>:3000`
-3. Enter the invite code — this creates your user and logs you in
-4. Complete onboarding (set your name, preferences, TTS voice)
+3. Enter your admin invite code — this creates your account with admin privileges
+4. Complete onboarding (set your name, preferences)
 
 **Adding household members:**
-- Add more codes to `INVITE_CODES` in `nanobot/.env` (comma-separated, e.g. `BUTLER-001,BUTLER-002`)
-- Restart: `cd nanobot && docker compose restart butler-api`
-- Share the code with the person — each code maps to one user
+1. Open **Settings** in the PWA (you must be admin)
+2. Tap **Generate Invite Code** — a 6-character code is created (valid for 7 days)
+3. Share the code with the person
+4. They enter it at `http://<server-ip>:3000` to create their account
+5. Used codes cannot be reused. You can revoke unused codes from Settings.
+
+**Sessions & multi-device:**
+- Access tokens expire after 1 hour and refresh automatically in the background
+- Refresh tokens last 180 days — users stay logged in across device restarts
+- No need to re-invite someone just because their session expired
+- To use Butler on a new device, log in with the same invite code (admin code) or ask the admin for a new code
 
 ### Media Services
 

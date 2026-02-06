@@ -25,6 +25,11 @@ class AuthTokens(BaseModel):
 class RedeemInviteResponse(BaseModel):
     tokens: AuthTokens
     hasCompletedOnboarding: bool
+    role: str = "user"
+
+
+class RefreshTokenRequest(BaseModel):
+    refreshToken: str
 
 
 class LiveKitTokenRequest(BaseModel):
@@ -34,6 +39,33 @@ class LiveKitTokenRequest(BaseModel):
 class LiveKitTokenResponse(BaseModel):
     livekit_token: str
     room_name: str
+
+
+# --- Admin: Invite Code Management ---
+
+
+class CreateInviteCodeRequest(BaseModel):
+    expiresInDays: int = 7
+
+
+class InviteCodeInfo(BaseModel):
+    code: str
+    createdBy: str | None
+    usedBy: str | None
+    expiresAt: str
+    createdAt: str
+    usedAt: str | None
+    isExpired: bool
+    isUsed: bool
+
+
+class InviteCodeListResponse(BaseModel):
+    codes: list[InviteCodeInfo]
+
+
+class CreateInviteCodeResponse(BaseModel):
+    code: str
+    expiresAt: str
 
 
 # --- User (matches app/src/types/user.ts) ---
@@ -58,6 +90,7 @@ class UserProfile(BaseModel):
     name: str
     email: str | None = None
     butlerName: str = "Butler"
+    role: str = "user"
     createdAt: str
     soul: SoulConfig = Field(default_factory=SoulConfig)
     facts: list[UserFact] = Field(default_factory=list)

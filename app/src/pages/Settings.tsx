@@ -3,7 +3,7 @@ import { useAuthStore } from '../stores/authStore'
 import { useUserStore } from '../stores/userStore'
 import { useSettingsStore } from '../stores/settingsStore'
 import { api } from '../services/api'
-import type { OAuthConnection } from '../types/user'
+import type { InviteCode, OAuthConnection } from '../types/user'
 
 interface ConnectionsResponse {
   connections: OAuthConnection[]
@@ -13,19 +13,39 @@ interface AuthorizeResponse {
   authorizeUrl: string
 }
 
+interface InviteCodeListResponse {
+  codes: InviteCode[]
+}
+
+interface CreateInviteCodeResponse {
+  code: string
+  expiresAt: string
+}
+
 export default function Settings() {
-  const { logout } = useAuthStore()
+  const { logout, role } = useAuthStore()
   const { profile, updateButlerName, updateSoul, isLoading } = useUserStore()
   const { voiceMode, setVoiceMode } = useSettingsStore()
+  const isAdmin = role === 'admin'
 
   const [connections, setConnections] = useState<OAuthConnection[]>([])
   const [connectionsLoading, setConnectionsLoading] = useState(true)
   const [oauthMessage, setOauthMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
+  // Invite code state (admin only)
+  const [inviteCodes, setInviteCodes] = useState<InviteCode[]>([])
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [copiedCode, setCopiedCode] = useState<string | null>(null)
+
   // Fetch OAuth connections on mount
   useEffect(() => {
     fetchConnections()
   }, [])
+
+  // Fetch invite codes on mount (admin only)
+  useEffect(() => {
+    if (isAdmin) fetchInviteCodes()
+  }, [isAdmin])
 
   // Handle OAuth callback redirect params
   useEffect(() => {
@@ -55,6 +75,49 @@ export default function Settings() {
       setConnections([])
     } finally {
       setConnectionsLoading(false)
+    }
+  }
+
+  async function fetchInviteCodes() {
+    try {
+      const data = await api.get<InviteCodeListResponse>('/admin/invite-codes')
+      setInviteCodes(data.codes)
+    } catch {
+      setInviteCodes([])
+    }
+  }
+
+  async function generateInviteCode() {
+    setIsGenerating(true)
+    try {
+      const data = await api.post<CreateInviteCodeResponse>('/admin/invite-codes')
+      // Re-fetch the full list to get complete status info
+      await fetchInviteCodes()
+      // Auto-copy the new code
+      await copyCode(data.code)
+    } catch {
+      // Silently fail — admin can retry
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
+  async function revokeInviteCode(code: string) {
+    try {
+      await api.delete(`/admin/invite-codes/${code}`)
+      setInviteCodes(prev => prev.filter(c => c.code !== code))
+    } catch {
+      // Silently fail
+    }
+  }
+
+  async function copyCode(code: string) {
+    try {
+      await navigator.clipboard.writeText(code)
+      setCopiedCode(code)
+      setTimeout(() => setCopiedCode(null), 2000)
+    } catch {
+      // Clipboard API not available
     }
   }
 
@@ -108,8 +171,77 @@ export default function Settings() {
             <label className="block text-sm text-butler-300 mb-1">Name</label>
             <div className="text-butler-100">{profile.name}</div>
           </div>
+          {isAdmin && (
+            <div>
+              <label className="block text-sm text-butler-300 mb-1">Role</label>
+              <div className="text-accent text-sm">Admin</div>
+            </div>
+          )}
         </div>
       </section>
+
+      {/* Invite Codes - admin only */}
+      {isAdmin && (
+        <section className="card p-4">
+          <h2 className="text-sm font-medium text-butler-400 uppercase tracking-wide mb-4">
+            Invite Codes
+            <span className="text-butler-600 ml-2 text-xs normal-case">admin</span>
+          </h2>
+
+          <button
+            onClick={generateInviteCode}
+            disabled={isGenerating}
+            className="btn btn-primary w-full mb-4 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isGenerating ? 'Generating...' : 'Generate Invite Code'}
+          </button>
+
+          {inviteCodes.length === 0 ? (
+            <p className="text-sm text-butler-500 text-center">
+              No invite codes yet. Generate one to add household members.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {inviteCodes.map(code => (
+                <div
+                  key={code.code}
+                  className="flex items-center justify-between p-3 bg-butler-800 rounded-lg"
+                >
+                  <div className="min-w-0">
+                    <span className="font-mono text-butler-100 text-sm">{code.code}</span>
+                    <div className="text-xs text-butler-500 mt-0.5">
+                      {code.isUsed
+                        ? `Used${code.usedBy ? ` by ${code.usedBy.replace('invite_', '')}` : ''}`
+                        : code.isExpired
+                          ? 'Expired'
+                          : `Expires ${new Date(code.expiresAt).toLocaleDateString()}`
+                      }
+                    </div>
+                  </div>
+                  <div className="flex gap-2 shrink-0 ml-2">
+                    {!code.isUsed && !code.isExpired && (
+                      <>
+                        <button
+                          onClick={() => copyCode(code.code)}
+                          className="px-2 py-1 rounded text-xs bg-butler-700 text-accent hover:bg-butler-600"
+                        >
+                          {copiedCode === code.code ? 'Copied!' : 'Copy'}
+                        </button>
+                        <button
+                          onClick={() => revokeInviteCode(code.code)}
+                          className="px-2 py-1 rounded text-xs bg-red-900/50 text-red-300 hover:bg-red-900"
+                        >
+                          Revoke
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Butler Settings - synced across devices */}
       <section className="card p-4">

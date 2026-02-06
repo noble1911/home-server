@@ -1,18 +1,19 @@
 import { useState } from 'react'
 import { useAuthStore } from '../stores/authStore'
 import { api } from '../services/api'
-import type { AuthTokens } from '../types/user'
+import type { AuthTokens, UserRole } from '../types/user'
 
 interface RedeemInviteResponse {
   tokens: AuthTokens
   hasCompletedOnboarding: boolean
+  role: UserRole
 }
 
 export default function Login() {
   const [inviteCode, setInviteCode] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
-  const { setTokens, setOnboardingComplete } = useAuthStore()
+  const { setTokens, setRole, setOnboardingComplete } = useAuthStore()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -26,6 +27,7 @@ export default function Login() {
       })
 
       setTokens(response.tokens)
+      setRole(response.role)
       setOnboardingComplete(response.hasCompletedOnboarding)
     } catch (err) {
       // Dev-only mock code — stripped from production builds by Vite
@@ -35,6 +37,7 @@ export default function Login() {
           refreshToken: 'mock_refresh_token',
           expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
         })
+        setRole('admin')
         setOnboardingComplete(false)
       } else {
         setError(
@@ -71,9 +74,9 @@ export default function Login() {
               type="text"
               value={inviteCode}
               onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
-              placeholder="XXX-XXX"
+              placeholder="Enter code"
               className="input text-center text-xl tracking-widest font-mono"
-              maxLength={7}
+              maxLength={10}
               autoComplete="off"
               autoFocus
             />

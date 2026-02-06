@@ -1,8 +1,11 @@
+export type UserRole = 'admin' | 'user'
+
 export interface User {
   id: string
   name: string
   email?: string
   butlerName: string
+  role: UserRole
   createdAt: string
 }
 
@@ -29,6 +32,17 @@ export interface AuthTokens {
   accessToken: string
   refreshToken: string
   expiresAt: number
+}
+
+export interface InviteCode {
+  code: string
+  createdBy: string | null
+  usedBy: string | null
+  expiresAt: string
+  createdAt: string
+  usedAt: string | null
+  isExpired: boolean
+  isUsed: boolean
 }
 
 export interface OAuthConnection {
