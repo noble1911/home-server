@@ -46,6 +46,10 @@ class Settings(BaseSettings):
     sonarr_url: str = ""
     sonarr_api_key: str = ""
 
+    # Jellyfin (media playback)
+    jellyfin_url: str = ""
+    jellyfin_api_key: str = ""
+
     # Service-to-service auth (LiveKit Agents -> butler-api)
     internal_api_key: str = ""
 

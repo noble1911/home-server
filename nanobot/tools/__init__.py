@@ -31,6 +31,7 @@ from .memory import (
 from .home_assistant import HomeAssistantTool, ListEntitiesByDomainTool
 from .gmail import GmailTool
 from .google_calendar import GoogleCalendarTool
+from .jellyfin import JellyfinTool
 from .radarr import RadarrTool
 from .readarr import ReadarrTool
 from .sonarr import SonarrTool
@@ -58,6 +59,8 @@ __all__ = [
     "GmailTool",
     # Google Calendar
     "GoogleCalendarTool",
+    # Jellyfin
+    "JellyfinTool",
     # Radarr
     "RadarrTool",
     # Readarr
