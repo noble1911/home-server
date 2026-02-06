@@ -70,7 +70,7 @@ class TestHomeAssistantTool:
             mock_resp.status = 200
             mock_resp.json = AsyncMock(return_value=mock_response)
 
-            mock_session.return_value.__aenter__.return_value.get.return_value.__aenter__.return_value = mock_resp
+            mock_session.return_value.get.return_value.__aenter__.return_value = mock_resp
 
             result = await tool.execute(action="get_state", entity_id="light.living_room")
 
@@ -85,7 +85,7 @@ class TestHomeAssistantTool:
             mock_resp = AsyncMock()
             mock_resp.status = 404
 
-            mock_session.return_value.__aenter__.return_value.get.return_value.__aenter__.return_value = mock_resp
+            mock_session.return_value.get.return_value.__aenter__.return_value = mock_resp
 
             result = await tool.execute(action="get_state", entity_id="light.nonexistent")
 
@@ -105,7 +105,7 @@ class TestHomeAssistantTool:
             mock_resp.status = 200
             mock_resp.json = AsyncMock(return_value=mock_response)
 
-            mock_session.return_value.__aenter__.return_value.post.return_value.__aenter__.return_value = mock_resp
+            mock_session.return_value.post.return_value.__aenter__.return_value = mock_resp
 
             result = await tool.execute(action="turn_on", entity_id="light.kitchen")
 
@@ -127,7 +127,7 @@ class TestHomeAssistantTool:
             mock_resp.status = 200
             mock_resp.json = AsyncMock(return_value=mock_response)
 
-            mock_session.return_value.__aenter__.return_value.post.return_value.__aenter__.return_value = mock_resp
+            mock_session.return_value.post.return_value.__aenter__.return_value = mock_resp
 
             result = await tool.execute(action="turn_off", entity_id="switch.coffee_maker")
 
@@ -151,7 +151,7 @@ class TestHomeAssistantTool:
             mock_resp = AsyncMock()
             mock_resp.status = 200
             mock_resp.json = AsyncMock(return_value=mock_response)
-            mock_post = mock_session.return_value.__aenter__.return_value.post
+            mock_post = mock_session.return_value.post
             mock_post.return_value.__aenter__.return_value = mock_resp
 
             result = await tool.execute(
@@ -202,7 +202,7 @@ class TestListEntitiesByDomainTool:
             mock_resp.status = 200
             mock_resp.json = AsyncMock(return_value=mock_response)
 
-            mock_session.return_value.__aenter__.return_value.get.return_value.__aenter__.return_value = mock_resp
+            mock_session.return_value.get.return_value.__aenter__.return_value = mock_resp
 
             result = await list_tool.execute(domain="light")
 
@@ -225,13 +225,13 @@ class TestListEntitiesByDomainTool:
             mock_resp.status = 200
             mock_resp.json = AsyncMock(return_value=mock_response)
 
-            mock_session.return_value.__aenter__.return_value.get.return_value.__aenter__.return_value = mock_resp
+            mock_session.return_value.get.return_value.__aenter__.return_value = mock_resp
 
             result = await list_tool.execute()
 
             assert "light: 2 entities" in result
-            assert "switch: 1 entities" in result
-            assert "sensor: 1 entities" in result
+            assert "switch: 1 entity" in result
+            assert "sensor: 1 entity" in result
 
 
 if __name__ == "__main__":
