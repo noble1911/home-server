@@ -1,10 +1,12 @@
 import { useUserStore } from '../../stores/userStore'
 import { useConversationStore } from '../../stores/conversationStore'
+import { useOnlineStatus } from '../../hooks/useOnlineStatus'
 import StatusIndicator from './StatusIndicator'
 
 export default function Header() {
   const { profile } = useUserStore()
   const { connectionStatus } = useConversationStore()
+  const isOnline = useOnlineStatus()
 
   // Use profile butler name, fallback to 'Butler' while loading
   const butlerName = profile?.butlerName || 'Butler'
@@ -24,7 +26,17 @@ export default function Header() {
           </div>
         </div>
 
-        <StatusIndicator status={connectionStatus} />
+        <div className="flex items-center gap-3">
+          {!isOnline && (
+            <span className="flex items-center gap-1.5 text-xs text-yellow-400">
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 5.636a9 9 0 11-12.728 0M12 9v4m0 4h.01" />
+              </svg>
+              Offline
+            </span>
+          )}
+          <StatusIndicator status={connectionStatus} />
+        </div>
       </div>
     </header>
   )
