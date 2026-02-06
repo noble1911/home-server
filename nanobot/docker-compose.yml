@@ -67,6 +67,9 @@ services:
       - HOME_ASSISTANT_TOKEN=${HA_TOKEN:-}
       # Weather
       - OPENWEATHERMAP_API_KEY=${OPENWEATHERMAP_API_KEY:-}
+      # Radarr
+      - RADARR_URL=http://radarr:7878
+      - RADARR_API_KEY=${RADARR_API_KEY:-}
       # Google OAuth (for Calendar, Gmail, etc.)
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
