@@ -3,7 +3,7 @@
 -- local Ollama embeddings which produce 768-dimensional vectors.
 --
 -- Usage:
---   docker exec immich-postgres psql -U postgres -d immich -f /app/migrations/002_update_embedding_dimensions.sql
+--   docker exec immich-postgres psql -U postgres -d immich -f /app/migrations/003_update_embedding_dimensions.sql
 
 -- Drop existing HNSW index (dimension is baked into the index)
 DROP INDEX IF EXISTS butler.idx_user_facts_embedding;

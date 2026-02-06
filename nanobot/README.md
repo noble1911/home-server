@@ -16,7 +16,7 @@ docker compose up -d
 
 # 4. Run database migrations (first time only)
 docker exec immich-postgres psql -U postgres -d immich -f /app/migrations/001_butler_schema.sql
-docker exec immich-postgres psql -U postgres -d immich -f /app/migrations/002_update_embedding_dimensions.sql
+docker exec immich-postgres psql -U postgres -d immich -f /app/migrations/003_update_embedding_dimensions.sql
 
 # 5. Check logs
 docker logs -f nanobot
@@ -124,7 +124,7 @@ Butler uses **nomic-embed-text** via a local Ollama instance for semantic search
 ### Changing the embedding model
 
 1. Update `EMBEDDING_MODEL` and `EMBEDDING_DIM` in `tools/embeddings.py`
-2. Write a new migration to `ALTER COLUMN embedding TYPE VECTOR(<new_dim>)` and rebuild the HNSW index (see `002_update_embedding_dimensions.sql` for the pattern)
+2. Write a new migration to `ALTER COLUMN embedding TYPE VECTOR(<new_dim>)` and rebuild the HNSW index (see `003_update_embedding_dimensions.sql` for the pattern)
 3. Re-embed existing facts — old vectors will be incompatible with the new dimension
 
 ## Database Schema
@@ -136,4 +136,4 @@ The butler schema lives in Immich's PostgreSQL:
 - `butler.conversation_history` - Message history
 - `butler.scheduled_tasks` - Reminders and automations
 
-See `migrations/001_butler_schema.sql` for the initial schema and `002_update_embedding_dimensions.sql` for the dimension migration.
+See `migrations/001_butler_schema.sql` for the initial schema and `003_update_embedding_dimensions.sql` for the dimension migration.

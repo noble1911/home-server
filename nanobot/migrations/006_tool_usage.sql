@@ -2,7 +2,7 @@
 -- Tracks every tool call for debugging, observability, and cost analysis.
 --
 -- Usage:
---   docker exec immich-postgres psql -U postgres -d immich -f /app/migrations/005_tool_usage.sql
+--   docker exec immich-postgres psql -U postgres -d immich -f /app/migrations/006_tool_usage.sql
 
 CREATE TABLE IF NOT EXISTS butler.tool_usage (
     id              SERIAL PRIMARY KEY,
