@@ -6,10 +6,15 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from .config import settings
 from .deps import cleanup_resources, get_db_pool, init_resources
+from .ratelimit import RateLimitConfig, RateLimitMiddleware, SlidingWindowStore
 from .routes import admin, auth, chat, oauth, system, tasks, users, voice
 
 logger = logging.getLogger(__name__)
+
+# Shared in-memory store — passed to middleware and cleanup task
+rate_limit_store = SlidingWindowStore()
 
 
 @asynccontextmanager
@@ -38,6 +43,19 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+app.add_middleware(
+    RateLimitMiddleware,
+    store=rate_limit_store,
+    config=RateLimitConfig(
+        enabled=settings.rate_limit_enabled,
+        rate_limit_auth=settings.rate_limit_auth,
+        rate_limit_chat=settings.rate_limit_chat,
+        rate_limit_voice=settings.rate_limit_voice,
+        rate_limit_default=settings.rate_limit_default,
+        internal_api_key=settings.internal_api_key,
+    ),
 )
 
 # Route mounting — prefixes match what the PWA expects at /api/*
