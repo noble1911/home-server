@@ -173,6 +173,11 @@ The `metadata.db` file must exist. Either:
 
 Add root folders in Settings > Media Management before searching for books.
 
+## Related Guides
+
+- [OPDS Feed Setup](./opds-setup.md) — Connect mobile reading apps to browse and download books
+- [Prowlarr Indexer Setup](./prowlarr-indexers.md) — Configure indexers for Readarr book search
+
 ## Next Step
 
 → [Step 10: Deploy Photos & Files](./10-photos-files.md)
