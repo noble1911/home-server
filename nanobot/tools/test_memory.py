@@ -9,6 +9,7 @@ import pytest
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from .embeddings import EmbeddingService
 from .memory import (
     DatabasePool,
     RememberFactTool,
@@ -19,12 +20,23 @@ from .memory import (
 )
 
 
+FAKE_EMBEDDING = [0.1] * 768
+
+
 @pytest.fixture
 def mock_pool():
     """Create a mock database pool."""
     pool = MagicMock(spec=DatabasePool)
     pool.pool = AsyncMock()
     return pool
+
+
+@pytest.fixture
+def mock_embedding_service():
+    """Create a mock embedding service that returns fake vectors."""
+    service = MagicMock(spec=EmbeddingService)
+    service.embed = AsyncMock(return_value=FAKE_EMBEDDING)
+    return service
 
 
 class TestDatabasePool:
@@ -521,6 +533,182 @@ class TestUpdateSoulTool:
         assert "personality: warm" in result
         assert "formality: casual" in result
         assert "verbosity: concise" in result
+
+
+class TestRememberFactWithEmbeddings:
+    """Tests for RememberFactTool with embedding service."""
+
+    @pytest.mark.asyncio
+    async def test_stores_embedding_when_service_available(self, mock_pool, mock_embedding_service):
+        """Test that embedding is generated and stored alongside the fact."""
+        tool = RememberFactTool(mock_pool, mock_embedding_service)
+
+        result = await tool.execute(user_id="user123", fact="Likes spicy Thai food")
+
+        assert "Remembered" in result
+
+        # Verify embedding was requested
+        mock_embedding_service.embed.assert_called_once_with("Likes spicy Thai food")
+
+        # Verify INSERT includes embedding (the vector cast)
+        calls = mock_pool.pool.execute.call_args_list
+        fact_insert_sql = calls[-1][0][0]
+        assert "embedding" in fact_insert_sql
+        assert "::vector" in fact_insert_sql
+
+    @pytest.mark.asyncio
+    async def test_stores_without_embedding_on_failure(self, mock_pool):
+        """Test graceful fallback when embedding service returns None."""
+        failing_service = MagicMock(spec=EmbeddingService)
+        failing_service.embed = AsyncMock(return_value=None)
+
+        tool = RememberFactTool(mock_pool, failing_service)
+
+        result = await tool.execute(user_id="user123", fact="Test fact")
+
+        assert "Remembered" in result
+
+        # Verify INSERT does NOT include embedding column
+        calls = mock_pool.pool.execute.call_args_list
+        fact_insert_sql = calls[-1][0][0]
+        assert "embedding" not in fact_insert_sql
+
+    @pytest.mark.asyncio
+    async def test_stores_without_embedding_when_no_service(self, mock_pool):
+        """Test that tool works normally without embedding service (backward compat)."""
+        tool = RememberFactTool(mock_pool)  # No embedding_service
+
+        result = await tool.execute(user_id="user123", fact="Test fact")
+
+        assert "Remembered" in result
+
+        # Verify INSERT does NOT include embedding column
+        calls = mock_pool.pool.execute.call_args_list
+        fact_insert_sql = calls[-1][0][0]
+        assert "embedding" not in fact_insert_sql
+
+
+class TestRecallFactsWithSemanticSearch:
+    """Tests for RecallFactsTool semantic search functionality."""
+
+    def test_query_parameter_in_schema(self, mock_pool):
+        """Verify the query parameter is exposed in the tool schema."""
+        tool = RecallFactsTool(mock_pool)
+        assert "query" in tool.parameters["properties"]
+        assert "semantic" in tool.parameters["properties"]["query"]["description"].lower()
+
+    @pytest.mark.asyncio
+    async def test_semantic_search_with_query(self, mock_pool, mock_embedding_service):
+        """Test semantic search when query is provided."""
+        mock_rows = [
+            {"fact": "Likes spicy Thai food", "category": "preference", "confidence": 1.0, "distance": 0.15},
+            {"fact": "Allergic to peanuts", "category": "health", "confidence": 0.9, "distance": 0.35},
+        ]
+        mock_pool.pool.fetch = AsyncMock(return_value=mock_rows)
+
+        tool = RecallFactsTool(mock_pool, mock_embedding_service)
+        result = await tool.execute(user_id="user123", query="food preferences")
+
+        # Verify embedding was generated for the query
+        mock_embedding_service.embed.assert_called_once_with("food preferences")
+
+        # Verify vector similarity SQL was used
+        call_args = mock_pool.pool.fetch.call_args
+        sql = call_args[0][0]
+        assert "<=>" in sql
+        assert "::vector" in sql
+
+        # Verify output contains facts with relevance scores
+        assert "Likes spicy Thai food" in result
+        assert "Allergic to peanuts" in result
+        assert "relevance:" in result
+
+    @pytest.mark.asyncio
+    async def test_semantic_search_with_category(self, mock_pool, mock_embedding_service):
+        """Test semantic search filtered by category."""
+        mock_rows = [
+            {"fact": "Likes pasta", "category": "preference", "confidence": 1.0, "distance": 0.2},
+        ]
+        mock_pool.pool.fetch = AsyncMock(return_value=mock_rows)
+
+        tool = RecallFactsTool(mock_pool, mock_embedding_service)
+        result = await tool.execute(user_id="user123", query="food", category="preference")
+
+        # Verify SQL includes both category filter and vector search
+        call_args = mock_pool.pool.fetch.call_args
+        sql = call_args[0][0]
+        assert "category = $2" in sql
+        assert "<=>" in sql
+
+    @pytest.mark.asyncio
+    async def test_falls_back_when_embedding_fails(self, mock_pool):
+        """Test fallback to category search when embedding generation fails."""
+        failing_service = MagicMock(spec=EmbeddingService)
+        failing_service.embed = AsyncMock(return_value=None)
+
+        mock_rows = [
+            {"fact": "Likes coffee", "category": "preference", "confidence": 1.0, "created_at": datetime.now(timezone.utc)},
+        ]
+        mock_pool.pool.fetch = AsyncMock(return_value=mock_rows)
+
+        tool = RecallFactsTool(mock_pool, failing_service)
+        result = await tool.execute(user_id="user123", query="drinks")
+
+        # Should fall back to category-based search (no <=> in SQL)
+        call_args = mock_pool.pool.fetch.call_args
+        sql = call_args[0][0]
+        assert "<=>" not in sql
+
+        # Should still return facts in category format
+        assert "Known facts about user123" in result
+
+    @pytest.mark.asyncio
+    async def test_falls_back_when_no_service(self, mock_pool):
+        """Test that query is ignored when no embedding service is configured."""
+        mock_rows = [
+            {"fact": "Likes coffee", "category": "preference", "confidence": 1.0, "created_at": datetime.now(timezone.utc)},
+        ]
+        mock_pool.pool.fetch = AsyncMock(return_value=mock_rows)
+
+        tool = RecallFactsTool(mock_pool)  # No embedding_service
+        result = await tool.execute(user_id="user123", query="food preferences")
+
+        # Should use category-based search
+        call_args = mock_pool.pool.fetch.call_args
+        sql = call_args[0][0]
+        assert "<=>" not in sql
+
+        assert "Known facts about user123" in result
+
+    @pytest.mark.asyncio
+    async def test_semantic_search_no_results(self, mock_pool, mock_embedding_service):
+        """Test semantic search with no matching facts."""
+        mock_pool.pool.fetch = AsyncMock(return_value=[])
+
+        tool = RecallFactsTool(mock_pool, mock_embedding_service)
+        result = await tool.execute(user_id="user123", query="quantum physics")
+
+        assert "No matching facts" in result
+
+    @pytest.mark.asyncio
+    async def test_category_search_unchanged(self, mock_pool):
+        """Test that category-based search is completely unchanged."""
+        mock_rows = [
+            {"fact": "Works at Acme", "category": "work", "confidence": 1.0, "created_at": datetime.now(timezone.utc)},
+        ]
+        mock_pool.pool.fetch = AsyncMock(return_value=mock_rows)
+
+        tool = RecallFactsTool(mock_pool)
+        result = await tool.execute(user_id="user123", category="work")
+
+        # Verify original SQL is used
+        call_args = mock_pool.pool.fetch.call_args
+        sql = call_args[0][0]
+        assert "category = $2" in sql
+        assert "<=>" not in sql
+        assert "ORDER BY confidence DESC" in sql
+
+        assert "Works at Acme" in result
 
 
 class TestToolCleanup:

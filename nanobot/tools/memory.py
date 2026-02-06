@@ -26,6 +26,7 @@ import os
 import asyncpg
 
 from .base import Tool
+from .embeddings import EmbeddingService
 
 
 class DatabasePool:
@@ -126,6 +127,14 @@ class DatabaseTool(Tool):
 class RememberFactTool(DatabaseTool):
     """Store a fact about a user for future reference."""
 
+    def __init__(
+        self,
+        db_pool: DatabasePool | None = None,
+        embedding_service: EmbeddingService | None = None,
+    ):
+        super().__init__(db_pool)
+        self._embedding_service = embedding_service
+
     @property
     def name(self) -> str:
         return "remember_fact"
@@ -184,20 +193,45 @@ class RememberFactTool(DatabaseTool):
             user_id
         )
 
-        # Store the fact
-        await pool.execute(
-            """
-            INSERT INTO butler.user_facts (user_id, fact, category, confidence, source)
-            VALUES ($1, $2, $3, $4, 'conversation')
-            """,
-            user_id, fact, category, confidence
-        )
+        # Generate embedding if service available
+        embedding = None
+        if self._embedding_service:
+            embedding = await self._embedding_service.embed(fact)
+
+        if embedding is not None:
+            # Store fact with vector embedding (cast text → vector for pgvector)
+            vector_str = "[" + ",".join(str(v) for v in embedding) + "]"
+            await pool.execute(
+                """
+                INSERT INTO butler.user_facts
+                    (user_id, fact, category, confidence, source, embedding)
+                VALUES ($1, $2, $3, $4, 'conversation', $5::vector)
+                """,
+                user_id, fact, category, confidence, vector_str
+            )
+        else:
+            await pool.execute(
+                """
+                INSERT INTO butler.user_facts
+                    (user_id, fact, category, confidence, source)
+                VALUES ($1, $2, $3, $4, 'conversation')
+                """,
+                user_id, fact, category, confidence
+            )
 
         return f"Remembered: {fact}"
 
 
 class RecallFactsTool(DatabaseTool):
     """Recall stored facts about a user."""
+
+    def __init__(
+        self,
+        db_pool: DatabasePool | None = None,
+        embedding_service: EmbeddingService | None = None,
+    ):
+        super().__init__(db_pool)
+        self._embedding_service = embedding_service
 
     @property
     def name(self) -> str:
@@ -208,7 +242,8 @@ class RecallFactsTool(DatabaseTool):
         return (
             "Recall stored facts about a user. "
             "Use this at the start of conversations to personalize responses, "
-            "or when you need to reference something you learned before."
+            "or when you need to reference something you learned before. "
+            "Use the 'query' parameter to search semantically (e.g., 'food preferences')."
         )
 
     @property
@@ -219,6 +254,14 @@ class RecallFactsTool(DatabaseTool):
                 "user_id": {
                     "type": "string",
                     "description": "User identifier"
+                },
+                "query": {
+                    "type": "string",
+                    "description": (
+                        "Natural language search query for semantic recall "
+                        "(e.g., 'food preferences', 'work schedule'). "
+                        "When provided, finds facts by meaning similarity."
+                    )
                 },
                 "category": {
                     "type": "string",
@@ -237,11 +280,22 @@ class RecallFactsTool(DatabaseTool):
 
     async def execute(self, **kwargs: Any) -> str:
         user_id = kwargs["user_id"]
+        query = kwargs.get("query")
         category = kwargs.get("category")
         limit = kwargs.get("limit", 20)
 
         pool = await self._get_pool()
 
+        # Semantic search path: embed the query and find similar facts
+        if query and self._embedding_service:
+            query_embedding = await self._embedding_service.embed(query)
+            if query_embedding is not None:
+                return await self._semantic_search(
+                    pool, user_id, query_embedding, category, limit
+                )
+            # Embedding failed — fall through to category-based search
+
+        # Category-based search (original behaviour)
         if category:
             rows = await pool.fetch(
                 """
@@ -270,6 +324,62 @@ class RecallFactsTool(DatabaseTool):
         if not rows:
             return f"No facts stored for user {user_id}."
 
+        return self._format_by_category(user_id, rows)
+
+    async def _semantic_search(
+        self,
+        pool: asyncpg.Pool,
+        user_id: str,
+        query_embedding: list[float],
+        category: str | None,
+        limit: int,
+    ) -> str:
+        """Find facts by vector similarity using cosine distance."""
+        vector_str = "[" + ",".join(str(v) for v in query_embedding) + "]"
+
+        if category:
+            rows = await pool.fetch(
+                """
+                SELECT fact, category, confidence,
+                       embedding <=> $3::vector AS distance
+                FROM butler.user_facts
+                WHERE user_id = $1 AND category = $2
+                  AND embedding IS NOT NULL
+                  AND (expires_at IS NULL OR expires_at > NOW())
+                ORDER BY embedding <=> $3::vector
+                LIMIT $4
+                """,
+                user_id, category, vector_str, limit
+            )
+        else:
+            rows = await pool.fetch(
+                """
+                SELECT fact, category, confidence,
+                       embedding <=> $2::vector AS distance
+                FROM butler.user_facts
+                WHERE user_id = $1
+                  AND embedding IS NOT NULL
+                  AND (expires_at IS NULL OR expires_at > NOW())
+                ORDER BY embedding <=> $2::vector
+                LIMIT $3
+                """,
+                user_id, vector_str, limit
+            )
+
+        if not rows:
+            return f"No matching facts found for user {user_id}."
+
+        lines = [f"Facts matching query for {user_id}:"]
+        for row in rows:
+            cat = row["category"] or "other"
+            similarity = 1 - row["distance"]  # cosine distance → similarity
+            lines.append(f"  - [{cat}] {row['fact']} (relevance: {similarity:.0%})")
+
+        return "\n".join(lines)
+
+    @staticmethod
+    def _format_by_category(user_id: str, rows: list) -> str:
+        """Format facts grouped by category (original output format)."""
         facts_by_category: dict[str, list[str]] = {}
         for row in rows:
             cat = row["category"] or "other"

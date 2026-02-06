@@ -67,6 +67,8 @@ services:
       - HOME_ASSISTANT_TOKEN=${HA_TOKEN:-}
       # Weather
       - OPENWEATHERMAP_API_KEY=${OPENWEATHERMAP_API_KEY:-}
+      # Ollama (for local embeddings / semantic memory search)
+      - OLLAMA_URL=${OLLAMA_URL:-http://ollama:11434}
       # Radarr
       - RADARR_URL=http://radarr:7878
       - RADARR_API_KEY=${RADARR_API_KEY:-}
