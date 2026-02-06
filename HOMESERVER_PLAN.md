@@ -728,7 +728,7 @@ Instead of the paid Home Assistant Cloud (£5/month), we use the community-maint
 
 **Setup Overview:**
 1. Create free AWS account
-2. Deploy haaska Lambda function via CloudFormation
+2. Deploy haaska Lambda function (ZIP upload)
 3. Create Alexa Smart Home skill in Amazon Developer Console
 4. Configure Cloudflare Tunnel to expose HA API endpoint
 5. Link Alexa skill to Lambda, Lambda to HA via tunnel
@@ -1232,7 +1232,7 @@ This does NOT protect against: Mac Mini theft/fire (use cloud for that).
 - [ ] Create free Cloudflare account
 - [ ] Deploy Cloudflare Tunnel (cloudflared container)
 - [ ] Create free AWS account
-- [ ] Deploy haaska to AWS Lambda (CloudFormation)
+- [ ] Deploy haaska to AWS Lambda (ZIP upload)
 - [ ] Create Alexa Smart Home skill in Amazon Developer Console
 - [ ] Generate HA Long-Lived Access Token
 - [ ] Link Alexa skill → Lambda → Tunnel → HA

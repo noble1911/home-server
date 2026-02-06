@@ -139,7 +139,6 @@ launchctl list | grep homeserver.backup
 
 With 7 daily + 4 weekly retention, expect ~10-15 GB total at steady state.
 
-## Next Steps
+## Next Step
 
-- **Monitor health**: Set up alerts with `./scripts/16-monitoring.sh` (when available)
-- **Cloud backup**: For photos/documents, see HOMESERVER_PLAN.md § Backup Strategy
+→ [Step 15: Configure Alexa Integration (haaska)](./15-alexa-haaska.md)

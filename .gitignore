@@ -18,6 +18,9 @@ TODO.md
 credentials.json
 secrets.yaml
 
+# haaska config (contains HA access token)
+haaska-config/
+
 # Node.js
 node_modules/
 npm-debug.log*

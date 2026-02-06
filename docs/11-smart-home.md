@@ -89,59 +89,15 @@ Your HA will be accessible at: `https://ha.yourdomain.com`
 
 ## Alexa Integration (haaska)
 
-haaska is a free bridge between Alexa and Home Assistant.
-
-### Architecture
+haaska is a free bridge between Alexa and Home Assistant using AWS Lambda (free tier).
 
 ```
-"Alexa, turn on living room"
-         ↓
-    Amazon Echo
-         ↓
-    AWS Lambda (haaska)
-         ↓
-    Cloudflare Tunnel
-         ↓
-    Home Assistant
-         ↓
-    Your smart devices
+Alexa Echo → AWS Lambda (haaska) → Cloudflare Tunnel → Home Assistant → Devices
 ```
 
-### 1. Create AWS Account
+**→ See [Step 15: Configure Alexa Integration](./15-alexa-haaska.md) for the full setup guide.**
 
-1. Go to https://aws.amazon.com
-2. Create free account
-3. AWS Lambda has a generous free tier (1M requests/month)
-
-### 2. Deploy haaska
-
-Follow the official guide: https://github.com/mike-grant/haaska
-
-Quick steps:
-1. Download haaska release
-2. Edit `config.json`:
-   ```json
-   {
-     "url": "https://your-tunnel-url.com",
-     "bearer_token": "your-long-lived-access-token",
-     "ssl_verify": true
-   }
-   ```
-3. Deploy to Lambda via CloudFormation
-
-### 3. Create Alexa Skill
-
-1. Go to https://developer.amazon.com/alexa/console/ask
-2. Create new skill (Smart Home type)
-3. Link to your Lambda function
-4. Enable skill in Alexa app
-
-### 4. Discover Devices
-
-1. Open Alexa app
-2. Devices > + > Add Device
-3. Other > Discover Devices
-4. Your HA devices appear!
+The guide covers: AWS account setup, Lambda deployment, Alexa skill creation, account linking, device discovery, and troubleshooting.
 
 ## Home Assistant Configuration
 
