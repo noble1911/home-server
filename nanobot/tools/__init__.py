@@ -29,6 +29,7 @@ from .memory import (
     VALID_SOUL_KEYS,
 )
 from .home_assistant import HomeAssistantTool, ListEntitiesByDomainTool
+from .gmail import GmailTool
 from .google_calendar import GoogleCalendarTool
 from .radarr import RadarrTool
 from .sonarr import SonarrTool
@@ -52,6 +53,8 @@ __all__ = [
     # Home Assistant
     "HomeAssistantTool",
     "ListEntitiesByDomainTool",
+    # Gmail
+    "GmailTool",
     # Google Calendar
     "GoogleCalendarTool",
     # Radarr

@@ -28,8 +28,9 @@ GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo"
 
 # Scopes
 CALENDAR_READONLY_SCOPE = "https://www.googleapis.com/auth/calendar.readonly"
+GMAIL_READONLY_SCOPE = "https://www.googleapis.com/auth/gmail.readonly"
 USERINFO_EMAIL_SCOPE = "https://www.googleapis.com/auth/userinfo.email"
-GOOGLE_SCOPES = f"{CALENDAR_READONLY_SCOPE} {USERINFO_EMAIL_SCOPE}"
+GOOGLE_SCOPES = f"{CALENDAR_READONLY_SCOPE} {GMAIL_READONLY_SCOPE} {USERINFO_EMAIL_SCOPE}"
 
 # State JWT settings
 _STATE_TTL_MINUTES = 10

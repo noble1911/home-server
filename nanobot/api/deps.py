@@ -14,6 +14,7 @@ from fastapi import Depends, Header, HTTPException
 from tools import (
     DatabasePool,
     EmbeddingService,
+    GmailTool,
     GoogleCalendarTool,
     HomeAssistantTool,
     ListEntitiesByDomainTool,
@@ -147,4 +148,5 @@ def get_user_tools(
     user_tools = dict(global_tools)
     if settings.google_client_id:
         user_tools["google_calendar"] = GoogleCalendarTool(db_pool, user_id)
+        user_tools["gmail"] = GmailTool(db_pool, user_id)
     return user_tools

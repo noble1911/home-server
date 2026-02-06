@@ -93,10 +93,10 @@ class GoogleCalendarTool(Tool):
         # Import here to avoid circular imports at module level
         from api.oauth import get_valid_token
 
-        access_token = await get_valid_token(self._pool, self._user_id, "google_calendar")
+        access_token = await get_valid_token(self._pool, self._user_id, "google")
         if not access_token:
             return (
-                "Google Calendar is not connected. "
+                "Google is not connected. "
                 "Please connect it in the Settings page of the Butler app."
             )
 
