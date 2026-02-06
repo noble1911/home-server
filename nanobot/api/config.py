@@ -67,6 +67,9 @@ class Settings(BaseSettings):
     health_check_timeout: int = 5
     prowlarr_api_key: str = ""
 
+    # Cleanup jobs
+    cleanup_retention_days: int = 30
+
     # Google OAuth (for Calendar, Gmail, etc.)
     google_client_id: str = ""
     google_client_secret: str = ""
