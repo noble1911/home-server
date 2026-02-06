@@ -12,7 +12,7 @@ import logging
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from starlette.responses import StreamingResponse
 
 from tools import DatabasePool, Tool
@@ -195,3 +195,17 @@ async def stream_text_chat(
                     )
 
     return StreamingResponse(generate(), media_type="text/event-stream")
+
+
+@router.delete("/chat/history", status_code=204)
+async def clear_chat_history(
+    user_id: str = Depends(get_current_user),
+    pool: DatabasePool = Depends(get_db_pool),
+):
+    """Delete all conversation history for the authenticated user."""
+    db = pool.pool
+    await db.execute(
+        "DELETE FROM butler.conversation_history WHERE user_id = $1",
+        user_id,
+    )
+    return Response(status_code=204)

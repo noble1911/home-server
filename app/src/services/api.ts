@@ -204,6 +204,21 @@ export function getChatHistory(
   return api.get<ChatHistoryResponse>(`/chat/history?${params}`)
 }
 
+/** Clear all conversation history for the current user */
+export function clearChatHistory(): Promise<void> {
+  return api.delete('/chat/history')
+}
+
+/** Clear all learned facts for the current user */
+export function clearUserFacts(): Promise<void> {
+  return api.delete('/user/facts')
+}
+
+/** Permanently delete the current user's account and all data */
+export function deleteUserAccount(): Promise<void> {
+  return api.delete('/user/account')
+}
+
 // ── System monitoring ──────────────────────────────────────────────
 
 export interface ServiceStatus {

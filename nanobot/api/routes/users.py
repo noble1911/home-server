@@ -15,12 +15,16 @@ Also implements GET /api/users/me from issue #30 spec.
 from __future__ import annotations
 
 import json
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 
 from tools import DatabasePool
 
 from ..deps import get_current_user, get_db_pool
+from ..oauth import revoke_google_token
+
+logger = logging.getLogger(__name__)
 from ..models import (
     AddFactRequest,
     OnboardingRequest,
@@ -194,6 +198,20 @@ async def add_fact(
     )
 
 
+@router.delete("/user/facts", status_code=204)
+async def clear_all_facts(
+    user_id: str = Depends(get_current_user),
+    pool: DatabasePool = Depends(get_db_pool),
+):
+    """Delete all facts for the authenticated user."""
+    db = pool.pool
+    await db.execute(
+        "DELETE FROM butler.user_facts WHERE user_id = $1",
+        user_id,
+    )
+    return Response(status_code=204)
+
+
 @router.delete("/user/facts/{fact_id}", status_code=204)
 async def remove_fact(
     fact_id: int,
@@ -209,4 +227,45 @@ async def remove_fact(
     )
     if result == "DELETE 0":
         raise HTTPException(404, "Fact not found")
+    return Response(status_code=204)
+
+
+@router.delete("/user/account", status_code=204)
+async def delete_account(
+    user_id: str = Depends(get_current_user),
+    pool: DatabasePool = Depends(get_db_pool),
+):
+    """Permanently delete the authenticated user's account and all data.
+
+    Order of operations:
+    1. Revoke OAuth tokens at external providers (best-effort)
+    2. Delete user row (CASCADE removes all child records)
+    """
+    db = pool.pool
+
+    # 1. Best-effort revoke OAuth tokens at provider before cascade deletes them
+    oauth_rows = await db.fetch(
+        "SELECT provider, access_token, refresh_token FROM butler.oauth_tokens WHERE user_id = $1",
+        user_id,
+    )
+    for row in oauth_rows:
+        token_to_revoke = row["refresh_token"] or row["access_token"]
+        if token_to_revoke:
+            try:
+                await revoke_google_token(token_to_revoke)
+            except Exception:
+                logger.warning(
+                    "Failed to revoke %s token during account deletion for user=%s",
+                    row["provider"],
+                    user_id,
+                )
+
+    # 2. Delete user row — CASCADE handles all child tables
+    result = await db.execute(
+        "DELETE FROM butler.users WHERE id = $1",
+        user_id,
+    )
+    if result == "DELETE 0":
+        raise HTTPException(404, "User not found")
+
     return Response(status_code=204)
