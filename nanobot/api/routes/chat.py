@@ -47,6 +47,9 @@ async def text_chat(
         system_prompt=ctx.system_prompt,
         user_message=req.message,
         tools=all_tools,
+        db_pool=pool,
+        user_id=user_id,
+        channel="pwa",
     )
 
     message_id = str(uuid.uuid4())
@@ -151,6 +154,9 @@ async def stream_text_chat(
                 system_prompt=ctx.system_prompt,
                 user_message=req.message,
                 tools=all_tools,
+                db_pool=pool,
+                user_id=user_id,
+                channel="pwa",
             ):
                 if event.get("type") == "text_delta":
                     full_response_parts.append(event["delta"])

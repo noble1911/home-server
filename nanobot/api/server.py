@@ -1,18 +1,31 @@
 """FastAPI application with CORS, lifespan, and route mounting."""
 
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .deps import cleanup_resources, init_resources
+from .deps import cleanup_resources, get_db_pool, init_resources
 from .routes import admin, auth, chat, oauth, system, tasks, users, voice
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup: init db pool + tools. Shutdown: release resources."""
     await init_resources()
+
+    # One-shot cleanup of stale tool usage logs (bridge until Issue #75 scheduler)
+    try:
+        from .audit import cleanup_tool_usage_logs
+
+        pool = get_db_pool()
+        await cleanup_tool_usage_logs(pool)
+    except Exception:
+        logger.debug("Tool usage cleanup skipped (table may not exist yet)")
+
     yield
     await cleanup_resources()
 
