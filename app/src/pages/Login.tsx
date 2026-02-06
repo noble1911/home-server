@@ -28,19 +28,19 @@ export default function Login() {
       setTokens(response.tokens)
       setOnboardingComplete(response.hasCompletedOnboarding)
     } catch (err) {
-      // For development: allow mock code
-      if (inviteCode.toUpperCase() === 'DEV-123') {
+      // Dev-only mock code — stripped from production builds by Vite
+      if (import.meta.env.DEV && inviteCode.toUpperCase() === 'DEV-123') {
         setTokens({
           accessToken: 'mock_access_token',
           refreshToken: 'mock_refresh_token',
           expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
         })
-        setOnboardingComplete(false) // Go to onboarding
+        setOnboardingComplete(false)
       } else {
         setError(
           err instanceof Error
             ? err.message
-            : 'Invalid invite code. Try DEV-123 for testing.'
+            : 'Invalid invite code'
         )
       }
     } finally {
