@@ -65,6 +65,8 @@ services:
       # Home Assistant
       - HOME_ASSISTANT_URL=http://homeassistant:8123
       - HOME_ASSISTANT_TOKEN=${HA_TOKEN:-}
+      # Weather
+      - OPENWEATHERMAP_API_KEY=${OPENWEATHERMAP_API_KEY:-}
       # Google OAuth (for Calendar, Gmail, etc.)
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
