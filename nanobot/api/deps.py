@@ -19,6 +19,7 @@ from tools import (
     RememberFactTool,
     GetUserTool,
     Tool,
+    WeatherTool,
 )
 
 from .auth import decode_user_jwt
@@ -49,6 +50,12 @@ async def init_resources() -> None:
         _tools["list_ha_entities"] = ListEntitiesByDomainTool(
             base_url=settings.home_assistant_url,
             token=settings.home_assistant_token,
+        )
+
+    # Only register weather tool if configured
+    if settings.openweathermap_api_key:
+        _tools["weather"] = WeatherTool(
+            api_key=settings.openweathermap_api_key,
         )
 
 
