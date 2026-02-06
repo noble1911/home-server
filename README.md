@@ -15,7 +15,7 @@ Self-hosted media server with AI voice assistant on Mac Mini M4.
 | OpenWeatherMap API Key | Optional | [openweathermap.org](https://openweathermap.org/api) (free tier) |
 | Home Assistant Token | Optional | Generated in HA after setup |
 | Google OAuth credentials | Optional | [Google Cloud Console](https://console.cloud.google.com/apis/credentials) — see [setup guide](docs/google-oauth-setup.md) |
-| Cloudflare Tunnel Token | Optional | [Cloudflare Zero Trust](https://dash.cloudflare.com) — for Alexa integration |
+| Cloudflare Tunnel Token | **Recommended** | [Cloudflare Zero Trust](https://dash.cloudflare.com) — remote access for all services |
 
 > Security secrets (JWT, LiveKit keys, internal API key) are **auto-generated** during setup.
 
@@ -55,7 +55,7 @@ Other flags:
 | Step | Script | Manual | Description |
 |------|--------|--------|-------------|
 | 1 | [01-homebrew.sh](scripts/01-homebrew.sh) | [docs](docs/01-homebrew.md) | Install Homebrew package manager |
-| 2 | [02-tailscale.sh](scripts/02-tailscale.sh) | [docs](docs/02-tailscale.md) | Install Tailscale for secure remote access |
+| 2 | [02-cloudflare-tunnel.sh](scripts/02-cloudflare-tunnel.sh) | [docs](docs/02-cloudflare-tunnel.md) | Configure Cloudflare Tunnel for remote access |
 | 3 | [03-power-settings.sh](scripts/03-power-settings.sh) | [docs](docs/03-power-settings.md) | Configure Mac to stay awake 24/7 |
 | 4 | [04-ssh.sh](scripts/04-ssh.sh) | [docs](docs/04-ssh.md) | Enable SSH *(optional)* |
 | 5 | [05-orbstack.sh](scripts/05-orbstack.sh) | [docs](docs/05-orbstack.md) | Install OrbStack (Docker) |
@@ -70,8 +70,8 @@ Other flags:
 
 Run individual steps:
 ```bash
-# Example: just install Tailscale
-curl -fsSL https://raw.githubusercontent.com/noble1911/home-server/main/scripts/02-tailscale.sh | bash
+# Example: just configure Cloudflare Tunnel
+curl -fsSL https://raw.githubusercontent.com/noble1911/home-server/main/scripts/02-cloudflare-tunnel.sh | bash
 ```
 
 Or follow the manual docs for step-by-step instructions.
@@ -94,7 +94,7 @@ All environment variables live in `nanobot/.env` (created from `.env.example` du
 | `OPENWEATHERMAP_API_KEY` | Weather queries | No (prompted) |
 | `GOOGLE_CLIENT_ID` | Google Calendar/Gmail OAuth | No (prompted) |
 | `GOOGLE_CLIENT_SECRET` | Google Calendar/Gmail OAuth | No (prompted) |
-| `CLOUDFLARE_TUNNEL_TOKEN` | Alexa → Home Assistant tunnel | No (prompted) |
+| `CLOUDFLARE_TUNNEL_TOKEN` | Remote access for all services | No (prompted) |
 | `INVITE_CODES` | Admin bootstrap invite code | Defaults to `BUTLER-001` |
 | `DB_USER` / `DB_PASSWORD` | PostgreSQL (shared with Immich) | Defaults to `postgres` |
 
@@ -107,7 +107,7 @@ cd nanobot && docker compose down && docker compose up -d
 
 ## After Setup: First-Time Login for Each Service
 
-Once `setup.sh` finishes, every service needs its own first-time setup. Open each URL in a browser on the same network (or via Tailscale) and create an admin account.
+Once `setup.sh` finishes, every service needs its own first-time setup. Open each URL in a browser on the same network (or remotely via your Cloudflare Tunnel domain) and create an admin account.
 
 ### Butler (AI Assistant)
 
@@ -192,7 +192,7 @@ After setting up Home Assistant, generate a **Long-Lived Access Token** (Profile
 | Component | Purpose |
 |-----------|---------|
 | [Homebrew](https://brew.sh/) | Package manager for macOS |
-| [Tailscale](https://tailscale.com/) | Secure mesh VPN for remote access |
+| [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) | Secure remote access for all user-facing services |
 | [OrbStack](https://orbstack.dev/) | Docker for macOS (optimized for Apple Silicon) |
 
 ### Media & Downloads
@@ -222,7 +222,7 @@ After setting up Home Assistant, generate a **Long-Lived Access Token** (Profile
 | Component | Purpose | Port |
 |-----------|---------|------|
 | [Home Assistant](https://www.home-assistant.io/) | Smart home hub | 8123 |
-| Cloudflare Tunnel | Secure access for Alexa | - |
+| Cloudflare Tunnel | Secure remote access for all user-facing services | - |
 
 ### Voice Assistant
 | Component | Purpose | Port |

@@ -39,7 +39,7 @@ app = FastAPI(title="Butler API", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Tailscale-only network; tighten if exposed
+    allow_origins=["*"],  # Cloudflare Tunnel handles access control
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

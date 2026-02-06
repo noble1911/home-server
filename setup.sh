@@ -57,7 +57,7 @@ echo -e "${NC}"
 # Phase 1: Foundation
 echo -e "\n${GREEN}Phase 1: Foundation${NC}"
 curl -fsSL "${BASE_URL}/01-homebrew.sh" | bash
-curl -fsSL "${BASE_URL}/02-tailscale.sh" | bash
+curl -fsSL "${BASE_URL}/02-cloudflare-tunnel.sh" | bash
 curl -fsSL "${BASE_URL}/03-power-settings.sh" | bash
 
 if [[ "$ENABLE_SSH" == "true" ]]; then
@@ -149,14 +149,11 @@ echo ""
 fi
 echo -e "${YELLOW}Next steps:${NC}"
 echo ""
-echo "  1. Open Tailscale and sign in:"
-echo "     open -a Tailscale"
+echo "  1. Configure Cloudflare Tunnel routes (see docs/cloudflare-tunnel.md)"
 echo ""
 echo "  2. Configure each service (see docs/ for guides)"
 echo ""
-echo "  3. Set up Cloudflare Tunnel for Alexa (see docs/11-smart-home.md)"
-echo ""
-echo "  4. Install mobile apps (Jellyfin, Immich, Audiobookshelf)"
+echo "  3. Install mobile apps (Jellyfin, Immich, Audiobookshelf)"
 echo ""
 if [[ "$SKIP_NANOBOT" == "false" ]]; then
 echo "  5. Access Butler PWA at http://localhost:3000 (after building)"

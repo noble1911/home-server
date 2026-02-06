@@ -80,7 +80,7 @@ Add to `~/.ssh/config` on your MacBook:
 
 ```ssh-config
 Host macmini
-  HostName mac-mini.local    # Or Tailscale IP: 100.x.y.z
+  HostName mac-mini.local    # Use LAN hostname or IP
   User ron
   IdentityFile ~/.ssh/id_ed25519_macmini
   IdentitiesOnly yes

@@ -174,12 +174,12 @@ home-server/
 ├── setup.sh               # All-in-one setup (calls scripts/)
 ├── scripts/               # Individual setup scripts
 │   ├── 01-homebrew.sh
-│   ├── 02-tailscale.sh
+│   ├── 02-cloudflare-tunnel.sh
 │   ├── 03-power-settings.sh
 │   └── 04-ssh.sh
 └── docs/                  # Manual instructions for each step
     ├── 01-homebrew.md
-    ├── 02-tailscale.md
+    ├── 02-cloudflare-tunnel.md
     ├── 03-power-settings.md
     └── 04-ssh.md
 ```
@@ -213,7 +213,7 @@ home-server/
 | Agent extensions | Skills + Python Tools | Skills for simple, Tools for critical |
 | Memory storage | PostgreSQL (Immich's DB) | Already in stack, has vector extensions |
 | Task tracking | GitHub Issues | Avoids merge conflicts with parallel agents |
-| Remote access | Tailscale | No port forwarding, works everywhere |
+| Remote access | Cloudflare Tunnel | No port forwarding, works on any device with a browser |
 | SSH | Optional | Not everyone runs headless |
 
 ## Monthly Costs

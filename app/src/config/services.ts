@@ -15,8 +15,8 @@ const SERVICE_NAME_MAP: Record<string, string> = {
   'homeassistant': 'home-assistant',
 }
 
-// Optional: set VITE_SERVICE_HOSTNAME for Tailscale/remote access
-// e.g. VITE_SERVICE_HOSTNAME=macmini.tail12345.ts.net
+// Optional: set VITE_SERVICE_HOSTNAME for Cloudflare Tunnel/remote access
+// e.g. VITE_SERVICE_HOSTNAME=home.yourdomain.com
 const HOSTNAME = import.meta.env.VITE_SERVICE_HOSTNAME || ''
 
 function serviceUrl(envVar: string, port: number, localDefault: string): string {

@@ -42,7 +42,7 @@ docker compose ps
    - iOS: App Store "Immich"
    - Android: Google Play "Immich"
 4. **Configure mobile app:**
-   - Server URL: `http://your-mac-mini-ip:2283` (or Tailscale IP)
+   - Server URL: `http://your-mac-mini-ip:2283` (or Cloudflare Tunnel URL)
    - Login with admin account
    - Settings > Backup > Enable automatic backup
 5. **Web features:**
@@ -141,11 +141,11 @@ docker logs immich-machine-learning
 
 For access outside your home:
 
-1. **Via Tailscale (recommended):**
-   - Use Tailscale IP: `http://100.x.x.x:2283`
-   - Works from anywhere on your tailnet
+1. **Via Cloudflare Tunnel (recommended):**
+   - Use your tunnel URL (e.g., `https://photos.yourdomain.com`)
+   - Works from anywhere with no client software needed
 
-2. **Direct IP (local only):**
+2. **Direct IP (LAN only):**
    - Find Mac IP: `ipconfig getifaddr en0`
    - Use: `http://192.168.x.x:2283`
 
