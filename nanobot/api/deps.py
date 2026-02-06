@@ -13,6 +13,7 @@ from fastapi import Depends, Header, HTTPException
 
 from tools import (
     DatabasePool,
+    EmbeddingService,
     GoogleCalendarTool,
     HomeAssistantTool,
     ListEntitiesByDomainTool,
@@ -36,9 +37,12 @@ async def init_resources() -> None:
     global _db_pool, _tools
     _db_pool = await DatabasePool.create(settings.database_url)
 
+    # Embedding service for semantic memory search (optional)
+    embedding_service = EmbeddingService(settings.ollama_url) if settings.ollama_url else None
+
     _tools = {
-        "remember_fact": RememberFactTool(_db_pool),
-        "recall_facts": RecallFactsTool(_db_pool),
+        "remember_fact": RememberFactTool(_db_pool, embedding_service),
+        "recall_facts": RecallFactsTool(_db_pool, embedding_service),
         "get_user": GetUserTool(_db_pool),
     }
 

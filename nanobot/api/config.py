@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     # Service-to-service auth (LiveKit Agents -> butler-api)
     internal_api_key: str = ""
 
+    # Ollama (for local embeddings)
+    ollama_url: str = ""
+
     # Google OAuth (for Calendar, Gmail, etc.)
     google_client_id: str = ""
     google_client_secret: str = ""

@@ -17,6 +17,7 @@ Usage:
 """
 
 from .base import Tool
+from .embeddings import EmbeddingService
 from .memory import (
     DatabasePool,
     DatabaseTool,
@@ -34,6 +35,8 @@ from .weather import WeatherTool
 __all__ = [
     # Base
     "Tool",
+    # Embeddings
+    "EmbeddingService",
     # Database
     "DatabasePool",
     "DatabaseTool",
