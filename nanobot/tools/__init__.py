@@ -36,6 +36,7 @@ from .radarr import RadarrTool
 from .readarr import ReadarrTool
 from .sonarr import SonarrTool
 from .immich import ImmichTool
+from .phone_location import PhoneLocationTool
 from .weather import WeatherTool
 from .alerting import AlertStateManager, NotificationDispatcher
 from .server_health import ServerHealthTool
@@ -66,6 +67,8 @@ __all__ = [
     "GoogleCalendarTool",
     # Jellyfin
     "JellyfinTool",
+    # Phone Location
+    "PhoneLocationTool",
     # Radarr
     "RadarrTool",
     # Readarr
