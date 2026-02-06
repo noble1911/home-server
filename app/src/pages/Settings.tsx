@@ -3,6 +3,7 @@ import { useAuthStore } from '../stores/authStore'
 import { useUserStore } from '../stores/userStore'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useConversationStore } from '../stores/conversationStore'
+import { usePushNotifications } from '../hooks/usePushNotifications'
 import { api, clearUserFacts, deleteUserAccount } from '../services/api'
 import ConfirmDialog from '../components/ConfirmDialog'
 import type { AdminUser, InviteCode, OAuthConnection, ToolPermission } from '../types/user'
@@ -34,6 +35,7 @@ export default function Settings() {
   const { profile, updateButlerName, updateSoul, clearAllFacts, clearProfile, isLoading } = useUserStore()
   const { voiceMode, setVoiceMode } = useSettingsStore()
   const { clearMessages } = useConversationStore()
+  const push = usePushNotifications()
   const isAdmin = role === 'admin'
 
   const [connections, setConnections] = useState<OAuthConnection[]>([])
@@ -595,6 +597,63 @@ export default function Settings() {
             This setting only applies to this device.
           </p>
         </div>
+      </section>
+
+      {/* Push Notifications - per device */}
+      <section className="card p-4">
+        <h2 className="text-sm font-medium text-butler-400 uppercase tracking-wide mb-4">
+          Push Notifications
+          <span className="text-butler-600 ml-2 text-xs normal-case">this device</span>
+        </h2>
+
+        {!push.isSupported ? (
+          <p className="text-sm text-butler-500">
+            Push notifications are not supported in this browser.
+          </p>
+        ) : push.permission === 'denied' ? (
+          <p className="text-sm text-butler-500">
+            Notifications are blocked. Enable them in your browser settings to receive push notifications.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm text-butler-100">
+                  {push.isSubscribed ? 'Enabled' : 'Disabled'}
+                </div>
+                <div className="text-xs text-butler-500">
+                  {push.isSubscribed
+                    ? 'You will receive notifications from Butler'
+                    : 'Enable to receive alerts when the app is closed'}
+                </div>
+              </div>
+              <button
+                onClick={push.isSubscribed ? push.unsubscribe : push.subscribe}
+                disabled={push.isLoading}
+                className={`px-3 py-1.5 rounded-lg text-xs disabled:opacity-50 ${
+                  push.isSubscribed
+                    ? 'bg-red-900/50 text-red-300 hover:bg-red-900 hover:text-red-200'
+                    : 'bg-accent text-white hover:bg-accent/80'
+                }`}
+              >
+                {push.isLoading
+                  ? 'Loading...'
+                  : push.isSubscribed
+                    ? 'Disable'
+                    : 'Enable'}
+              </button>
+            </div>
+
+            {push.isSubscribed && (
+              <button
+                onClick={push.sendTest}
+                className="w-full btn bg-butler-700 text-butler-300 hover:bg-butler-600 text-sm"
+              >
+                Send Test Notification
+              </button>
+            )}
+          </div>
+        )}
       </section>
 
       {/* Data Management */}

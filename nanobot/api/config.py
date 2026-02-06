@@ -89,6 +89,11 @@ class Settings(BaseSettings):
     # Home Assistant webhook authentication
     ha_webhook_secret: str = ""
 
+    # Web Push (VAPID keys for PWA push notifications)
+    vapid_public_key: str = ""
+    vapid_private_key: str = ""
+    vapid_subject: str = "mailto:admin@homeserver.local"
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
 

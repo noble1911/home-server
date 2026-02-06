@@ -15,3 +15,6 @@ anthropic>=0.40.0
 # Auth
 PyJWT>=2.8.0
 livekit-api>=0.7.0
+
+# Push notifications (Web Push API)
+pywebpush>=2.0.0

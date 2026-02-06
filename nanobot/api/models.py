@@ -231,6 +231,25 @@ class ScheduledTaskResponse(BaseModel):
     createdAt: str  # ISO8601
 
 
+# --- Push Notifications ---
+
+
+class PushSubscriptionKeys(BaseModel):
+    p256dh: str
+    auth: str
+
+
+class PushSubscribeRequest(BaseModel):
+    endpoint: str
+    keys: PushSubscriptionKeys
+
+
+class PushSubscriptionInfo(BaseModel):
+    id: int
+    endpoint: str
+    createdAt: str
+
+
 # --- Tool Usage (system observability) ---
 
 
