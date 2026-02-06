@@ -18,7 +18,10 @@ Example:
     await pool.close()
 """
 
+from __future__ import annotations
+
 from typing import Any
+import json
 import os
 import asyncpg
 
@@ -92,24 +95,23 @@ class DatabasePool:
         await self.close()
 
 
-class RememberFactTool(Tool):
-    """Store a fact about a user for future reference."""
+class DatabaseTool(Tool):
+    """Base class for tools that need a PostgreSQL connection pool.
+
+    Handles shared vs owned pool lifecycle. If a shared DatabasePool is
+    provided, it is used directly and never closed by this tool. If no
+    pool is provided, one is created lazily on first use and closed when
+    close() is called.
+    """
 
     def __init__(self, db_pool: DatabasePool | None = None):
-        """Initialize the tool.
-
-        Args:
-            db_pool: Shared database pool. If not provided, creates one lazily.
-        """
         self._db_pool = db_pool
-        self._owned_pool: DatabasePool | None = None  # Pool we created ourselves
+        self._owned_pool: DatabasePool | None = None
 
     async def _get_pool(self) -> asyncpg.Pool:
         """Get the database connection pool, creating if needed."""
         if self._db_pool:
             return self._db_pool.pool
-
-        # Lazy initialization for backwards compatibility
         if self._owned_pool is None:
             self._owned_pool = await DatabasePool.create()
         return self._owned_pool.pool
@@ -119,6 +121,10 @@ class RememberFactTool(Tool):
         if self._owned_pool:
             await self._owned_pool.close()
             self._owned_pool = None
+
+
+class RememberFactTool(DatabaseTool):
+    """Store a fact about a user for future reference."""
 
     @property
     def name(self) -> str:
@@ -190,32 +196,8 @@ class RememberFactTool(Tool):
         return f"Remembered: {fact}"
 
 
-class RecallFactsTool(Tool):
+class RecallFactsTool(DatabaseTool):
     """Recall stored facts about a user."""
-
-    def __init__(self, db_pool: DatabasePool | None = None):
-        """Initialize the tool.
-
-        Args:
-            db_pool: Shared database pool. If not provided, creates one lazily.
-        """
-        self._db_pool = db_pool
-        self._owned_pool: DatabasePool | None = None
-
-    async def _get_pool(self) -> asyncpg.Pool:
-        """Get the database connection pool, creating if needed."""
-        if self._db_pool:
-            return self._db_pool.pool
-
-        if self._owned_pool is None:
-            self._owned_pool = await DatabasePool.create()
-        return self._owned_pool.pool
-
-    async def close(self) -> None:
-        """Close any pool we created ourselves."""
-        if self._owned_pool:
-            await self._owned_pool.close()
-            self._owned_pool = None
 
     @property
     def name(self) -> str:
@@ -304,32 +286,8 @@ class RecallFactsTool(Tool):
         return "\n".join(lines)
 
 
-class GetUserTool(Tool):
+class GetUserTool(DatabaseTool):
     """Get user profile including soul/personality configuration."""
-
-    def __init__(self, db_pool: DatabasePool | None = None):
-        """Initialize the tool.
-
-        Args:
-            db_pool: Shared database pool. If not provided, creates one lazily.
-        """
-        self._db_pool = db_pool
-        self._owned_pool: DatabasePool | None = None
-
-    async def _get_pool(self) -> asyncpg.Pool:
-        """Get the database connection pool, creating if needed."""
-        if self._db_pool:
-            return self._db_pool.pool
-
-        if self._owned_pool is None:
-            self._owned_pool = await DatabasePool.create()
-        return self._owned_pool.pool
-
-    async def close(self) -> None:
-        """Close any pool we created ourselves."""
-        if self._owned_pool:
-            await self._owned_pool.close()
-            self._owned_pool = None
 
     @property
     def name(self) -> str:
@@ -385,5 +343,212 @@ class GetUserTool(Tool):
             lines.append("Preferences:")
             for key, value in soul.items():
                 lines.append(f"  - {key}: {value}")
+
+        return "\n".join(lines)
+
+
+class GetConversationsTool(DatabaseTool):
+    """Retrieve recent conversation history for context injection."""
+
+    @property
+    def name(self) -> str:
+        return "get_conversations"
+
+    @property
+    def description(self) -> str:
+        return (
+            "Retrieve recent conversation history for a user. "
+            "Use this at the start of conversations to recall what was discussed recently, "
+            "enabling continuity like 'Yesterday you asked about the Dune audiobook.'"
+        )
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "user_id": {
+                    "type": "string",
+                    "description": "User identifier"
+                },
+                "days": {
+                    "type": "integer",
+                    "description": "Number of days to look back (default: 7)",
+                    "minimum": 1,
+                    "maximum": 90
+                },
+                "channel": {
+                    "type": "string",
+                    "description": "Filter by channel",
+                    "enum": ["whatsapp", "telegram", "voice", "pwa"]
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Maximum number of messages to return (default: 20)",
+                    "minimum": 1,
+                    "maximum": 100
+                }
+            },
+            "required": ["user_id"]
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        user_id = kwargs["user_id"]
+        days = kwargs.get("days", 7)
+        channel = kwargs.get("channel")
+        limit = kwargs.get("limit", 20)
+
+        pool = await self._get_pool()
+
+        if channel:
+            rows = await pool.fetch(
+                """
+                SELECT role, content, channel, created_at
+                FROM butler.conversation_history
+                WHERE user_id = $1
+                  AND channel = $2
+                  AND created_at >= NOW() - INTERVAL '1 day' * $3
+                ORDER BY created_at DESC
+                LIMIT $4
+                """,
+                user_id, channel, days, limit
+            )
+        else:
+            rows = await pool.fetch(
+                """
+                SELECT role, content, channel, created_at
+                FROM butler.conversation_history
+                WHERE user_id = $1
+                  AND created_at >= NOW() - INTERVAL '1 day' * $2
+                ORDER BY created_at DESC
+                LIMIT $3
+                """,
+                user_id, days, limit
+            )
+
+        if not rows:
+            return f"No recent conversations found for user {user_id} in the last {days} days."
+
+        # Group by date for concise output (reverse to chronological order)
+        by_date: dict[str, list[dict]] = {}
+        for row in reversed(rows):
+            date_key = row["created_at"].strftime("%Y-%m-%d")
+            if date_key not in by_date:
+                by_date[date_key] = []
+            by_date[date_key].append({
+                "role": row["role"],
+                "content": row["content"],
+                "channel": row["channel"],
+                "time": row["created_at"].strftime("%H:%M"),
+            })
+
+        lines = [f"Recent conversations for {user_id} (last {days} days):"]
+        for date, messages in by_date.items():
+            lines.append(f"\n{date}:")
+            for msg in messages:
+                prefix = "You" if msg["role"] == "assistant" else "User"
+                content = msg["content"]
+                if len(content) > 120:
+                    content = content[:117] + "..."
+                channel_tag = f" [{msg['channel']}]" if not channel else ""
+                lines.append(f"  {msg['time']} {prefix}{channel_tag}: {content}")
+
+        return "\n".join(lines)
+
+
+# Valid soul keys — prevents LLM from injecting arbitrary keys into JSONB
+VALID_SOUL_KEYS = frozenset({"personality", "formality", "verbosity", "humor", "custom_instructions"})
+
+
+class UpdateSoulTool(DatabaseTool):
+    """Update a user's personality/soul configuration."""
+
+    @property
+    def name(self) -> str:
+        return "update_soul"
+
+    @property
+    def description(self) -> str:
+        return (
+            "Update a user's personality and communication preferences. "
+            "This merges new settings into the existing soul config without overwriting "
+            "unrelated keys. Use when a user expresses preferences like "
+            "'be more casual' or 'use less humor'."
+        )
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "user_id": {
+                    "type": "string",
+                    "description": "User identifier"
+                },
+                "personality": {
+                    "type": "string",
+                    "description": "Overall personality style (e.g., 'warm and encouraging', 'dry and witty')"
+                },
+                "formality": {
+                    "type": "string",
+                    "description": "Communication formality level",
+                    "enum": ["casual", "balanced", "formal"]
+                },
+                "verbosity": {
+                    "type": "string",
+                    "description": "Response length preference",
+                    "enum": ["concise", "balanced", "detailed"]
+                },
+                "humor": {
+                    "type": "string",
+                    "description": "Humor level in responses",
+                    "enum": ["none", "light", "moderate", "heavy"]
+                },
+                "custom_instructions": {
+                    "type": "string",
+                    "description": "Free-form instructions (e.g., 'Always greet me in Spanish')"
+                }
+            },
+            "required": ["user_id"]
+        }
+
+    async def execute(self, **kwargs: Any) -> str:
+        user_id = kwargs["user_id"]
+
+        # Extract only valid soul keys from kwargs
+        updates = {
+            key: kwargs[key]
+            for key in VALID_SOUL_KEYS
+            if key in kwargs
+        }
+
+        if not updates:
+            return (
+                "No soul preferences provided. Specify at least one of: "
+                "personality, formality, verbosity, humor, custom_instructions."
+            )
+
+        pool = await self._get_pool()
+
+        # Use PostgreSQL's jsonb concatenation (||) for partial merge
+        # COALESCE handles NULL soul, || merges top-level keys atomically
+        row = await pool.fetchrow(
+            """
+            UPDATE butler.users
+            SET soul = COALESCE(soul, '{}'::jsonb) || $2::jsonb
+            WHERE id = $1
+            RETURNING soul
+            """,
+            user_id, json.dumps(updates)
+        )
+
+        if not row:
+            return f"User {user_id} not found. Create user profile first."
+
+        updated_soul = row["soul"] if isinstance(row["soul"], dict) else json.loads(row["soul"])
+        updated_keys = ", ".join(updates.keys())
+        lines = [f"Updated soul for {user_id} ({updated_keys}):"]
+        for key, value in updated_soul.items():
+            lines.append(f"  - {key}: {value}")
 
         return "\n".join(lines)

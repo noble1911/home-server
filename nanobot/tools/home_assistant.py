@@ -19,6 +19,8 @@ API Reference:
     https://developers.home-assistant.io/docs/api/rest/
 """
 
+from __future__ import annotations
+
 from typing import Any
 import os
 import aiohttp

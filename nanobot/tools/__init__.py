@@ -17,7 +17,16 @@ Usage:
 """
 
 from .base import Tool
-from .memory import DatabasePool, RememberFactTool, RecallFactsTool, GetUserTool
+from .memory import (
+    DatabasePool,
+    DatabaseTool,
+    RememberFactTool,
+    RecallFactsTool,
+    GetUserTool,
+    GetConversationsTool,
+    UpdateSoulTool,
+    VALID_SOUL_KEYS,
+)
 from .home_assistant import HomeAssistantTool, ListEntitiesByDomainTool
 
 __all__ = [
@@ -25,10 +34,14 @@ __all__ = [
     "Tool",
     # Database
     "DatabasePool",
+    "DatabaseTool",
     # Memory
     "RememberFactTool",
     "RecallFactsTool",
     "GetUserTool",
+    "GetConversationsTool",
+    "UpdateSoulTool",
+    "VALID_SOUL_KEYS",
     # Home Assistant
     "HomeAssistantTool",
     "ListEntitiesByDomainTool",
