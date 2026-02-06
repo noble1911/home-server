@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     home_assistant_url: str = ""
     home_assistant_token: str = ""
 
+    # Weather (OpenWeatherMap)
+    openweathermap_api_key: str = ""
+
     # Service-to-service auth (LiveKit Agents -> butler-api)
     internal_api_key: str = ""
 
