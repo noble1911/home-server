@@ -14,7 +14,9 @@ export default function ServiceCard({ service }: ServiceCardProps) {
   return (
     <button
       onClick={handleClick}
-      className="card p-4 text-left hover:bg-butler-700/50 transition-colors group"
+      className={`card p-4 text-left hover:bg-butler-700/50 transition-colors group${
+        service.status === 'offline' ? ' opacity-60 border-red-500/20' : ''
+      }`}
     >
       <div className="text-3xl mb-2">{service.icon}</div>
       <h3 className="font-medium text-butler-100 group-hover:text-accent transition-colors">

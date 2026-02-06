@@ -1,72 +1,35 @@
+import { useState, useEffect, useCallback } from 'react'
 import ServiceCard from '../components/services/ServiceCard'
-import type { Service, ServiceCategory } from '../types/services'
+import type { ServiceCategory } from '../types/services'
+import { getSystemHealth, type ServiceStatus } from '../services/api'
+import { services as defaultServices, categoryLabels, applyHealthStatus } from '../config/services'
 
-// Service definitions - URLs will be configured per-deployment
-const services: Service[] = [
-  {
-    id: 'jellyfin',
-    name: 'Jellyfin',
-    description: 'Movies & TV Shows',
-    icon: '🎬',
-    url: 'http://jellyfin.local',
-    mobileUrl: 'jellyfin://',
-    category: 'media',
-  },
-  {
-    id: 'audiobookshelf',
-    name: 'Audiobookshelf',
-    description: 'Audiobooks & Podcasts',
-    icon: '🎧',
-    url: 'http://audiobooks.local',
-    mobileUrl: 'audiobookshelf://',
-    category: 'media',
-  },
-  {
-    id: 'calibre',
-    name: 'Calibre-Web',
-    description: 'E-Books Library',
-    icon: '📚',
-    url: 'http://books.local',
-    category: 'books',
-  },
-  {
-    id: 'immich',
-    name: 'Immich',
-    description: 'Photo Backup',
-    icon: '📷',
-    url: 'http://photos.local',
-    mobileUrl: 'immich://',
-    category: 'photos',
-  },
-  {
-    id: 'nextcloud',
-    name: 'Nextcloud',
-    description: 'Files & Documents',
-    icon: '📁',
-    url: 'http://files.local',
-    mobileUrl: 'nextcloud://',
-    category: 'files',
-  },
-  {
-    id: 'home-assistant',
-    name: 'Home Assistant',
-    description: 'Smart Home Control',
-    icon: '🏠',
-    url: 'http://ha.local',
-    mobileUrl: 'homeassistant://',
-    category: 'smart-home',
-  },
-]
-
-const categoryLabels: Record<ServiceCategory, string> = {
-  'media': 'Media',
-  'books': 'Books',
-  'photos': 'Photos',
-  'files': 'Files',
-  'smart-home': 'Smart Home',
-}
+const REFRESH_INTERVAL = 60_000
 
 export default function Services() {
+  const [healthData, setHealthData] = useState<ServiceStatus[] | null>(null)
+  const [error, setError] = useState('')
+
+  const fetchStatus = useCallback(async () => {
+    try {
+      const data = await getSystemHealth()
+      setHealthData(data.services)
+      setError('')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch service status')
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchStatus()
+    const id = setInterval(fetchStatus, REFRESH_INTERVAL)
+    return () => clearInterval(id)
+  }, [fetchStatus])
+
+  const services = healthData
+    ? applyHealthStatus(defaultServices, healthData)
+    : defaultServices
+
   const categories = [...new Set(services.map(s => s.category))] as ServiceCategory[]
 
   return (
@@ -75,6 +38,12 @@ export default function Services() {
         <h1 className="text-xl font-bold text-butler-100">Services</h1>
         <p className="text-sm text-butler-400">Quick access to your home server apps</p>
       </div>
+
+      {error && (
+        <div className="text-sm text-red-400/70 bg-red-500/10 rounded-lg px-3 py-2">
+          {error}
+        </div>
+      )}
 
       {categories.map(category => (
         <div key={category}>
