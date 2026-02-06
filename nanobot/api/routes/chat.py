@@ -41,7 +41,7 @@ async def text_chat(
     track the response.
     """
     ctx = await load_user_context(pool, user_id)
-    all_tools = get_user_tools(user_id, tools, pool)
+    all_tools = await get_user_tools(user_id, tools, pool)
 
     response_text = await chat_with_tools(
         system_prompt=ctx.system_prompt,
@@ -144,7 +144,7 @@ async def stream_text_chat(
         data: [DONE]
     """
     ctx = await load_user_context(pool, user_id)
-    all_tools = get_user_tools(user_id, tools, pool)
+    all_tools = await get_user_tools(user_id, tools, pool)
     message_id = str(uuid.uuid4())
     full_response_parts: list[str] = []
 

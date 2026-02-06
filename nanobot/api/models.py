@@ -68,6 +68,24 @@ class CreateInviteCodeResponse(BaseModel):
     expiresAt: str
 
 
+# --- Admin: User & Permission Management ---
+
+
+class AdminUserInfo(BaseModel):
+    id: str
+    name: str
+    role: str
+    permissions: list[str]
+
+
+class AdminUserListResponse(BaseModel):
+    users: list[AdminUserInfo]
+
+
+class UpdatePermissionsRequest(BaseModel):
+    permissions: list[str]
+
+
 # --- User (matches app/src/types/user.ts) ---
 
 
@@ -91,6 +109,7 @@ class UserProfile(BaseModel):
     email: str | None = None
     butlerName: str = "Butler"
     role: str = "user"
+    permissions: list[str] = Field(default_factory=lambda: ["media", "home"])
     createdAt: str
     soul: SoulConfig = Field(default_factory=SoulConfig)
     facts: list[UserFact] = Field(default_factory=list)

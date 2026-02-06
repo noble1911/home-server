@@ -5,7 +5,8 @@ import { useSettingsStore } from '../stores/settingsStore'
 import { useConversationStore } from '../stores/conversationStore'
 import { api, clearUserFacts, deleteUserAccount } from '../services/api'
 import ConfirmDialog from '../components/ConfirmDialog'
-import type { InviteCode, OAuthConnection } from '../types/user'
+import type { AdminUser, InviteCode, OAuthConnection, ToolPermission } from '../types/user'
+import { PERMISSION_INFO } from '../types/user'
 
 interface ConnectionsResponse {
   connections: OAuthConnection[]
@@ -24,6 +25,10 @@ interface CreateInviteCodeResponse {
   expiresAt: string
 }
 
+interface AdminUserListResponse {
+  users: AdminUser[]
+}
+
 export default function Settings() {
   const { logout, role } = useAuthStore()
   const { profile, updateButlerName, updateSoul, clearAllFacts, clearProfile, isLoading } = useUserStore()
@@ -40,6 +45,11 @@ export default function Settings() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [copiedCode, setCopiedCode] = useState<string | null>(null)
 
+  // Permission management state (admin only)
+  const [adminUsers, setAdminUsers] = useState<AdminUser[]>([])
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
+  const [permSaving, setPermSaving] = useState(false)
+
   // Deletion state
   const [showClearFactsConfirm, setShowClearFactsConfirm] = useState(false)
   const [showDeleteAccountConfirm, setShowDeleteAccountConfirm] = useState(false)
@@ -51,9 +61,12 @@ export default function Settings() {
     fetchConnections()
   }, [])
 
-  // Fetch invite codes on mount (admin only)
+  // Fetch invite codes and user list on mount (admin only)
   useEffect(() => {
-    if (isAdmin) fetchInviteCodes()
+    if (isAdmin) {
+      fetchInviteCodes()
+      fetchAdminUsers()
+    }
   }, [isAdmin])
 
   // Handle OAuth callback redirect params
@@ -149,6 +162,42 @@ export default function Settings() {
     }
   }
 
+  async function fetchAdminUsers() {
+    try {
+      const data = await api.get<AdminUserListResponse>('/admin/users')
+      setAdminUsers(data.users)
+    } catch {
+      setAdminUsers([])
+    }
+  }
+
+  async function togglePermission(userId: string, perm: ToolPermission) {
+    const user = adminUsers.find(u => u.id === userId)
+    if (!user) return
+
+    const has = user.permissions.includes(perm)
+    const updated = has
+      ? user.permissions.filter(p => p !== perm)
+      : [...user.permissions, perm]
+
+    // Optimistic update
+    setAdminUsers(prev =>
+      prev.map(u => u.id === userId ? { ...u, permissions: updated } : u)
+    )
+
+    setPermSaving(true)
+    try {
+      await api.put(`/admin/users/${userId}/permissions`, { permissions: updated })
+    } catch {
+      // Revert on error
+      setAdminUsers(prev =>
+        prev.map(u => u.id === userId ? { ...u, permissions: user.permissions } : u)
+      )
+    } finally {
+      setPermSaving(false)
+    }
+  }
+
   async function handleClearFacts() {
     setIsDeleting(true)
     setDeleteError(null)
@@ -177,6 +226,9 @@ export default function Settings() {
       setShowDeleteAccountConfirm(false)
     }
   }
+
+  const selectedUser = adminUsers.find(u => u.id === selectedUserId)
+  const allPermissions = Object.keys(PERMISSION_INFO) as ToolPermission[]
 
   const googleConnection = connections.find(c => c.provider === 'google')
 
@@ -421,6 +473,97 @@ export default function Settings() {
           </div>
         </div>
       </section>
+
+      {/* Your Tool Access - read-only view of permissions */}
+      <section className="card p-4">
+        <h2 className="text-sm font-medium text-butler-400 uppercase tracking-wide mb-4">
+          Tool Access
+          <span className="text-butler-600 ml-2 text-xs normal-case">synced</span>
+        </h2>
+        <p className="text-xs text-butler-500 mb-3">
+          Tools your Butler can use on your behalf. {!isAdmin && 'Ask an admin to change these.'}
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {allPermissions.map(perm => {
+            const info = PERMISSION_INFO[perm]
+            const enabled = profile.permissions?.includes(perm)
+            return (
+              <div
+                key={perm}
+                className={`px-3 py-1.5 rounded-lg text-xs ${
+                  enabled
+                    ? 'bg-accent/20 text-accent border border-accent/30'
+                    : 'bg-butler-800 text-butler-500 border border-butler-700'
+                }`}
+                title={info.description}
+              >
+                {info.label}
+              </div>
+            )
+          })}
+        </div>
+      </section>
+
+      {/* Manage Permissions - admin only */}
+      {isAdmin && (
+        <section className="card p-4">
+          <h2 className="text-sm font-medium text-butler-400 uppercase tracking-wide mb-4">
+            Manage Permissions
+            <span className="text-butler-600 ml-2 text-xs normal-case">admin</span>
+            {permSaving && <span className="text-accent ml-2 text-xs normal-case">saving...</span>}
+          </h2>
+
+          {adminUsers.length === 0 ? (
+            <p className="text-sm text-butler-500 text-center">Loading users...</p>
+          ) : (
+            <>
+              <div className="mb-4">
+                <label className="block text-sm text-butler-300 mb-2">Select User</label>
+                <select
+                  value={selectedUserId || ''}
+                  onChange={(e) => setSelectedUserId(e.target.value || null)}
+                  className="input w-full"
+                >
+                  <option value="">Choose a user...</option>
+                  {adminUsers.map(u => (
+                    <option key={u.id} value={u.id}>
+                      {u.name} {u.role === 'admin' ? '(admin)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {selectedUser && (
+                <div className="space-y-2">
+                  {allPermissions.map(perm => {
+                    const info = PERMISSION_INFO[perm]
+                    const enabled = selectedUser.permissions.includes(perm)
+                    return (
+                      <button
+                        key={perm}
+                        onClick={() => togglePermission(selectedUser.id, perm)}
+                        className="w-full flex items-center justify-between p-3 bg-butler-800 rounded-lg hover:bg-butler-700 transition-colors"
+                      >
+                        <div className="text-left">
+                          <div className="text-sm text-butler-100">{info.label}</div>
+                          <div className="text-xs text-butler-500">{info.description}</div>
+                        </div>
+                        <div className={`w-10 h-6 rounded-full relative transition-colors ${
+                          enabled ? 'bg-accent' : 'bg-butler-600'
+                        }`}>
+                          <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
+                            enabled ? 'translate-x-5' : 'translate-x-1'
+                          }`} />
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </>
+          )}
+        </section>
+      )}
 
       {/* Device Settings - local to this device */}
       <section className="card p-4">

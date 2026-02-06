@@ -43,6 +43,29 @@ from .cleanup import start_cleanup, stop_cleanup
 from .config import settings
 from .ratelimit import start_ratelimit_cleanup, stop_ratelimit_cleanup
 
+# ── Permission system ────────────────────────────────────────────────
+# Tools in ALWAYS_ALLOWED bypass permission checks entirely.
+# PERMISSION_TOOL_MAP maps permission group names → tool names.
+
+ALWAYS_ALLOWED_TOOLS: set[str] = {
+    "remember_fact", "recall_facts", "get_user",
+    "weather", "server_health", "storage_monitor",
+}
+
+PERMISSION_TOOL_MAP: dict[str, list[str]] = {
+    "media": ["radarr", "readarr", "sonarr", "immich", "jellyfin"],
+    "home": ["home_assistant", "list_ha_entities"],
+    "location": ["phone_location"],
+    "calendar": ["google_calendar"],
+    "email": ["gmail"],
+    "automation": ["schedule_task"],
+    "communication": ["whatsapp"],
+}
+
+ALL_PERMISSION_GROUPS: list[str] = sorted(PERMISSION_TOOL_MAP.keys())
+
+DEFAULT_PERMISSIONS: list[str] = ["media", "home"]
+
 # Module-level state, set during lifespan startup
 _db_pool: DatabasePool | None = None
 _tools: dict[str, Tool] | None = None
@@ -246,19 +269,40 @@ async def get_internal_or_user(
     return await get_current_user(authorization)
 
 
-def get_user_tools(
+async def get_user_tools(
     user_id: str,
     global_tools: dict[str, Tool],
     db_pool: DatabasePool,
 ) -> dict[str, Tool]:
-    """Merge global tools with per-user tools (e.g., Google Calendar).
+    """Build a tool set filtered by the user's permissions.
 
-    Per-user tools are created per-request because they depend on
-    the authenticated user's OAuth tokens. Only registered when
-    the corresponding service is configured.
+    1. Query butler.users.permissions for the user's allowed groups.
+    2. Compute which tool names are allowed (always-allowed + permission groups).
+    3. Filter global tools and conditionally add per-user OAuth tools.
     """
-    user_tools = dict(global_tools)
+    import json as _json
+
+    db = db_pool.pool
+    row = await db.fetchval(
+        "SELECT permissions FROM butler.users WHERE id = $1", user_id
+    )
+    user_perms: list[str] = (
+        _json.loads(row) if isinstance(row, str) else row
+    ) if row is not None else DEFAULT_PERMISSIONS
+
+    # Build the set of allowed tool names
+    allowed: set[str] = set(ALWAYS_ALLOWED_TOOLS)
+    for perm in user_perms:
+        allowed.update(PERMISSION_TOOL_MAP.get(perm, []))
+
+    # Filter global tools
+    user_tools = {name: tool for name, tool in global_tools.items() if name in allowed}
+
+    # Add per-user OAuth tools only if user has the corresponding permission
     if settings.google_client_id:
-        user_tools["google_calendar"] = GoogleCalendarTool(db_pool, user_id)
-        user_tools["gmail"] = GmailTool(db_pool, user_id)
+        if "calendar" in user_perms:
+            user_tools["google_calendar"] = GoogleCalendarTool(db_pool, user_id)
+        if "email" in user_perms:
+            user_tools["gmail"] = GmailTool(db_pool, user_id)
+
     return user_tools

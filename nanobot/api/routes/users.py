@@ -43,7 +43,7 @@ async def _get_profile(user_id: str, pool: DatabasePool) -> UserProfile:
     db = pool.pool
 
     user = await db.fetchrow(
-        "SELECT id, name, soul, role, created_at FROM butler.users WHERE id = $1",
+        "SELECT id, name, soul, role, permissions, created_at FROM butler.users WHERE id = $1",
         user_id,
     )
     if not user:
@@ -59,12 +59,17 @@ async def _get_profile(user_id: str, pool: DatabasePool) -> UserProfile:
     )
 
     soul = user["soul"] or {}
+    raw_perms = user["permissions"]
+    permissions = (
+        json.loads(raw_perms) if isinstance(raw_perms, str) else raw_perms
+    ) if raw_perms is not None else ["media", "home"]
 
     return UserProfile(
         id=user["id"],
         name=user["name"],
         butlerName=soul.get("butler_name", "Butler"),
         role=user["role"],
+        permissions=permissions,
         createdAt=user["created_at"].isoformat(),
         soul=SoulConfig(
             personality=soul.get("personality", "balanced"),
