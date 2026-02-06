@@ -38,6 +38,24 @@ services:
       - homeserver
     restart: unless-stopped
 
+  livekit-agent:
+    build: ../../butler/livekit-agent
+    container_name: livekit-agent
+    environment:
+      - LIVEKIT_URL=ws://livekit:7880
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY:-devkey}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET:-secret}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - KOKORO_URL=http://kokoro-tts:8880
+      - BUTLER_API_URL=http://butler-api:8000
+      - BUTLER_API_KEY=${INTERNAL_API_KEY:-}
+    depends_on:
+      - livekit
+      - kokoro-tts
+    networks:
+      - homeserver
+    restart: unless-stopped
+
 networks:
   homeserver:
     external: true

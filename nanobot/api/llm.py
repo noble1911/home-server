@@ -4,13 +4,15 @@ This module calls the Anthropic API directly using the existing Tool classes
 from nanobot/tools/. The key adapter is tool_to_anthropic_schema() which
 converts our OpenAI-format tool schemas to Anthropic's format.
 
-The chat_with_tools() function implements the standard tool-use loop:
-send message -> if Claude wants tools -> execute them -> send results -> repeat.
+Two main functions:
+- chat_with_tools(): Batch mode — waits for full response (used by text chat)
+- stream_chat_with_tools(): Streaming mode — yields text chunks via SSE (used by voice)
 """
 
 from __future__ import annotations
 
 import logging
+from collections.abc import AsyncGenerator
 
 import anthropic
 
@@ -128,3 +130,89 @@ async def chat_with_tools(
     # Exhausted tool rounds
     logger.warning("Exhausted %d tool rounds", max_tool_rounds)
     return "I'm sorry, I wasn't able to complete that request. Could you try again?"
+
+
+async def stream_chat_with_tools(
+    system_prompt: str,
+    user_message: str,
+    tools: dict[str, Tool],
+    max_tool_rounds: int = 5,
+) -> AsyncGenerator[str, None]:
+    """Stream Claude's response text, executing any tool calls between rounds.
+
+    Like chat_with_tools() but yields text chunks as they arrive from
+    Claude's streaming API. This enables the voice pipeline to start TTS
+    on the first sentence while Claude is still generating.
+
+    Each round is streamed: if Claude says "Let me check the lights" before
+    calling a tool, those words are yielded immediately. After tool execution,
+    the next round streams the result ("The lights are now on").
+
+    Args:
+        system_prompt: Personalized system prompt from context.py
+        user_message: User's text message or voice transcript
+        tools: Dict of tool_name -> Tool instance
+        max_tool_rounds: Safety limit on tool use iterations
+
+    Yields:
+        Text chunks as they arrive from Claude's streaming API
+    """
+    client = _get_client()
+    tool_definitions = [tool_to_anthropic_schema(t) for t in tools.values()]
+    messages: list[dict] = [{"role": "user", "content": user_message}]
+
+    for round_num in range(max_tool_rounds):
+        async with client.messages.stream(
+            model=settings.anthropic_model,
+            max_tokens=1024,
+            system=system_prompt,
+            tools=tool_definitions if tools else [],
+            messages=messages,
+        ) as stream:
+            async for text in stream.text_stream:
+                yield text
+
+            response = await stream.get_final_message()
+
+        # Check if Claude requested tool use
+        tool_use_blocks = [b for b in response.content if b.type == "tool_use"]
+
+        if not tool_use_blocks:
+            return  # Done — all text has been yielded
+
+        logger.info(
+            "Streaming tool use round %d: %s",
+            round_num + 1,
+            [b.name for b in tool_use_blocks],
+        )
+
+        # Append assistant response and execute tools
+        messages.append({"role": "assistant", "content": response.content})
+
+        tool_results = []
+        for block in tool_use_blocks:
+            tool_name = block.name
+            tool_input = block.input
+
+            if tool_name in tools:
+                try:
+                    result = await tools[tool_name].execute(**tool_input)
+                except Exception as e:
+                    logger.exception("Tool %s execution failed", tool_name)
+                    result = f"Error executing {tool_name}: {e}"
+            else:
+                result = f"Unknown tool: {tool_name}"
+
+            tool_results.append(
+                {
+                    "type": "tool_result",
+                    "tool_use_id": block.id,
+                    "content": result,
+                }
+            )
+
+        messages.append({"role": "user", "content": tool_results})
+
+    # Exhausted tool rounds
+    logger.warning("Exhausted %d streaming tool rounds", max_tool_rounds)
+    yield "I'm sorry, I wasn't able to complete that request. Could you try again?"
