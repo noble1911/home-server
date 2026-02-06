@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     # Weather (OpenWeatherMap)
     openweathermap_api_key: str = ""
 
+    # Radarr (movie management)
+    radarr_url: str = ""
+    radarr_api_key: str = ""
+
     # Service-to-service auth (LiveKit Agents -> butler-api)
     internal_api_key: str = ""
 
