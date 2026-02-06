@@ -11,7 +11,7 @@ OPDS (Open Publication Distribution System) is a catalog format that ebook apps 
 - Browse your full library by author, category, or series
 - Search for specific titles
 - Download books directly to the device
-- Access your library from anywhere via Tailscale
+- Access your library remotely via Cloudflare Tunnel
 
 Think of it as an RSS feed for your ebook collection.
 
@@ -41,17 +41,11 @@ Once enabled, the OPDS feed is available at:
 | Access Method | URL |
 |--------------|-----|
 | Local network | `http://localhost:8083/opds` |
-| Tailscale (remote) | `http://<tailscale-ip>:8083/opds` |
-| Tailscale MagicDNS | `http://mac-mini:8083/opds` |
+| Cloudflare Tunnel (remote) | `https://books.yourdomain.com/opds` |
 
-To find your Tailscale IP:
+Replace `books.yourdomain.com` with the hostname you configured in your Cloudflare Tunnel for Calibre-Web ([Step 2](./02-cloudflare-tunnel.md)).
 
-```bash
-tailscale ip -4
-# Returns something like 100.x.y.z
-```
-
-> **Note:** OPDS uses HTTP Basic Authentication — your Calibre-Web username and password protect the feed. When connecting from outside your home, always use Tailscale rather than exposing port 8083 to the internet.
+> **Note:** OPDS uses HTTP Basic Authentication — your Calibre-Web username and password protect the feed. Cloudflare Tunnel provides HTTPS automatically, so credentials are encrypted in transit.
 
 ## 3. Connect Mobile Apps
 
@@ -64,7 +58,7 @@ KOReader is the best choice for e-ink devices (Kindle, Kobo, PocketBook running 
 3. Tap **+** to add a new catalog
 4. Enter:
    - **Catalog name:** Home Library
-   - **Catalog URL:** `http://<tailscale-ip>:8083/opds`
+   - **Catalog URL:** `https://books.yourdomain.com/opds`
 5. When prompted, enter your Calibre-Web **username** and **password**
 6. Browse your library, tap a book, and choose a format to download
 
@@ -76,7 +70,7 @@ KOReader is the best choice for e-ink devices (Kindle, Kobo, PocketBook running 
 4. Tap **+** (Add) at the top
 5. Enter:
    - **Name:** Home Library
-   - **URL:** `http://<tailscale-ip>:8083/opds`
+   - **URL:** `https://books.yourdomain.com/opds`
    - **Username:** your Calibre-Web username
    - **Password:** your Calibre-Web password
 6. Tap **OK**
@@ -88,7 +82,7 @@ KOReader is the best choice for e-ink devices (Kindle, Kobo, PocketBook running 
 2. Go to **Menu** → **Network Library** → **Add catalog**
 3. Enter:
    - **Title:** Home Library
-   - **URL:** `http://<tailscale-ip>:8083/opds`
+   - **URL:** `https://books.yourdomain.com/opds`
    - **User name:** your Calibre-Web username
    - **Password:** your Calibre-Web password
 4. Tap **OK** or **Add**
@@ -102,7 +96,7 @@ Panels is a good OPDS client for iPhone and iPad, especially for comics and mang
 2. Tap **Library** → **Add OPDS Feed**
 3. Enter:
    - **Name:** Home Library
-   - **URL:** `http://<tailscale-ip>:8083/opds`
+   - **URL:** `https://books.yourdomain.com/opds`
    - **Username:** your Calibre-Web username
    - **Password:** your Calibre-Web password
 4. Tap **Save**
@@ -113,7 +107,7 @@ Panels is a good OPDS client for iPhone and iPad, especially for comics and mang
 Many iOS ebook readers support OPDS. The general setup pattern is:
 
 1. Look for **Add catalog**, **OPDS**, or **Network Library** in the app's settings
-2. Enter the URL: `http://<tailscale-ip>:8083/opds`
+2. Enter the URL: `https://books.yourdomain.com/opds`
 3. Enter Calibre-Web credentials when prompted
 
 ## 4. Verify It Works
@@ -129,21 +123,22 @@ After connecting an app, confirm these work:
 
 > **Tip:** If you only see a few books, make sure your Calibre library has been populated. Calibre-Web reads from the `metadata.db` in your Calibre library directory.
 
-## 5. Remote Access via Tailscale
+## 5. Remote Access via Cloudflare Tunnel
 
-OPDS works seamlessly over Tailscale, giving you access to your library from anywhere:
+OPDS works seamlessly over your Cloudflare Tunnel, giving you access to your library from anywhere — no VPN or extra apps needed on your phone.
 
-1. Install Tailscale on your mobile device ([iOS](https://apps.apple.com/app/tailscale/id1470499037) / [Android](https://play.google.com/store/apps/details?id=com.tailscale.ipn))
-2. Sign in with the same account as your server
-3. Use the Tailscale IP or MagicDNS hostname in your OPDS URL
-4. Books download directly to your phone — no cloud storage needed
+If you've already set up a Cloudflare Tunnel hostname for Calibre-Web (e.g. `books.yourdomain.com`), just use the HTTPS URL in your OPDS app:
+
+```
+https://books.yourdomain.com/opds
+```
 
 ### Speed Expectations
 
 | Connection | Speed |
 |-----------|-------|
 | Same Wi-Fi network | Near-instant downloads |
-| Tailscale (remote) | Depends on your home upload speed; typical ebooks (1-5 MB) download in seconds |
+| Remote (Cloudflare Tunnel) | Depends on your home upload speed; typical ebooks (1-5 MB) download in seconds |
 | Large PDFs / comics | May take longer on slower connections |
 
 ## Troubleshooting
@@ -163,7 +158,7 @@ OPDS works seamlessly over Tailscale, giving you access to your library from any
 ### "Connection refused" or timeout
 
 - **On local network:** Confirm Calibre-Web is running: `docker ps | grep calibre-web`
-- **Over Tailscale:** Verify Tailscale is connected on both devices: `tailscale status`
+- **Over Cloudflare Tunnel:** Verify the tunnel is running: `docker logs cloudflared`
 - **Port check:** Ensure port 8083 is mapped: `docker port calibre-web`
 
 ### App doesn't show OPDS option
