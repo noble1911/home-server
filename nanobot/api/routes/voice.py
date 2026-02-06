@@ -1,7 +1,10 @@
-"""Voice processing route.
+"""Voice processing routes.
 
-POST /api/voice/process — Called by LiveKit Agents with a transcript.
-Loads user context, calls Claude with tools, saves conversation, returns response.
+POST /api/voice/process — Batch: returns full response JSON (text chat fallback)
+POST /api/voice/stream  — Streaming: returns SSE text chunks (primary voice path)
+
+Both are called by LiveKit Agents with a transcript. The stream endpoint enables
+TTS to start speaking on the first sentence while Claude is still generating.
 """
 
 from __future__ import annotations
@@ -10,12 +13,13 @@ import json
 import logging
 
 from fastapi import APIRouter, Depends
+from starlette.responses import StreamingResponse
 
 from tools import DatabasePool, Tool
 
 from ..context import load_user_context
 from ..deps import get_db_pool, get_internal_or_user, get_tools
-from ..llm import chat_with_tools
+from ..llm import chat_with_tools, stream_chat_with_tools
 from ..models import VoiceProcessRequest, VoiceProcessResponse
 
 logger = logging.getLogger(__name__)
@@ -80,6 +84,76 @@ async def process_voice(
         response=response_text,
         should_end_turn=_should_end_turn(response_text),
     )
+
+
+@router.post("/stream")
+async def stream_voice(
+    req: VoiceProcessRequest,
+    caller_user_id: str | None = Depends(get_internal_or_user),
+    pool: DatabasePool = Depends(get_db_pool),
+    tools: dict[str, Tool] = Depends(get_tools),
+):
+    """Stream a voice response as Server-Sent Events.
+
+    Primary voice endpoint for the LiveKit Agent. Text chunks arrive as
+    SSE events so the agent can feed them to TTS sentence-by-sentence,
+    producing audio while Claude is still generating.
+
+    SSE format:
+        data: {"delta": "Hello"}
+        data: {"delta": " there!"}
+        data: [DONE]
+    """
+    user_id = caller_user_id or req.user_id
+    ctx = await load_user_context(pool, user_id)
+    full_response_parts: list[str] = []
+
+    async def generate():
+        try:
+            async for chunk in stream_chat_with_tools(
+                system_prompt=ctx.system_prompt,
+                user_message=req.transcript,
+                tools=tools,
+            ):
+                full_response_parts.append(chunk)
+                yield f"data: {json.dumps({'delta': chunk})}\n\n"
+
+            yield "data: [DONE]\n\n"
+        finally:
+            # Save conversation history even if the client disconnects mid-stream.
+            # The finally block runs on both normal completion and generator aclose().
+            full_text = "".join(full_response_parts)
+            if full_text:
+                try:
+                    metadata = {"session_id": req.session_id}
+                    db = pool.pool
+                    await db.execute(
+                        """
+                        INSERT INTO butler.conversation_history
+                            (user_id, channel, role, content, metadata)
+                        VALUES ($1, 'voice', 'user', $2, $3::jsonb)
+                        """,
+                        user_id,
+                        req.transcript,
+                        _json_str(metadata),
+                    )
+                    await db.execute(
+                        """
+                        INSERT INTO butler.conversation_history
+                            (user_id, channel, role, content, metadata)
+                        VALUES ($1, 'voice', 'assistant', $2, $3::jsonb)
+                        """,
+                        user_id,
+                        full_text,
+                        _json_str(metadata),
+                    )
+                except Exception:
+                    logger.exception(
+                        "Failed to save voice conversation history for user=%s",
+                        user_id,
+                    )
+
+    return StreamingResponse(generate(), media_type="text/event-stream")
 
 
 def _should_end_turn(response: str) -> bool:

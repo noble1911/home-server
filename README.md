@@ -100,8 +100,15 @@ Or follow the manual docs for step-by-step instructions.
 | Component | Purpose | Port |
 |-----------|---------|------|
 | [LiveKit](https://livekit.io/) | WebRTC server | 7880 |
-| [Whisper](https://github.com/openai/whisper) | Speech-to-text | 9000 |
+| [Groq Whisper](https://console.groq.com/) | Speech-to-text (cloud, primary) | - |
+| [Whisper](https://github.com/openai/whisper) | Speech-to-text (local fallback) | 9000 |
+| LiveKit Agent | Voice pipeline orchestrator | - |
 | [Kokoro TTS](https://github.com/remsky/Kokoro-FastAPI) | Text-to-speech | 8880 |
+| Butler API | AI reasoning + tool execution | 8000 |
+
+> **Voice setup:** Requires a free [Groq API key](https://console.groq.com/keys) for
+> speech-to-text. The setup script will prompt for this, or add `GROQ_API_KEY` to
+> `nanobot/.env` and `docker/voice-stack/.env` manually.
 
 ---
 

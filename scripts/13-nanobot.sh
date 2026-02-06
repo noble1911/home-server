@@ -97,6 +97,40 @@ if [ ! -f .env ]; then
     else
         echo -e "  ${YELLOW}⚠${NC} Home Assistant skipped (can configure later in .env)"
     fi
+
+    # Ask about Groq (for voice features)
+    echo ""
+    echo -e "${YELLOW}Groq API Key (for Voice)${NC}"
+    echo "Free tier — sign up at: https://console.groq.com/keys"
+    echo "Provides fast speech-to-text via Whisper. Required for voice features."
+    echo ""
+    read -p "Enter your Groq API key (gsk_...) or press Enter to skip: " groq_key
+
+    if [ -n "$groq_key" ]; then
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            sed -i '' "s|GROQ_API_KEY=gsk_...|GROQ_API_KEY=${groq_key}|" .env
+        else
+            sed -i "s|GROQ_API_KEY=gsk_...|GROQ_API_KEY=${groq_key}|" .env
+        fi
+        echo -e "  ${GREEN}✓${NC} Groq API key configured"
+
+        # Also write to voice-stack .env for livekit-agent container
+        VOICE_ENV="${SCRIPT_DIR}/../docker/voice-stack/.env"
+        mkdir -p "$(dirname "$VOICE_ENV")"
+        if grep -q 'GROQ_API_KEY' "$VOICE_ENV" 2>/dev/null; then
+            if [[ "$OSTYPE" == "darwin"* ]]; then
+                sed -i '' "s|GROQ_API_KEY=.*|GROQ_API_KEY=${groq_key}|" "$VOICE_ENV"
+            else
+                sed -i "s|GROQ_API_KEY=.*|GROQ_API_KEY=${groq_key}|" "$VOICE_ENV"
+            fi
+        else
+            echo "GROQ_API_KEY=${groq_key}" >> "$VOICE_ENV"
+        fi
+        echo -e "  ${GREEN}✓${NC} Voice stack configured with Groq key"
+    else
+        echo -e "  ${YELLOW}⚠${NC} Groq skipped — voice STT will not work until configured"
+        echo "   Add GROQ_API_KEY to nanobot/.env and docker/voice-stack/.env later"
+    fi
 else
     echo -e "  ${GREEN}✓${NC} Using existing .env configuration"
 fi
@@ -162,6 +196,13 @@ echo "    - URL: http://localhost:8100"
 echo "    - Health: http://localhost:8100/health"
 echo "    - Model: claude-sonnet-4"
 echo ""
+echo "  Butler API:"
+echo "    - URL: http://localhost:8000"
+echo "    - Health: http://localhost:8000/health"
+echo "    - Voice (batch): POST /api/voice/process"
+echo "    - Voice (stream): POST /api/voice/stream"
+echo "    - Auth: POST /api/auth/redeem-invite"
+echo ""
 echo "  Database:"
 echo "    - Schema: butler (in Immich's PostgreSQL)"
 echo "    - Tables: users, user_facts, conversation_history, scheduled_tasks"
@@ -189,13 +230,11 @@ echo ""
 echo "  1. Build additional tools (issues #5-#9):"
 echo "     - Radarr, Sonarr, Jellyfin, Google Calendar"
 echo ""
-echo "  2. Add voice API endpoints (issue #30):"
-echo "     - /api/voice/process, /api/auth/token"
-echo ""
-echo "  3. Build LiveKit Agents worker (issue #29):"
-echo "     - Connects voice stack to Nanobot"
-echo ""
-echo "  4. Connect PWA to LiveKit (issue #31):"
+echo "  2. Connect PWA to LiveKit (issue #31):"
 echo "     - Enable voice in Butler app"
+echo ""
+echo "  3. If you skipped the Groq API key, add it later:"
+echo "     - Edit nanobot/.env and docker/voice-stack/.env"
+echo "     - Get a free key at: https://console.groq.com/keys"
 echo ""
 echo "See docs/VOICE_ARCHITECTURE.md for the full voice integration plan."
