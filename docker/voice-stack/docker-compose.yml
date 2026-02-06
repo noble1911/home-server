@@ -62,3 +62,4 @@ networks:
 
 volumes:
   kokoro-models:
+    name: kokoro-models

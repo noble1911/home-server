@@ -81,5 +81,8 @@ networks:
 
 volumes:
   immich-ml-cache:
+    name: immich-ml-cache
   immich-postgres-data:
+    name: immich-postgres-data
   nextcloud-data:
+    name: nextcloud-data

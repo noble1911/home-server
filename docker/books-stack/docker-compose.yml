@@ -55,6 +55,10 @@ networks:
 
 volumes:
   calibre-web-config:
+    name: calibre-web-config
   audiobookshelf-config:
+    name: audiobookshelf-config
   audiobookshelf-metadata:
+    name: audiobookshelf-metadata
   readarr-config:
+    name: readarr-config
