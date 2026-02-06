@@ -192,6 +192,20 @@ async def get_current_user(
         raise HTTPException(401, f"Invalid token: {e}")
 
 
+async def get_admin_user(
+    user_id: str = Depends(get_current_user),
+    pool: DatabasePool = Depends(get_db_pool),
+) -> str:
+    """Require admin role. Returns user_id if admin, raises 403 otherwise."""
+    db = pool.pool
+    row = await db.fetchrow(
+        "SELECT role FROM butler.users WHERE id = $1", user_id
+    )
+    if not row or row["role"] != "admin":
+        raise HTTPException(403, "Admin access required")
+    return user_id
+
+
 async def get_internal_or_user(
     authorization: Annotated[str | None, Header()] = None,
     x_api_key: Annotated[str | None, Header()] = None,

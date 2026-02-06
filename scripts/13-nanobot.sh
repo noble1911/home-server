@@ -207,14 +207,16 @@ if [ ! -f .env ]; then
         echo -e "  ${YELLOW}⚠${NC} Cloudflare Tunnel skipped (can configure later in .env)"
     fi
 
-    # Ask about invite code customization
+    # Ask about admin invite code
     echo ""
-    read -p "Custom invite code for household registration? (default: BUTLER-001): " invite_code
+    echo -e "  ${BLUE}Admin invite code:${NC} The first person to log in with this code becomes the admin."
+    echo -e "  ${BLUE}                  ${NC} The admin can then generate invite codes for others from Settings."
+    read -p "Set your admin invite code (default: BUTLER-001): " invite_code
     if [ -n "$invite_code" ]; then
         sed_inplace "s|^INVITE_CODES=.*|INVITE_CODES=${invite_code}|" .env
-        echo -e "  ${GREEN}✓${NC} Invite code set to: ${invite_code}"
+        echo -e "  ${GREEN}✓${NC} Admin invite code set to: ${invite_code}"
     else
-        echo -e "  ${GREEN}✓${NC} Using default invite code: BUTLER-001"
+        echo -e "  ${GREEN}✓${NC} Using default admin invite code: BUTLER-001"
     fi
 else
     echo -e "  ${GREEN}✓${NC} Using existing .env configuration"
