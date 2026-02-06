@@ -12,7 +12,7 @@ class ApiError extends Error {
   }
 }
 
-async function getAuthToken(): Promise<string | null> {
+export async function getAuthToken(): Promise<string | null> {
   const authData = localStorage.getItem('butler-auth')
   if (!authData) return null
 

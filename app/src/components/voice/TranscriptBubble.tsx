@@ -22,7 +22,16 @@ export default function TranscriptBubble({ message, butlerName }: TranscriptBubb
         {!isUser && (
           <div className="text-xs text-butler-400 mb-1">{butlerName}</div>
         )}
-        <p className="text-sm">{message.content}</p>
+        {message.role === 'assistant' && !message.content && !message.toolStatus ? (
+          <p className="text-sm text-butler-400 animate-pulse">...</p>
+        ) : (
+          <p className="text-sm">{message.content}</p>
+        )}
+        {message.toolStatus && (
+          <p className="text-xs text-butler-400 italic mt-1 animate-pulse">
+            {message.toolStatus}
+          </p>
+        )}
         <div className={`text-xs mt-1 ${isUser ? 'text-blue-200' : 'text-butler-500'}`}>
           {formatTime(message.timestamp)}
           {message.type === 'voice' && ' • 🎤'}

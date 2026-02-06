@@ -216,3 +216,85 @@ async def stream_chat_with_tools(
     # Exhausted tool rounds
     logger.warning("Exhausted %d streaming tool rounds", max_tool_rounds)
     yield "I'm sorry, I wasn't able to complete that request. Could you try again?"
+
+
+async def stream_chat_with_events(
+    system_prompt: str,
+    user_message: str,
+    tools: dict[str, Tool],
+    max_tool_rounds: int = 5,
+) -> AsyncGenerator[dict, None]:
+    """Stream Claude's response as structured events, including tool lifecycle.
+
+    Like stream_chat_with_tools() but yields dicts with a ``type`` field so
+    callers can distinguish text chunks from tool invocations:
+
+    - ``{"type": "text_delta", "delta": "..."}``  — text as it arrives
+    - ``{"type": "tool_start", "tool": "weather"}`` — tool execution begins
+    - ``{"type": "tool_end", "tool": "weather"}``   — tool execution finished
+
+    Used by the PWA chat streaming endpoint to surface tool activity in the UI.
+    """
+    client = _get_client()
+    tool_definitions = [tool_to_anthropic_schema(t) for t in tools.values()]
+    messages: list[dict] = [{"role": "user", "content": user_message}]
+
+    for round_num in range(max_tool_rounds):
+        async with client.messages.stream(
+            model=settings.anthropic_model,
+            max_tokens=1024,
+            system=system_prompt,
+            tools=tool_definitions if tools else [],
+            messages=messages,
+        ) as stream:
+            async for text in stream.text_stream:
+                yield {"type": "text_delta", "delta": text}
+
+            response = await stream.get_final_message()
+
+        tool_use_blocks = [b for b in response.content if b.type == "tool_use"]
+
+        if not tool_use_blocks:
+            return
+
+        logger.info(
+            "Event-stream tool use round %d: %s",
+            round_num + 1,
+            [b.name for b in tool_use_blocks],
+        )
+
+        messages.append({"role": "assistant", "content": response.content})
+
+        tool_results = []
+        for block in tool_use_blocks:
+            tool_name = block.name
+            tool_input = block.input
+
+            yield {"type": "tool_start", "tool": tool_name}
+
+            if tool_name in tools:
+                try:
+                    result = await tools[tool_name].execute(**tool_input)
+                except Exception as e:
+                    logger.exception("Tool %s execution failed", tool_name)
+                    result = f"Error executing {tool_name}: {e}"
+            else:
+                result = f"Unknown tool: {tool_name}"
+
+            yield {"type": "tool_end", "tool": tool_name}
+
+            tool_results.append(
+                {
+                    "type": "tool_result",
+                    "tool_use_id": block.id,
+                    "content": result,
+                }
+            )
+
+        messages.append({"role": "user", "content": tool_results})
+
+    logger.warning("Exhausted %d event-stream tool rounds", max_tool_rounds)
+    yield {
+        "type": "text_delta",
+        "delta": "I'm sorry, I wasn't able to complete that request. Could you try again?",
+    }

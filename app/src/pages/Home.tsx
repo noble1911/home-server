@@ -66,12 +66,12 @@ export default function Home() {
     loadHistory()
   }, [setMessages, setLoadingHistory, setHasMoreHistory])
 
-  // Scroll to bottom when new messages arrive
+  // Auto-scroll to bottom when messages change (including streaming updates)
   useEffect(() => {
     const el = scrollRef.current
     if (!el) return
     el.scrollTop = el.scrollHeight
-  }, [messages.length])
+  }, [messages])
 
   // Load older messages
   const loadMore = useCallback(async () => {
@@ -164,6 +164,7 @@ export default function Home() {
             </p>
           </div>
         )}
+
 
         {/* Messages with date separators */}
         {messages.map((message, index) => {

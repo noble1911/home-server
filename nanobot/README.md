@@ -14,8 +14,9 @@ nano .env
 # 3. Start the service
 docker compose up -d
 
-# 4. Run database migration (first time only)
+# 4. Run database migrations (first time only)
 docker exec immich-postgres psql -U postgres -d immich -f /app/migrations/001_butler_schema.sql
+docker exec immich-postgres psql -U postgres -d immich -f /app/migrations/002_update_embedding_dimensions.sql
 
 # 5. Check logs
 docker logs -f nanobot
@@ -109,13 +110,30 @@ docker compose up -d
 # Changes are reflected immediately (on next request)
 ```
 
+## Embedding Model
+
+Butler uses **nomic-embed-text** via a local Ollama instance for semantic search over user facts. The configuration lives in `tools/embeddings.py`:
+
+| Setting | Value | Notes |
+|---------|-------|-------|
+| Model | `nomic-embed-text` | 768-dim, runs locally via Ollama |
+| Dimensions | 768 | Stored in `EMBEDDING_DIM` constant |
+| DB column | `VECTOR(768)` | pgvector type in `butler.user_facts` |
+| Index | HNSW (cosine) | Approximate nearest-neighbour search |
+
+### Changing the embedding model
+
+1. Update `EMBEDDING_MODEL` and `EMBEDDING_DIM` in `tools/embeddings.py`
+2. Write a new migration to `ALTER COLUMN embedding TYPE VECTOR(<new_dim>)` and rebuild the HNSW index (see `002_update_embedding_dimensions.sql` for the pattern)
+3. Re-embed existing facts — old vectors will be incompatible with the new dimension
+
 ## Database Schema
 
 The butler schema lives in Immich's PostgreSQL:
 
 - `butler.users` - User profiles and preferences
-- `butler.user_facts` - Learned facts about users
+- `butler.user_facts` - Learned facts about users (with optional vector embeddings)
 - `butler.conversation_history` - Message history
 - `butler.scheduled_tasks` - Reminders and automations
 
-See `migrations/001_butler_schema.sql` for details.
+See `migrations/001_butler_schema.sql` for the initial schema and `002_update_embedding_dimensions.sql` for the dimension migration.

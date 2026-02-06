@@ -18,6 +18,7 @@ interface ConversationState {
   // Actions
   addMessage: (message: Message) => void
   prependMessages: (messages: Message[]) => void
+  updateMessage: (id: string, updates: Partial<Pick<Message, 'content' | 'toolStatus'>>) => void
   setMessages: (messages: Message[]) => void
   clearMessages: () => void
   setConnectionStatus: (status: ConnectionStatus) => void
@@ -41,6 +42,12 @@ export const useConversationStore = create<ConversationState>((set) => ({
 
   prependMessages: (messages) => set((state) => ({
     messages: [...messages, ...state.messages],
+  })),
+
+  updateMessage: (id, updates) => set((state) => ({
+    messages: state.messages.map((m) =>
+      m.id === id ? { ...m, ...updates } : m
+    ),
   })),
 
   setMessages: (messages) => set({ messages }),

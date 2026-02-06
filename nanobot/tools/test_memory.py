@@ -9,7 +9,7 @@ import pytest
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from .embeddings import EmbeddingService
+from .embeddings import EMBEDDING_DIM, EmbeddingService
 from .memory import (
     DatabasePool,
     RememberFactTool,
@@ -20,7 +20,7 @@ from .memory import (
 )
 
 
-FAKE_EMBEDDING = [0.1] * 768
+FAKE_EMBEDDING = [0.1] * EMBEDDING_DIM
 
 
 @pytest.fixture
@@ -743,6 +743,64 @@ class TestToolCleanup:
 
         # Shared pool should not be closed by tool
         mock_pool.pool.close.assert_not_called()
+
+
+class TestEmbeddingRoundTrip:
+    """Integration test: embed → store → search round-trip."""
+
+    @pytest.mark.asyncio
+    async def test_embed_store_search_round_trip(self, mock_pool, mock_embedding_service):
+        """Verify a fact can be embedded, stored, and found via semantic search."""
+        # 1. Store a fact with embedding
+        remember = RememberFactTool(mock_pool, mock_embedding_service)
+        result = await remember.execute(
+            user_id="user123", fact="Loves hiking in the mountains"
+        )
+        assert "Remembered" in result
+        mock_embedding_service.embed.assert_called_with("Loves hiking in the mountains")
+
+        # Verify the stored vector is the right size
+        store_call = mock_pool.pool.execute.call_args_list[-1]
+        stored_vector_str = store_call[0][-1]  # last positional arg is the vector string
+        stored_dims = stored_vector_str.count(",") + 1
+        assert stored_dims == EMBEDDING_DIM
+
+        # 2. Search for the fact semantically
+        mock_pool.pool.fetch = AsyncMock(return_value=[
+            {"fact": "Loves hiking in the mountains", "category": "preference",
+             "confidence": 1.0, "distance": 0.05},
+        ])
+        mock_embedding_service.embed.reset_mock()
+
+        recall = RecallFactsTool(mock_pool, mock_embedding_service)
+        result = await recall.execute(user_id="user123", query="outdoor activities")
+
+        # Query was embedded
+        mock_embedding_service.embed.assert_called_once_with("outdoor activities")
+
+        # Vector similarity SQL was used
+        search_sql = mock_pool.pool.fetch.call_args[0][0]
+        assert "<=>" in search_sql
+
+        # Result contains the stored fact with high relevance
+        assert "Loves hiking in the mountains" in result
+        assert "relevance: 95%" in result
+
+    @pytest.mark.asyncio
+    async def test_wrong_dimension_embedding_not_stored(self, mock_pool):
+        """Verify that a wrong-dimension embedding is discarded before DB insert."""
+        wrong_dim_service = MagicMock(spec=EmbeddingService)
+        wrong_dim_service.embed = AsyncMock(return_value=[0.1] * 1536)  # wrong dims
+
+        tool = RememberFactTool(mock_pool, wrong_dim_service)
+        result = await tool.execute(user_id="user123", fact="Test fact")
+
+        assert "Remembered" in result
+
+        # Verify INSERT does NOT include embedding (fell back to fact-only)
+        calls = mock_pool.pool.execute.call_args_list
+        fact_insert_sql = calls[-1][0][0]
+        assert "embedding" not in fact_insert_sql
 
 
 if __name__ == "__main__":
