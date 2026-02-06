@@ -31,6 +31,7 @@ from .memory import (
 from .home_assistant import HomeAssistantTool, ListEntitiesByDomainTool
 from .google_calendar import GoogleCalendarTool
 from .radarr import RadarrTool
+from .sonarr import SonarrTool
 from .weather import WeatherTool
 
 __all__ = [
@@ -55,6 +56,8 @@ __all__ = [
     "GoogleCalendarTool",
     # Radarr
     "RadarrTool",
+    # Sonarr
+    "SonarrTool",
     # Weather
     "WeatherTool",
 ]

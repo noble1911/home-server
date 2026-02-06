@@ -38,6 +38,10 @@ class Settings(BaseSettings):
     radarr_url: str = ""
     radarr_api_key: str = ""
 
+    # Sonarr (TV series management)
+    sonarr_url: str = ""
+    sonarr_api_key: str = ""
+
     # Service-to-service auth (LiveKit Agents -> butler-api)
     internal_api_key: str = ""
 
