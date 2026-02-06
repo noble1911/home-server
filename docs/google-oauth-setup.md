@@ -1,6 +1,6 @@
 # Google OAuth Setup
 
-This guide walks you through creating Google OAuth credentials so Butler can access Google Calendar (and eventually Gmail, etc.) on behalf of household members.
+This guide walks you through creating Google OAuth credentials so Butler can access Google Calendar and Gmail on behalf of household members.
 
 **Time:** ~10 minutes, one-time setup.
 
@@ -13,11 +13,11 @@ This guide walks you through creating Google OAuth credentials so Butler can acc
 3. Name it something like `Butler Home Server`
 4. Click **Create**
 
-## 2. Enable the Google Calendar API
+## 2. Enable Google APIs
 
 1. In your new project, go to **APIs & Services > Library**
-2. Search for **Google Calendar API**
-3. Click it and press **Enable**
+2. Search for **Google Calendar API**, click it and press **Enable**
+3. Go back to the Library, search for **Gmail API**, click it and press **Enable**
 
 ## 3. Configure the OAuth Consent Screen
 
@@ -30,6 +30,7 @@ This guide walks you through creating Google OAuth credentials so Butler can acc
 4. Click **Save and Continue**
 5. On the **Scopes** page, click **Add or Remove Scopes** and add:
    - `https://www.googleapis.com/auth/calendar.readonly`
+   - `https://www.googleapis.com/auth/gmail.readonly`
    - `https://www.googleapis.com/auth/userinfo.email`
 6. Click **Save and Continue**
 7. On the **Test users** page, add the Google accounts of your household members
@@ -66,7 +67,7 @@ For production, update `GOOGLE_REDIRECT_URI` and `OAUTH_FRONTEND_URL` to your Ta
 docker compose restart butler-api
 ```
 
-Each household member can now connect their Google Calendar in **Settings > Connected Services**.
+Each household member can now connect their Google account (Calendar + Gmail) in **Settings > Connected Services**.
 
 ---
 
@@ -82,8 +83,9 @@ Your OAuth app starts in **Testing** mode. This is fine for a home server:
 
 ### Adding More Google Services
 
-The same OAuth credentials work for additional Google APIs. To add Gmail access later:
+The same OAuth credentials work for additional Google APIs. To add a new service:
 
-1. Enable the **Gmail API** in Google Cloud Console
-2. Add the Gmail scope to the consent screen
-3. Users may need to re-connect to grant the new scope
+1. Enable the API in Google Cloud Console (APIs & Services > Library)
+2. Add the required scope to the consent screen (APIs & Services > OAuth consent screen > Scopes)
+3. Add the scope to `GOOGLE_SCOPES` in `nanobot/api/oauth.py`
+4. Existing users will need to disconnect and reconnect to grant the new scope

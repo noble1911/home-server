@@ -7,7 +7,7 @@
 CREATE TABLE IF NOT EXISTS butler.oauth_tokens (
     id SERIAL PRIMARY KEY,
     user_id TEXT NOT NULL REFERENCES butler.users(id) ON DELETE CASCADE,
-    provider TEXT NOT NULL,                  -- 'google_calendar', 'google_gmail', etc.
+    provider TEXT NOT NULL,                  -- 'google', 'microsoft', etc.
     access_token TEXT NOT NULL,
     refresh_token TEXT,                      -- NULL for providers that don't issue refresh tokens
     token_expires_at TIMESTAMPTZ,            -- When access_token expires

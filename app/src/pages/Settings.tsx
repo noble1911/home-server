@@ -77,7 +77,7 @@ export default function Settings() {
     }
   }
 
-  const googleConnection = connections.find(c => c.provider === 'google_calendar')
+  const googleConnection = connections.find(c => c.provider === 'google')
 
   if (!profile) {
     return (
@@ -217,24 +217,24 @@ export default function Settings() {
         )}
 
         <div className="space-y-3">
-          {/* Google Calendar */}
+          {/* Google (Calendar + Gmail) */}
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm text-butler-100">Google Calendar</div>
+              <div className="text-sm text-butler-100">Google</div>
               {connectionsLoading ? (
                 <div className="text-xs text-butler-500">Checking...</div>
               ) : googleConnection ? (
                 <div className="text-xs text-butler-400">
-                  Connected{googleConnection.accountId ? ` as ${googleConnection.accountId}` : ''}
+                  Connected{googleConnection.accountId ? ` as ${googleConnection.accountId}` : ''} &middot; Calendar, Gmail
                 </div>
               ) : (
-                <div className="text-xs text-butler-500">Not connected</div>
+                <div className="text-xs text-butler-500">Not connected &middot; Calendar, Gmail</div>
               )}
             </div>
             {!connectionsLoading && (
               googleConnection ? (
                 <button
-                  onClick={() => disconnectProvider('google_calendar')}
+                  onClick={() => disconnectProvider('google')}
                   className="px-3 py-1.5 rounded-lg text-xs bg-red-900/50 text-red-300 hover:bg-red-900 hover:text-red-200"
                 >
                   Disconnect

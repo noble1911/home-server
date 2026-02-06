@@ -101,7 +101,7 @@ async def google_callback(
     email = await get_google_user_email(token_data["access_token"])
 
     # Store tokens
-    await store_tokens(pool, user_id, "google_calendar", token_data, account_id=email)
+    await store_tokens(pool, user_id, "google", token_data, account_id=email)
 
     params = urlencode({"oauth": "google", "status": "success"})
     return _redirect_html(f"{frontend_url}/settings?{params}")
