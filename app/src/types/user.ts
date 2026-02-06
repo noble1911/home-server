@@ -1,11 +1,21 @@
 export type UserRole = 'admin' | 'user'
 
+export type ToolPermission =
+  | 'media'
+  | 'home'
+  | 'location'
+  | 'calendar'
+  | 'email'
+  | 'automation'
+  | 'communication'
+
 export interface User {
   id: string
   name: string
   email?: string
   butlerName: string
   role: UserRole
+  permissions: ToolPermission[]
   createdAt: string
 }
 
@@ -50,4 +60,21 @@ export interface OAuthConnection {
   connected: boolean
   accountId?: string
   connectedAt?: string
+}
+
+export interface AdminUser {
+  id: string
+  name: string
+  role: UserRole
+  permissions: ToolPermission[]
+}
+
+export const PERMISSION_INFO: Record<ToolPermission, { label: string; description: string }> = {
+  media: { label: 'Media', description: 'Radarr, Sonarr, Readarr, Immich, Jellyfin' },
+  home: { label: 'Smart Home', description: 'Home Assistant, entity control' },
+  location: { label: 'Location', description: 'Phone location tracking' },
+  calendar: { label: 'Calendar', description: 'Google Calendar' },
+  email: { label: 'Email', description: 'Gmail' },
+  automation: { label: 'Automation', description: 'Scheduled tasks' },
+  communication: { label: 'Communication', description: 'WhatsApp messages' },
 }

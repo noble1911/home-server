@@ -1,12 +1,15 @@
-"""Admin routes: invite code management.
+"""Admin routes: invite codes and user management.
 
-POST   /api/admin/invite-codes      — Generate a new invite code
-GET    /api/admin/invite-codes      — List all codes and their status
-DELETE /api/admin/invite-codes/{code} — Revoke an unused code
+POST   /api/admin/invite-codes                  — Generate a new invite code
+GET    /api/admin/invite-codes                  — List all codes and their status
+DELETE /api/admin/invite-codes/{code}           — Revoke an unused code
+GET    /api/admin/users                         — List all users with permissions
+PUT    /api/admin/users/{user_id}/permissions   — Update a user's tool permissions
 """
 
 from __future__ import annotations
 
+import json
 import secrets
 import string
 from datetime import datetime, timedelta, timezone
@@ -15,12 +18,15 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 
 from tools import DatabasePool
 
-from ..deps import get_admin_user, get_db_pool
+from ..deps import ALL_PERMISSION_GROUPS, get_admin_user, get_db_pool
 from ..models import (
+    AdminUserInfo,
+    AdminUserListResponse,
     CreateInviteCodeRequest,
     CreateInviteCodeResponse,
     InviteCodeInfo,
     InviteCodeListResponse,
+    UpdatePermissionsRequest,
 )
 
 router = APIRouter()
@@ -112,3 +118,56 @@ async def revoke_invite_code(
     if result == "DELETE 0":
         raise HTTPException(404, "Code not found or already used")
     return Response(status_code=204)
+
+
+# ── User & permission management ─────────────────────────────────────
+
+
+@router.get("/users", response_model=AdminUserListResponse)
+async def list_users(
+    admin_id: str = Depends(get_admin_user),
+    pool: DatabasePool = Depends(get_db_pool),
+):
+    """List all users with their roles and permissions. Admin only."""
+    db = pool.pool
+    rows = await db.fetch(
+        "SELECT id, name, role, permissions FROM butler.users ORDER BY created_at"
+    )
+    users = []
+    for r in rows:
+        raw = r["permissions"]
+        perms = (
+            json.loads(raw) if isinstance(raw, str) else raw
+        ) if raw is not None else ["media", "home"]
+        users.append(
+            AdminUserInfo(
+                id=r["id"], name=r["name"], role=r["role"], permissions=perms,
+            )
+        )
+    return AdminUserListResponse(users=users)
+
+
+@router.put("/users/{user_id}/permissions")
+async def update_user_permissions(
+    user_id: str,
+    req: UpdatePermissionsRequest,
+    admin_id: str = Depends(get_admin_user),
+    pool: DatabasePool = Depends(get_db_pool),
+):
+    """Set a user's tool permissions. Admin only."""
+    # Validate permission names
+    invalid = set(req.permissions) - set(ALL_PERMISSION_GROUPS)
+    if invalid:
+        raise HTTPException(
+            400, f"Unknown permission groups: {', '.join(sorted(invalid))}"
+        )
+
+    db = pool.pool
+    result = await db.execute(
+        "UPDATE butler.users SET permissions = $2::jsonb WHERE id = $1",
+        user_id,
+        json.dumps(req.permissions),
+    )
+    if result == "UPDATE 0":
+        raise HTTPException(404, "User not found")
+    return {"status": "ok", "permissions": req.permissions}
