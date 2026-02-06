@@ -1100,18 +1100,28 @@ Nanobot is already minimal (~4k lines), but we further harden it:
 
 #### Local Backup Setup (For Databases & Configs)
 
-Keep a rolling backup ON THE MAC'S INTERNAL SSD (not the external drive):
+Keep a rolling backup ON THE MAC'S INTERNAL SSD (not the external drive).
+
+**Implemented:** `scripts/backup.sh` (daily via launchd), `scripts/restore.sh`, `scripts/14-backup-setup.sh`
 
 ```
 ~/ServerBackups/
 ├── databases/
-│   ├── immich-db-2026-02-05.sql.gz      # Daily PostgreSQL dump
-│   ├── jellyfin-db-2026-02-05.tar.gz    # Weekly Jellyfin backup
-│   └── ...
+│   └── immich-db-YYYY-MM-DD.sql.gz          # Daily pg_dumpall (Immich + Nextcloud)
 ├── configs/
-│   └── docker-volumes-2026-02-05.tar.gz  # Weekly config backup
+│   ├── jellyfin-config-YYYY-MM-DD.tar.gz    # Daily per-volume tarballs
+│   ├── radarr-config-YYYY-MM-DD.tar.gz
+│   ├── sonarr-config-YYYY-MM-DD.tar.gz
+│   ├── homeassistant-config-YYYY-MM-DD.tar.gz
+│   └── ... (13 volumes total)
+├── weekly/
+│   ├── databases/                            # Sunday backups promoted here
+│   └── configs/
+├── backup.log
 └── retention: 7 daily, 4 weekly
 ```
+
+**Scheduling:** launchd (`com.homeserver.backup`) runs daily at 3:00 AM.
 
 This protects against: external drive failure, accidental deletion, service corruption.
 This does NOT protect against: Mac Mini theft/fire (use cloud for that).
