@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useUserStore } from '../stores/userStore'
 import { useConversationStore } from '../stores/conversationStore'
 import { useLiveKitVoice } from '../hooks/useLiveKitVoice'
@@ -20,6 +20,12 @@ export default function Home() {
 
   const butlerName = profile?.butlerName || 'Butler'
   const showWaveform = isRecording || voiceStatus === 'speaking'
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Auto-scroll to bottom when messages change (including streaming updates)
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
 
   // Disconnect LiveKit when leaving the Home page
   useEffect(() => {
@@ -62,6 +68,7 @@ export default function Home() {
             />
           ))
         )}
+        <div ref={messagesEndRef} />
       </div>
 
       {/* Voice Interface */}
