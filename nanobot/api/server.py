@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .config import settings
 from .deps import cleanup_resources, get_db_pool, init_resources
 from .ratelimit import RateLimitConfig, RateLimitMiddleware, SlidingWindowStore
-from .routes import admin, auth, chat, oauth, system, tasks, users, voice, webhooks
+from .routes import admin, auth, chat, oauth, push, system, tasks, users, voice, webhooks
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +68,7 @@ app.include_router(oauth.router, prefix="/api/oauth", tags=["oauth"])
 app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
 app.include_router(system.router, prefix="/api", tags=["system"])
 app.include_router(webhooks.router, prefix="/api/webhooks", tags=["webhooks"])
+app.include_router(push.router, prefix="/api/push", tags=["push"])
 
 
 @app.get("/health")
