@@ -29,14 +29,14 @@ fi
 # Export for docker-compose
 export DRIVE_PATH
 
-# Deploy containers
-echo -e "${BLUE}==>${NC} Starting containers..."
+# Deploy containers and wait for health checks
+echo -e "${BLUE}==>${NC} Starting containers (waiting for health checks — Immich ML may take a minute)..."
 cd "$COMPOSE_DIR"
-docker compose up -d
-
-# Wait for services (Immich takes longer due to ML model loading)
-echo -e "${BLUE}==>${NC} Waiting for services to start (this may take a minute)..."
-sleep 30
+if docker compose up -d --wait --wait-timeout 180; then
+    echo -e "  ${GREEN}✓${NC} All services healthy"
+else
+    echo -e "  ${YELLOW}⚠${NC} Some services may still be starting..."
+fi
 
 # Check health
 echo ""

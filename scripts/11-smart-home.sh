@@ -25,11 +25,12 @@ echo -e "${BLUE}==>${NC} Starting Home Assistant..."
 cd "$COMPOSE_DIR"
 
 # Start only Home Assistant initially (cloudflared needs token)
-docker compose up -d homeassistant
-
-# Wait for service
-echo -e "${BLUE}==>${NC} Waiting for Home Assistant to start..."
-sleep 20
+echo -e "${BLUE}==>${NC} Starting Home Assistant (waiting for health check)..."
+if docker compose up -d homeassistant --wait --wait-timeout 120; then
+    echo -e "  ${GREEN}✓${NC} Home Assistant healthy"
+else
+    echo -e "  ${YELLOW}⚠${NC} Home Assistant may still be starting..."
+fi
 
 # Check health
 echo ""

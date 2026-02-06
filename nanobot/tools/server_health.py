@@ -87,6 +87,10 @@ DEFAULT_SERVICES: dict[str, dict[str, Any]] = {
         "url": "http://immich-server:2283/api/server/ping",
         "stack": "photos-files",
     },
+    "immich-machine-learning": {
+        "url": "http://immich-machine-learning:3003/ping",
+        "stack": "photos-files",
+    },
     "nextcloud": {
         "url": "http://nextcloud:80/status.php",
         "stack": "photos-files",
@@ -96,6 +100,10 @@ DEFAULT_SERVICES: dict[str, dict[str, Any]] = {
         "url": "http://homeassistant:8123/api/",
         "stack": "smart-home",
         "headers": {"Authorization": "Bearer {ha_token}"},
+    },
+    "cloudflared": {
+        "url": "http://cloudflared:2000/ready",
+        "stack": "smart-home",
     },
     # Voice stack
     "livekit": {
