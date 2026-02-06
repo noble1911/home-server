@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .deps import cleanup_resources, init_resources
-from .routes import auth, chat, users, voice
+from .routes import auth, chat, oauth, users, voice
 
 
 @asynccontextmanager
@@ -32,6 +32,7 @@ app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(voice.router, prefix="/api/voice", tags=["voice"])
 app.include_router(chat.router, prefix="/api", tags=["chat"])
 app.include_router(users.router, prefix="/api", tags=["users"])
+app.include_router(oauth.router, prefix="/api/oauth", tags=["oauth"])
 
 
 @app.get("/health")

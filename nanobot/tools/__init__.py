@@ -28,6 +28,7 @@ from .memory import (
     VALID_SOUL_KEYS,
 )
 from .home_assistant import HomeAssistantTool, ListEntitiesByDomainTool
+from .google_calendar import GoogleCalendarTool
 from .weather import WeatherTool
 
 __all__ = [
@@ -46,6 +47,8 @@ __all__ = [
     # Home Assistant
     "HomeAssistantTool",
     "ListEntitiesByDomainTool",
+    # Google Calendar
+    "GoogleCalendarTool",
     # Weather
     "WeatherTool",
 ]
