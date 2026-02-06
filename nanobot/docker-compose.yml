@@ -69,6 +69,9 @@ services:
       - OPENWEATHERMAP_API_KEY=${OPENWEATHERMAP_API_KEY:-}
       # Ollama (for local embeddings / semantic memory search)
       - OLLAMA_URL=${OLLAMA_URL:-http://ollama:11434}
+      # Radarr
+      - RADARR_URL=http://radarr:7878
+      - RADARR_API_KEY=${RADARR_API_KEY:-}
       # Google OAuth (for Calendar, Gmail, etc.)
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}

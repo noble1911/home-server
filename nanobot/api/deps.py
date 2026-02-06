@@ -17,6 +17,7 @@ from tools import (
     GoogleCalendarTool,
     HomeAssistantTool,
     ListEntitiesByDomainTool,
+    RadarrTool,
     RecallFactsTool,
     RememberFactTool,
     GetUserTool,
@@ -61,6 +62,13 @@ async def init_resources() -> None:
     if settings.openweathermap_api_key:
         _tools["weather"] = WeatherTool(
             api_key=settings.openweathermap_api_key,
+        )
+
+    # Only register Radarr tool if configured
+    if settings.radarr_url:
+        _tools["radarr"] = RadarrTool(
+            base_url=settings.radarr_url,
+            api_key=settings.radarr_api_key,
         )
 
 

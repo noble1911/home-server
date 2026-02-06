@@ -30,6 +30,7 @@ from .memory import (
 )
 from .home_assistant import HomeAssistantTool, ListEntitiesByDomainTool
 from .google_calendar import GoogleCalendarTool
+from .radarr import RadarrTool
 from .weather import WeatherTool
 
 __all__ = [
@@ -52,6 +53,8 @@ __all__ = [
     "ListEntitiesByDomainTool",
     # Google Calendar
     "GoogleCalendarTool",
+    # Radarr
+    "RadarrTool",
     # Weather
     "WeatherTool",
 ]
