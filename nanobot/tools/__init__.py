@@ -36,6 +36,9 @@ from .radarr import RadarrTool
 from .readarr import ReadarrTool
 from .sonarr import SonarrTool
 from .weather import WeatherTool
+from .alerting import AlertStateManager, NotificationDispatcher
+from .server_health import ServerHealthTool
+from .storage_monitor import StorageMonitorTool
 
 __all__ = [
     # Base
@@ -69,4 +72,11 @@ __all__ = [
     "SonarrTool",
     # Weather
     "WeatherTool",
+    # Alerting
+    "AlertStateManager",
+    "NotificationDispatcher",
+    # Health monitoring
+    "ServerHealthTool",
+    # Storage monitoring
+    "StorageMonitorTool",
 ]
