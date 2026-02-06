@@ -124,16 +124,13 @@ if [ ! -f .env ]; then
     echo -e "  ${GREEN}✓${NC} LIVEKIT_API_KEY/SECRET generated"
     echo -e "  ${GREEN}✓${NC} Voice stack .env synced"
 
-    # Ask about Home Assistant
+    # Home Assistant token — skipped during initial setup because HA was just
+    # deployed in step 11 and the user hasn't created an admin account yet.
+    # The token is added as a post-setup step (see README "After Setup" section).
     echo ""
-    read -p "Do you have a Home Assistant token? (y/N): " has_ha
-    if [[ "$has_ha" =~ ^[Yy]$ ]]; then
-        read -p "Enter Home Assistant token: " ha_token
-        sed_inplace "s|HA_TOKEN=eyJ...|HA_TOKEN=${ha_token}|" .env
-        echo -e "  ${GREEN}✓${NC} Home Assistant configured"
-    else
-        echo -e "  ${YELLOW}⚠${NC} Home Assistant skipped (can configure later in .env)"
-    fi
+    echo -e "  ${YELLOW}⚠${NC} Home Assistant token: configure after setup"
+    echo "   Open http://localhost:8123 → create account → Profile > Security > Long-Lived Access Token"
+    echo "   Then add HA_TOKEN=<your-token> to nanobot/.env and restart"
 
     # Ask about Groq (for voice features)
     echo ""

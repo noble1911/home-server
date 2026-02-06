@@ -105,6 +105,70 @@ cd nanobot && docker compose down && docker compose up -d
 
 ---
 
+## After Setup: First-Time Login for Each Service
+
+Once `setup.sh` finishes, every service needs its own first-time setup. Open each URL in a browser on the same network (or via Tailscale) and create an admin account.
+
+### Butler (AI Assistant)
+
+The Butler PWA uses **invite codes** instead of traditional accounts. As the admin, you control who can access Butler.
+
+1. **During setup**, you chose an invite code (default: `BUTLER-001`)
+2. Open the PWA at `http://<server-ip>:3000`
+3. Enter the invite code — this creates your user and logs you in
+4. Complete onboarding (set your name, preferences, TTS voice)
+
+**Adding household members:**
+- Add more codes to `INVITE_CODES` in `nanobot/.env` (comma-separated, e.g. `BUTLER-001,BUTLER-002`)
+- Restart: `cd nanobot && docker compose restart butler-api`
+- Share the code with the person — each code maps to one user
+
+### Media Services
+
+| Service | URL | First Login | Mobile App |
+|---------|-----|-------------|------------|
+| **Jellyfin** | `http://<server-ip>:8096` | Create admin account on first visit, then create accounts for household members | [Jellyfin](https://jellyfin.org/downloads/) (iOS/Android) |
+| **Radarr** | `http://<server-ip>:7878` | No auth by default — add password in Settings > General > Security | Admin only (no mobile app) |
+| **Sonarr** | `http://<server-ip>:8989` | No auth by default — add password in Settings > General > Security | Admin only (no mobile app) |
+| **Prowlarr** | `http://<server-ip>:9696` | No auth by default — add password in Settings > General > Security | Admin only (no mobile app) |
+| **qBittorrent** | `http://<server-ip>:8081` | Default: `admin` / check container logs for temp password | Admin only |
+
+> **Tip:** Radarr, Sonarr, Prowlarr, and qBittorrent are admin-only tools. No need to create accounts for household members — they interact with media through Jellyfin.
+
+### Books & Audio
+
+| Service | URL | First Login | Mobile App |
+|---------|-----|-------------|------------|
+| **Audiobookshelf** | `http://<server-ip>:13378` | Create admin account on first visit, then invite household members | [Audiobookshelf](https://audiobookshelf.org/) (iOS/Android) |
+| **Calibre-Web** | `http://<server-ip>:8083` | Default: `admin` / `admin123` — change immediately | Browser only |
+| **Readarr** | `http://<server-ip>:8787` | No auth by default — add password in Settings | Admin only |
+
+### Photos & Files
+
+| Service | URL | First Login | Mobile App |
+|---------|-----|-------------|------------|
+| **Immich** | `http://<server-ip>:2283` | Create admin account on first visit, then invite household members | [Immich](https://immich.app/docs/features/mobile-app) (iOS/Android) — enable auto-backup |
+| **Nextcloud** | `http://<server-ip>:8080` | Create admin account on first visit | [Nextcloud](https://nextcloud.com/install/#install-clients) (iOS/Android/Desktop) |
+
+### Smart Home
+
+| Service | URL | First Login | Mobile App |
+|---------|-----|-------------|------------|
+| **Home Assistant** | `http://<server-ip>:8123` | Create admin account, configure location/units, add smart devices | [Home Assistant](https://companion.home-assistant.io/) (iOS/Android) |
+
+After setting up Home Assistant, generate a **Long-Lived Access Token** (Profile > Security) and add it to `nanobot/.env` as `HA_TOKEN` so Butler can control your devices.
+
+### Recommended Setup Order
+
+1. **Jellyfin** — create admin + household accounts
+2. **Immich** — create admin, install mobile apps, enable photo backup
+3. **Home Assistant** — add devices, generate token for Butler
+4. **Audiobookshelf** — create admin + household accounts
+5. **Butler PWA** — enter invite code, complete onboarding
+6. ***arr stack** — configure indexers in Prowlarr, connect to Radarr/Sonarr/Readarr (admin only)
+
+---
+
 ## Documentation
 
 - **[HOMESERVER_PLAN.md](HOMESERVER_PLAN.md)** - Complete architecture and implementation plan
