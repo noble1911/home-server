@@ -30,6 +30,7 @@ from .memory import (
 )
 from .home_assistant import HomeAssistantTool, ListEntitiesByDomainTool
 from .google_calendar import GoogleCalendarTool
+from .jellyfin import JellyfinTool
 from .radarr import RadarrTool
 from .sonarr import SonarrTool
 from .weather import WeatherTool
@@ -54,6 +55,8 @@ __all__ = [
     "ListEntitiesByDomainTool",
     # Google Calendar
     "GoogleCalendarTool",
+    # Jellyfin
+    "JellyfinTool",
     # Radarr
     "RadarrTool",
     # Sonarr

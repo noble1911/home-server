@@ -16,6 +16,7 @@ from tools import (
     EmbeddingService,
     GoogleCalendarTool,
     HomeAssistantTool,
+    JellyfinTool,
     ListEntitiesByDomainTool,
     RadarrTool,
     RecallFactsTool,
@@ -77,6 +78,13 @@ async def init_resources() -> None:
         _tools["sonarr"] = SonarrTool(
             base_url=settings.sonarr_url,
             api_key=settings.sonarr_api_key,
+        )
+
+    # Only register Jellyfin tool if configured
+    if settings.jellyfin_url:
+        _tools["jellyfin"] = JellyfinTool(
+            base_url=settings.jellyfin_url,
+            api_key=settings.jellyfin_api_key,
         )
 
 
