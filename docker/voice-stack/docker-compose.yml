@@ -12,6 +12,12 @@ services:
     networks:
       - homeserver
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:7880"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
 
   whisper:
     image: onerahmet/openai-whisper-asr-webservice:latest
@@ -24,6 +30,12 @@ services:
     networks:
       - homeserver
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
 
   kokoro-tts:
     image: ghcr.io/remsky/kokoro-fastapi:latest
@@ -37,6 +49,12 @@ services:
     networks:
       - homeserver
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8880/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
   livekit-agent:
     build: ../../butler/livekit-agent
@@ -50,11 +68,19 @@ services:
       - BUTLER_API_URL=http://butler-api:8000
       - BUTLER_API_KEY=${INTERNAL_API_KEY:-}
     depends_on:
-      - livekit
-      - kokoro-tts
+      livekit:
+        condition: service_healthy
+      kokoro-tts:
+        condition: service_healthy
     networks:
       - homeserver
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "kill -0 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
 networks:
   homeserver:

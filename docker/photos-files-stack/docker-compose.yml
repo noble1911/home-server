@@ -16,9 +16,17 @@ services:
     networks:
       - homeserver
     depends_on:
-      - immich-redis
-      - immich-postgres
+      immich-redis:
+        condition: service_healthy
+      immich-postgres:
+        condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:2283/api/server/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   immich-machine-learning:
     image: ghcr.io/immich-app/immich-machine-learning:release
@@ -30,6 +38,12 @@ services:
     networks:
       - homeserver
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3003/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
 
   immich-redis:
     image: redis:alpine
@@ -37,6 +51,12 @@ services:
     networks:
       - homeserver
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
   immich-postgres:
     image: ghcr.io/immich-app/postgres:14-vectorchord0.3.0-pgvectors0.2.0
@@ -52,6 +72,12 @@ services:
     networks:
       - homeserver
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d immich"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
   nextcloud:
     image: nextcloud:latest
@@ -72,8 +98,15 @@ services:
     networks:
       - homeserver
     depends_on:
-      - immich-postgres
+      immich-postgres:
+        condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/status.php"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
 networks:
   homeserver:
