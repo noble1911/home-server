@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .deps import cleanup_resources, get_db_pool, init_resources
-from .routes import admin, auth, chat, oauth, system, users, voice
+from .routes import admin, auth, chat, oauth, system, tasks, users, voice
 
 logger = logging.getLogger(__name__)
 
@@ -45,9 +45,10 @@ app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(voice.router, prefix="/api/voice", tags=["voice"])
 app.include_router(chat.router, prefix="/api", tags=["chat"])
 app.include_router(users.router, prefix="/api", tags=["users"])
+app.include_router(tasks.router, prefix="/api", tags=["tasks"])
 app.include_router(oauth.router, prefix="/api/oauth", tags=["oauth"])
 app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
-app.include_router(system.router, prefix="/api/admin", tags=["system"])
+app.include_router(system.router, prefix="/api", tags=["system"])
 
 
 @app.get("/health")
