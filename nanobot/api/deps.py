@@ -21,6 +21,7 @@ from tools import (
     ImmichTool,
     JellyfinTool,
     ListEntitiesByDomainTool,
+    PhoneLocationTool,
     RadarrTool,
     ReadarrTool,
     RecallFactsTool,
@@ -62,6 +63,10 @@ async def init_resources() -> None:
             token=settings.home_assistant_token,
         )
         _tools["list_ha_entities"] = ListEntitiesByDomainTool(
+            base_url=settings.home_assistant_url,
+            token=settings.home_assistant_token,
+        )
+        _tools["phone_location"] = PhoneLocationTool(
             base_url=settings.home_assistant_url,
             token=settings.home_assistant_token,
         )
