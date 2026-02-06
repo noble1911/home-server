@@ -55,10 +55,11 @@ async def load_user_context(pool: DatabasePool, user_id: str) -> UserContext:
 
     history = await db.fetch(
         """
-        SELECT role, content, created_at FROM butler.conversation_history
+        SELECT role, content, channel, created_at
+        FROM butler.conversation_history
         WHERE user_id = $1 AND created_at > NOW() - INTERVAL '7 days'
         ORDER BY created_at DESC
-        LIMIT 10
+        LIMIT 20
         """,
         user_id,
     )
@@ -68,6 +69,19 @@ async def load_user_context(pool: DatabasePool, user_id: str) -> UserContext:
         user_name=user_name,
         butler_name=butler_name,
     )
+
+
+_CHANNEL_LABELS = {
+    "voice": "[via voice]",
+    "pwa": "[via text]",
+    "whatsapp": "[via whatsapp]",
+    "telegram": "[via telegram]",
+}
+
+
+def _channel_label(channel: str) -> str:
+    """Return a human-readable label for a conversation channel."""
+    return _CHANNEL_LABELS.get(channel, f"[via {channel}]")
 
 
 def _build_system_prompt(
@@ -105,14 +119,15 @@ def _build_system_prompt(
             category = row["category"] or "general"
             parts.append(f"- [{category}] {row['fact']}")
 
-    # Recent conversation context (shown chronologically)
+    # Recent conversation context (shown chronologically, across all channels)
     if history:
-        parts.append("\nRECENT CONTEXT (last 7 days):")
+        parts.append("\nRECENT CONTEXT (last 7 days, across all channels):")
         for row in reversed(history):
             role = "You" if row["role"] == "assistant" else user_name
             day = row["created_at"].strftime("%b %d")
+            channel_label = _channel_label(row.get("channel", "pwa"))
             content = row["content"][:100]
-            parts.append(f"- {day} ({role}): {content}")
+            parts.append(f"- {day} {channel_label} ({role}): {content}")
 
     # Behavioral rules
     parts.append("\nRULES:")
