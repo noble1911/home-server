@@ -20,6 +20,7 @@ interface UserState {
   updateSoul: (soul: Partial<SoulConfig>) => Promise<void>
   addFact: (content: string, category: UserFact['category']) => Promise<void>
   removeFact: (factId: string) => Promise<void>
+  clearAllFacts: () => void
   clearProfile: () => void
 }
 
@@ -131,6 +132,10 @@ export const useUserStore = create<UserState>((set, get) => ({
       })
     }
   },
+
+  clearAllFacts: () => set((state) => ({
+    profile: state.profile ? { ...state.profile, facts: [] } : null,
+  })),
 
   clearProfile: () => set({ profile: null, error: null }),
 }))

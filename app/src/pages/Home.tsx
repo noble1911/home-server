@@ -1,9 +1,10 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useCallback, useState } from 'react'
 import { useUserStore } from '../stores/userStore'
 import { useConversationStore } from '../stores/conversationStore'
 import { useLiveKitVoice } from '../hooks/useLiveKitVoice'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
-import { getChatHistory } from '../services/api'
+import { getChatHistory, clearChatHistory } from '../services/api'
+import ConfirmDialog from '../components/ConfirmDialog'
 import type { Message } from '../types/conversation'
 import VoiceButton from '../components/voice/VoiceButton'
 import Waveform from '../components/voice/Waveform'
@@ -19,6 +20,7 @@ export default function Home() {
     isLoadingHistory,
     hasMoreHistory,
     setMessages,
+    clearMessages,
     prependMessages,
     setLoadingHistory,
     setHasMoreHistory,
@@ -31,6 +33,9 @@ export default function Home() {
     connectionError,
   } = useLiveKitVoice()
   const { canInstall, isIOS, promptInstall, dismiss } = useInstallPrompt()
+
+  const [showClearConfirm, setShowClearConfirm] = useState(false)
+  const [isClearing, setIsClearing] = useState(false)
 
   const butlerName = profile?.butlerName || 'Butler'
   const showWaveform = isRecording || voiceStatus === 'speaking'
@@ -111,6 +116,19 @@ export default function Home() {
     }
   }, [isLoadingHistory, hasMoreHistory, messages, prependMessages, setLoadingHistory, setHasMoreHistory])
 
+  const handleClearHistory = useCallback(async () => {
+    setIsClearing(true)
+    try {
+      await clearChatHistory()
+      clearMessages()
+    } catch {
+      // Non-critical — user can retry
+    } finally {
+      setIsClearing(false)
+      setShowClearConfirm(false)
+    }
+  }, [clearMessages])
+
   // Disconnect LiveKit when leaving the Home page
   useEffect(() => {
     return () => {
@@ -164,6 +182,23 @@ export default function Home() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Clear history button */}
+      {messages.length > 0 && (
+        <div className="flex items-center justify-end px-4 pt-2">
+          <button
+            onClick={() => setShowClearConfirm(true)}
+            disabled={isClearing}
+            className="flex items-center gap-1 text-xs text-butler-500 hover:text-red-400 disabled:opacity-50"
+            aria-label="Clear conversation history"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            Clear
+          </button>
         </div>
       )}
 
@@ -245,6 +280,15 @@ export default function Home() {
 
         <ChatInput />
       </div>
+
+      <ConfirmDialog
+        open={showClearConfirm}
+        title="Clear Conversation History"
+        description="This will permanently delete all your conversation history across all devices. This action cannot be undone."
+        confirmLabel={isClearing ? 'Clearing...' : 'Clear History'}
+        onConfirm={handleClearHistory}
+        onCancel={() => setShowClearConfirm(false)}
+      />
     </div>
   )
 }

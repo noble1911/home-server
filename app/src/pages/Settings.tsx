@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react'
 import { useAuthStore } from '../stores/authStore'
 import { useUserStore } from '../stores/userStore'
 import { useSettingsStore } from '../stores/settingsStore'
-import { api } from '../services/api'
+import { useConversationStore } from '../stores/conversationStore'
+import { api, clearUserFacts, deleteUserAccount } from '../services/api'
+import ConfirmDialog from '../components/ConfirmDialog'
 import type { InviteCode, OAuthConnection } from '../types/user'
 
 interface ConnectionsResponse {
@@ -24,8 +26,9 @@ interface CreateInviteCodeResponse {
 
 export default function Settings() {
   const { logout, role } = useAuthStore()
-  const { profile, updateButlerName, updateSoul, isLoading } = useUserStore()
+  const { profile, updateButlerName, updateSoul, clearAllFacts, clearProfile, isLoading } = useUserStore()
   const { voiceMode, setVoiceMode } = useSettingsStore()
+  const { clearMessages } = useConversationStore()
   const isAdmin = role === 'admin'
 
   const [connections, setConnections] = useState<OAuthConnection[]>([])
@@ -36,6 +39,12 @@ export default function Settings() {
   const [inviteCodes, setInviteCodes] = useState<InviteCode[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
   const [copiedCode, setCopiedCode] = useState<string | null>(null)
+
+  // Deletion state
+  const [showClearFactsConfirm, setShowClearFactsConfirm] = useState(false)
+  const [showDeleteAccountConfirm, setShowDeleteAccountConfirm] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   // Fetch OAuth connections on mount
   useEffect(() => {
@@ -137,6 +146,35 @@ export default function Settings() {
       setOauthMessage({ type: 'success', text: 'Disconnected successfully.' })
     } catch {
       setOauthMessage({ type: 'error', text: 'Failed to disconnect.' })
+    }
+  }
+
+  async function handleClearFacts() {
+    setIsDeleting(true)
+    setDeleteError(null)
+    try {
+      await clearUserFacts()
+      clearAllFacts()
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Failed to clear facts')
+    } finally {
+      setIsDeleting(false)
+      setShowClearFactsConfirm(false)
+    }
+  }
+
+  async function handleDeleteAccount() {
+    setIsDeleting(true)
+    setDeleteError(null)
+    try {
+      await deleteUserAccount()
+      clearMessages()
+      clearProfile()
+      logout()
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Failed to delete account')
+      setIsDeleting(false)
+      setShowDeleteAccountConfirm(false)
     }
   }
 
@@ -416,6 +454,54 @@ export default function Settings() {
         </div>
       </section>
 
+      {/* Data Management */}
+      <section className="card p-4">
+        <h2 className="text-sm font-medium text-butler-400 uppercase tracking-wide mb-4">
+          Data Management
+        </h2>
+
+        {deleteError && (
+          <div className="text-sm mb-3 p-2 rounded bg-red-900/30 text-red-300">
+            {deleteError}
+          </div>
+        )}
+
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm text-butler-100">Clear Facts</div>
+              <div className="text-xs text-butler-500">
+                Remove all learned facts ({profile.facts.length})
+              </div>
+            </div>
+            <button
+              onClick={() => setShowClearFactsConfirm(true)}
+              disabled={profile.facts.length === 0}
+              className="px-3 py-1.5 rounded-lg text-xs bg-red-900/50 text-red-300 hover:bg-red-900 hover:text-red-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Clear
+            </button>
+          </div>
+
+          <div className="border-t border-butler-700" />
+
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm text-butler-100">Delete Account</div>
+              <div className="text-xs text-butler-500">
+                Permanently remove your account and all data
+              </div>
+            </div>
+            <button
+              onClick={() => setShowDeleteAccountConfirm(true)}
+              className="px-3 py-1.5 rounded-lg text-xs bg-red-900/50 text-red-300 hover:bg-red-900 hover:text-red-200"
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      </section>
+
       {/* About & Logout */}
       <section className="card p-4">
         <h2 className="text-sm font-medium text-butler-400 uppercase tracking-wide mb-4">
@@ -434,6 +520,24 @@ export default function Settings() {
           Sign Out
         </button>
       </section>
+
+      <ConfirmDialog
+        open={showClearFactsConfirm}
+        title="Clear All Facts"
+        description="This will permanently delete all learned facts about you. Butler will no longer remember your preferences, routines, or personal details. This cannot be undone."
+        confirmLabel={isDeleting ? 'Clearing...' : 'Clear All Facts'}
+        onConfirm={handleClearFacts}
+        onCancel={() => setShowClearFactsConfirm(false)}
+      />
+
+      <ConfirmDialog
+        open={showDeleteAccountConfirm}
+        title="Delete Account"
+        description="This will permanently delete your account, conversation history, facts, connected services, and all associated data. You will be signed out immediately. This action cannot be undone."
+        confirmLabel={isDeleting ? 'Deleting...' : 'Delete My Account'}
+        onConfirm={handleDeleteAccount}
+        onCancel={() => setShowDeleteAccountConfirm(false)}
+      />
     </div>
   )
 }
