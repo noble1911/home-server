@@ -43,6 +43,43 @@ services:
     restart: unless-stopped
     command: gateway --port 8100 --verbose
 
+  butler-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: butler-api
+    environment:
+      # Database (same Immich PostgreSQL)
+      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@immich-postgres:5432/immich
+      # Claude API
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-sonnet-4-20250514}
+      # LiveKit (must match voice-stack config)
+      - LIVEKIT_URL=ws://livekit:7880
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY:-devkey}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET:-secret}
+      # Auth
+      - JWT_SECRET=${JWT_SECRET}
+      - INVITE_CODES=${INVITE_CODES:-BUTLER-001}
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY:-}
+      # Home Assistant
+      - HOME_ASSISTANT_URL=http://homeassistant:8123
+      - HOME_ASSISTANT_TOKEN=${HA_TOKEN:-}
+    volumes:
+      - ./api:/app/api:ro
+      - ./tools:/app/tools:ro
+    ports:
+      - "8000:8000"
+    networks:
+      - homeserver
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+
 volumes:
   nanobot-data:
 
