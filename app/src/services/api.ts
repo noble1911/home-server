@@ -17,7 +17,7 @@ class ApiError extends Error {
   }
 }
 
-function getAuthToken(): string | null {
+export function getAuthToken(): string | null {
   const authData = localStorage.getItem('butler-auth')
   if (!authData) return null
 
@@ -177,4 +177,29 @@ export interface LiveKitTokenResponse {
 /** Fetch a LiveKit room token for voice sessions */
 export function getLiveKitToken(): Promise<LiveKitTokenResponse> {
   return api.post<LiveKitTokenResponse>('/auth/token')
+}
+
+/** A single message from conversation history */
+export interface HistoryMessage {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  type: 'voice' | 'text'
+  timestamp: string
+}
+
+/** Paginated chat history response */
+export interface ChatHistoryResponse {
+  messages: HistoryMessage[]
+  hasMore: boolean
+}
+
+/** Fetch paginated conversation history */
+export function getChatHistory(
+  before?: string,
+  limit: number = 50,
+): Promise<ChatHistoryResponse> {
+  const params = new URLSearchParams({ limit: String(limit) })
+  if (before) params.set('before', before)
+  return api.get<ChatHistoryResponse>(`/chat/history?${params}`)
 }

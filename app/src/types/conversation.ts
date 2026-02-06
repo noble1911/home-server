@@ -7,6 +7,7 @@ export interface Message {
   content: string
   type: MessageType
   timestamp: string
+  toolStatus?: string
 }
 
 export interface Conversation {
@@ -32,3 +33,10 @@ export interface AgentStateMessage {
 }
 
 export type LiveKitDataMessage = TranscriptMessage | AgentStateMessage
+
+/** SSE events from POST /api/chat/stream */
+export type ChatStreamEvent =
+  | { type: 'text_delta'; delta: string }
+  | { type: 'tool_start'; tool: string }
+  | { type: 'tool_end'; tool: string }
+  | { type: 'done'; message_id: string }

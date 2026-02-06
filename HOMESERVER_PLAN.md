@@ -495,7 +495,7 @@ CREATE TABLE butler.user_facts (
     source TEXT DEFAULT 'explicit',  -- 'explicit' (user said) or 'inferred'
     created_at TIMESTAMPTZ DEFAULT NOW(),
     last_referenced TIMESTAMPTZ,
-    embedding VECTOR(1536)  -- For semantic search (VectorChord/pgvector already installed)
+    embedding VECTOR(768)   -- nomic-embed-text via Ollama (see tools/embeddings.py)
 );
 
 -- Conversation history (short-term memory)

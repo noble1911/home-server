@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS butler.user_facts (
     category TEXT,                          -- preference, schedule, relationship, etc.
     confidence REAL DEFAULT 1.0,            -- How confident we are (0.0 - 1.0)
     source TEXT,                            -- Where we learned this (conversation, explicit, etc.)
-    embedding VECTOR(1536),                 -- For semantic search (optional)
+    embedding VECTOR(1536),                 -- For semantic search (migrated to 768 in 002)
     created_at TIMESTAMPTZ DEFAULT NOW(),
     expires_at TIMESTAMPTZ                  -- Optional expiry for temporary facts
 );

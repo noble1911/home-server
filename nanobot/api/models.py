@@ -129,6 +129,19 @@ class ChatResponse(BaseModel):
     message_id: str
 
 
+class HistoryMessage(BaseModel):
+    id: str
+    role: str
+    content: str
+    type: str  # 'voice' | 'text'
+    timestamp: str  # ISO 8601
+
+
+class ChatHistoryResponse(BaseModel):
+    messages: list[HistoryMessage]
+    hasMore: bool
+
+
 # --- Voice ---
 
 
