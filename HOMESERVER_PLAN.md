@@ -549,9 +549,11 @@ WHAT YOU KNOW ABOUT RON:
 - Listens to audiobooks during commute (8am, 6pm)
 - Recently asked about the Dune series
 
-RECENT CONTEXT:
-- Yesterday: Downloaded "The Way of Kings" audiobook
-- 3 days ago: Asked about smart home heating schedule
+RECENT CONTEXT (last 7 days, across all channels):
+- Feb 04 [via voice] (Ron): What's the weather tomorrow?
+- Feb 04 [via voice] (You): Tomorrow looks sunny, around 18°C.
+- Feb 05 [via text] (Ron): Download "The Way of Kings" audiobook
+- Feb 05 [via text] (You): Done! Added to your library.
 ```
 
 #### Memory Tools
