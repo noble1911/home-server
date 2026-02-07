@@ -65,19 +65,14 @@ else
     echo -e "  ${GREEN}✓${NC} qBittorrent config already exists"
 fi
 
-# ─────────────────────────────────────────────
-# Deploy containers
-# ─────────────────────────────────────────────
-echo -e "${BLUE}==>${NC} Starting containers..."
+# Deploy containers and wait for health checks
+echo -e "${BLUE}==>${NC} Starting containers (waiting for health checks)..."
 cd "$COMPOSE_DIR"
-docker compose up -d
-
-# ─────────────────────────────────────────────
-# Wait for healthy
-# ─────────────────────────────────────────────
-echo -e "${BLUE}==>${NC} Waiting for services..."
-wait_for_healthy "http://localhost:8081" 30 2 "qBittorrent"
-wait_for_healthy "http://localhost:9696" 30 2 "Prowlarr"
+if docker compose up -d --wait --wait-timeout 120; then
+    echo -e "  ${GREEN}✓${NC} All services healthy"
+else
+    echo -e "  ${YELLOW}⚠${NC} Some services may still be starting..."
+fi
 
 # ─────────────────────────────────────────────
 # Add default public indexers to Prowlarr

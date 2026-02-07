@@ -61,8 +61,7 @@ docker compose ps
 
 1. Open http://localhost:9696
 2. Set up authentication on first visit
-3. Go to **Settings > Indexers** to add your indexers
-4. Prowlarr will sync indexers to Radarr/Sonarr automatically (configured later)
+3. Add indexers and connect to *arr apps — see the **[Prowlarr Indexer Setup Guide](./prowlarr-indexers.md)** for detailed instructions
 
 ## Volume Mappings
 

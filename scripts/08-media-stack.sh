@@ -57,21 +57,14 @@ else
     echo -e "  ${GREEN}✓${NC} Sonarr config already exists (or no API key available)"
 fi
 
-# ─────────────────────────────────────────────
-# Deploy containers
-# ─────────────────────────────────────────────
-echo -e "${BLUE}==>${NC} Starting containers..."
+# Deploy containers and wait for health checks
+echo -e "${BLUE}==>${NC} Starting containers (waiting for health checks)..."
 cd "$COMPOSE_DIR"
-docker compose up -d
-
-# ─────────────────────────────────────────────
-# Wait for healthy
-# ─────────────────────────────────────────────
-echo -e "${BLUE}==>${NC} Waiting for services..."
-wait_for_healthy "http://localhost:8096" 30 2 "Jellyfin"
-wait_for_healthy "http://localhost:7878" 30 2 "Radarr"
-wait_for_healthy "http://localhost:8989" 30 2 "Sonarr"
-wait_for_healthy "http://localhost:6767" 30 2 "Bazarr"
+if docker compose up -d --wait --wait-timeout 120; then
+    echo -e "  ${GREEN}✓${NC} All services healthy"
+else
+    echo -e "  ${YELLOW}⚠${NC} Some services may still be starting..."
+fi
 
 # ─────────────────────────────────────────────
 # Jellyfin Startup Wizard
