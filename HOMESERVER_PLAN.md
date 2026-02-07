@@ -1,9 +1,7 @@
 # Home Server Master Plan
 
-> **Hardware:** Mac Mini M4 (24GB Unified Memory, 512GB SSD) + 8TB External USB Drive
-> **Location:** United Kingdom (hardware purchased tax-free in Japan)
+> **Hardware:** Mac Mini M4 (24GB Unified Memory, 512GB SSD) + External USB Drive
 > **Goal:** Self-hosted, privacy-focused media server with AI voice assistant + Alexa
-> **Hardware Cost:** ~£760 (Japan tax-free) vs ~£1,049 (UK) - **saving £289**
 > **Monthly Cost:** ~£7.21 (API + electricity) — backup optional, Alexa via free haaska
 > **Butler Engine:** [Nanobot](https://github.com/HKUDS/nanobot) (~4k lines, skill-based)
 >
@@ -47,7 +45,7 @@
 │                                    │                                        │
 │                                    ▼                                        │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                    8TB EXTERNAL DRIVE                               │   │
+│  │                    EXTERNAL DRIVE                                   │   │
 │  │   /Media  /Photos  /Documents  /Books  /Downloads  /Backups         │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -68,44 +66,43 @@
 | **Device** | Mac Mini M4 | Apple Silicon, excellent power efficiency |
 | **RAM** | 24GB Unified Memory | Shared between CPU, GPU, Neural Engine |
 | **Storage (Internal)** | 512GB SSD | OS, Docker images, databases |
-| **Storage (External)** | 8TB USB External HDD | Media, photos, documents (see below) |
+| **Storage (External)** | USB External HDD (4-8TB recommended) | Media, photos, documents (see below) |
 | **Connectivity** | Gigabit Ethernet | Hardwired recommended for streaming |
 | **Power Draw** | ~10-30W typical | Very efficient for 24/7 operation |
 
-### Recommended External Drive
+### Choosing an External Drive
 
 **Use Case:** On-demand media streaming, photo storage, document sync. Not 24/7 continuous operation.
 
-**Purchase in Japan (Tax-Free)** - Exchange rate: £1 = ¥213
+#### Recommended Capacity
 
-| Recommendation | Model | Japan (税込) | Tax-Free | GBP | Source |
-|----------------|-------|-------------|----------|-----|--------|
-| 🥇 **Best Value** | Buffalo HD-CD8U3-BA 8TB | ¥25,000 | ¥22,500 | **£106** | [Bic Camera](https://www.biccamera.com/bc/item/7832511/) |
-| 🥈 **Alternative** | WD Elements Desktop 8TB | ¥31,580 | ¥28,422 | £133 | [Kakaku](https://kakaku.com/item/K0001236095/) |
+| Library Size | Capacity | Typical Use |
+|-------------|----------|-------------|
+| **Starter** | 4TB | Small media collection, photos, documents |
+| **Standard** | 8TB | Moderate media library (200+ movies, 60+ TV seasons, photos) |
+| **Large** | 12-16TB | Extensive 4K media library, RAW photography |
 
-**Chosen: Buffalo HD-CD8U3-BA** ([Official specs](https://www.buffalo.jp/product/detail/hd-cd8u3-ba.html))
-- USB 3.2 Gen 1 (backwards compatible)
-- Mac compatible (officially supported)
-- Fanless, shock-absorbing, quiet operation
-- Vertical or horizontal placement
-- £27 cheaper than WD equivalent
+#### What to Look For
+
+- **Interface:** USB 3.0 or later (USB 3.2 Gen 1 is common). HDD speeds (~150 MB/s) are well under USB 3.0 limits, so any USB 3.0+ port works fine
+- **Mac compatibility:** Most external HDDs work with Mac after formatting. Check reviews to confirm
+- **Form factor:** Desktop drives (3.5") offer better value per TB. Portable drives (2.5") don't need a power adapter but top out around 5TB
+- **Noise:** Look for fanless models if the server will be near living spaces
 
 > **Why consumer-grade is fine:** Your server workload is read-heavy and on-demand (stream movie → drive wakes → watch → drive sleeps). NAS-grade drives are overkill for this pattern.
 
-**Connection Note:** Drive uses USB-A cable. Use with Mac Mini's USB-C ports via included cable or adapter. Speed is not a bottleneck (HDD maxes at ~150 MB/s, USB 3.0 supports 625 MB/s).
+**Format:** Use APFS or Mac OS Extended (Journaled) — no need for NTFS drivers.
 
-**Format:** Use APFS or Mac OS Extended (Journaled) - no need for NTFS drivers.
+#### Popular Options
 
-**⚠️ CRITICAL: Check Power Supply at Store**
+| Brand | Series | Notes |
+|-------|--------|-------|
+| WD Elements / My Book | Desktop | Widely available, reliable, good value |
+| Seagate Expansion / One Touch | Desktop | Competitive pricing, similar to WD |
+| Toshiba Canvio | Desktop / Portable | Often cheapest per TB |
+| Buffalo | Desktop | Quiet, fanless, officially Mac-supported |
 
-Before purchasing, verify the AC adapter supports UK voltage:
-
-| On Adapter | Meaning | UK Compatible? |
-|------------|---------|----------------|
-| **100-240V** | Universal | ✅ Yes |
-| **100V** only | Japan only | ❌ Needs transformer |
-
-Ask at store: "このACアダプターは100-240V対応ですか？" (Does this AC adapter support 100-240V?)
+> **Tip:** Prices fluctuate — check your local retailers and wait for sales. External HDDs often go on discount during Black Friday, Amazon Prime Day, etc.
 
 ---
 
@@ -832,26 +829,24 @@ Nanobot is already minimal (~4k lines), but we further harden it:
 | **Avoid** | Large media files | Wastes precious SSD space |
 | **Health Rule** | Keep 10-15% free | macOS needs breathing room |
 
-#### External Drive (8TB) - Buffalo HD-CD8U3-BA
+#### External Drive (USB HDD)
 
 | Property | Value | Notes |
 |----------|-------|-------|
-| **Type** | Spinning HDD (5400 RPM typical) | Slower random access |
-| **Interface** | USB 3.2 Gen 1 (USB 3.0) | Max ~400-500 MB/s real-world |
+| **Type** | Spinning HDD (5400-7200 RPM typical) | Slower random access than SSD |
+| **Interface** | USB 3.0+ | Real-world ~150 MB/s (HDD bottleneck, not USB) |
 | **Format** | APFS or Mac OS Extended | Native Mac format |
 | **Best For** | Media, photos, backups | Large sequential files |
 | **Avoid** | Databases, app data | Poor random I/O performance |
-| **Features** | Fanless, quiet, shock-absorbing | Good for home server |
 
-##### ⚠️ Buffalo Drive Considerations
+##### External HDD Considerations
 
 | Limitation | Impact | Mitigation |
 |------------|--------|------------|
 | **Spin-down** | Drive sleeps after inactivity, causes 2-5s delay on wake | Accept delay or schedule periodic activity |
-| **Single drive** | No redundancy - if drive fails, data is lost | Cloud backup for irreplaceable data (photos/docs) |
+| **Single drive** | No redundancy — if drive fails, data is lost | Cloud backup for irreplaceable data (photos/docs) |
 | **USB disconnect** | macOS can unmount on sleep/wake | Enable "Prevent sleep" or use Amphetamine app |
 | **Seek times** | Slow for random file access (~10ms vs 0.1ms SSD) | Keep databases on SSD |
-| **Power supply** | Verify 100-240V before purchase | Check at store - may need UK plug adapter only |
 
 ---
 
@@ -902,32 +897,36 @@ Nanobot is already minimal (~4k lines), but we further harden it:
 
 ---
 
-### External HDD Budget (8TB)
+### External HDD Budget
 
 #### Usable Space Calculation
 
-| Factor | Impact |
-|--------|--------|
-| Advertised capacity | 8TB (8,000,000,000,000 bytes) |
-| Actual formatted (base-2) | **7.27 TB** (7,450 GB) |
-| NTFS filesystem overhead | ~1% |
-| **Real usable space** | **~7.2 TB** |
+Manufacturers advertise capacity in decimal (base-10), but your OS reports binary (base-2). Expect ~9% less usable space than advertised:
 
-#### Space Allocation Plan
+| Advertised | Actual Formatted | Usable (after overhead) |
+|------------|-----------------|------------------------|
+| 4TB | 3.64 TB | ~3.6 TB |
+| 8TB | 7.27 TB | ~7.2 TB |
+| 12TB | 10.91 TB | ~10.8 TB |
+| 16TB | 14.55 TB | ~14.4 TB |
 
-| Category | Allocated | % of Total | Contents |
-|----------|-----------|------------|----------|
-| **Movies** | 3,000 GB | 41% | ~75 4K movies OR ~300 1080p movies |
-| **TV Shows** | 2,000 GB | 28% | ~40 4K seasons OR ~200 1080p seasons |
-| **Photos** | 1,000 GB | 14% | ~50,000 RAW or ~250,000 JPEG |
-| **Audiobooks** | 300 GB | 4% | ~600 audiobooks |
-| **eBooks** | 50 GB | <1% | ~10,000 eBooks |
-| **Documents** | 200 GB | 3% | Nextcloud files |
-| **Downloads Buffer** | 400 GB | 5% | In-progress downloads |
-| **Backups** | 200 GB | 3% | Database & config backups |
-| **Reserved** | ~50 GB | <1% | Breathing room |
-| | | | |
-| **Total** | **7,200 GB** | **100%** | |
+#### Suggested Space Allocation
+
+Percentages scale to any drive size. Example values shown for an 8TB (~7.2TB usable) drive:
+
+| Category | % of Total | Example (8TB) | Contents |
+|----------|-----------|---------------|----------|
+| **Movies** | 41% | 3,000 GB | ~75 4K movies OR ~300 1080p movies |
+| **TV Shows** | 28% | 2,000 GB | ~40 4K seasons OR ~200 1080p seasons |
+| **Photos** | 14% | 1,000 GB | ~50,000 RAW or ~250,000 JPEG |
+| **Audiobooks** | 4% | 300 GB | ~600 audiobooks |
+| **eBooks** | <1% | 50 GB | ~10,000 eBooks |
+| **Documents** | 3% | 200 GB | Nextcloud files |
+| **Downloads Buffer** | 5% | 400 GB | In-progress downloads |
+| **Backups** | 3% | 200 GB | Database & config backups |
+| **Reserved** | <1% | ~50 GB | Breathing room |
+
+> Adjust percentages based on your priorities. Heavy media users should shift allocation toward Movies/TV; photographers toward Photos.
 
 ---
 
@@ -978,7 +977,7 @@ Nanobot is already minimal (~4k lines), but we further harden it:
 ### Directory Structure
 
 ```
-/Volumes/HomeServer/                    # 8TB External Drive
+/Volumes/HomeServer/                    # External Drive
 │
 ├── Media/                              # 5TB allocated
 │   ├── Movies/                         # Radarr root folder
@@ -1301,25 +1300,15 @@ This does NOT protect against: Mac Mini theft/fire (use cloud for that).
 
 ## Cost Summary
 
-### Hardware (One-Time) - Japan Shopping List (Tax-Free)
+### Hardware (One-Time)
 
-Purchased in Japan with tourist tax-free discount (10% off). Exchange rate: £1 = ¥213
+| Item | Estimated Cost | Notes |
+|------|---------------|-------|
+| Mac Mini M4 (24GB/512GB) | £899 / $799 | Check Apple's website or authorized resellers for current pricing |
+| External USB HDD (8TB) | £100-150 / $100-150 | See [Choosing an External Drive](#choosing-an-external-drive) |
+| **Total Hardware** | **~£1,000-1,050** | |
 
-| Item | Store | Japan (税込) | Tax-Free (-10%) | GBP | UK Price |
-|------|-------|-------------|-----------------|-----|----------|
-| Mac Mini M4 (24GB/512GB) | Yamada Denki | ¥154,800 | ¥139,320 | **£654** | £899 |
-| Buffalo HD-CD8U3-BA 8TB | Bic Camera | ¥25,000 | ¥22,500 | **£106** | ~£150* |
-| USB cable | Included | - | - | £0 | - |
-| **Total Hardware** | | ¥179,800 | ¥161,820 | **£760** | £1,049 |
-
-> **Savings vs UK purchase: ~£289 (28% off!)** 🎉
->
-> *Buffalo not commonly sold in UK; WD equivalent price used for comparison
->
-> **Remember:**
-> - Bring passport for tax-free (免税) purchase
-> - Check Buffalo AC adapter is 100-240V (not 100V only)
-> - [Bic Camera product page](https://www.biccamera.com/bc/item/7832511/)
+> **Tip:** Look for deals during sales events (Black Friday, Amazon Prime Day). Refurbished Mac Minis from Apple are also a good option — same warranty, lower price.
 
 ### Monthly Running Costs (UK)
 
@@ -1356,23 +1345,23 @@ Purchased in Japan with tourist tax-free discount (10% off). Exchange rate: £1 
 
 | Item | Value |
 |------|-------|
-| Hardware cost (Japan tax-free) | £760 |
+| Hardware cost (estimated) | ~£1,000 |
 | Monthly net savings | £44.23 |
-| **Break-even point** | **~17 months (~1.4 years)** |
+| **Break-even point** | **~23 months (~1.9 years)** |
 
 > **Note:** Actual savings depend on which subscriptions you currently have. If you only had Netflix + Audible, savings would be lower. The non-financial benefits (privacy, ownership, no ads, no content removal, Alexa voice control) are immediate.
 >
-> **If you add iCloud backup (£6.99/mo):** Net savings = £37.24/month, break-even = ~20 months
+> **If you add iCloud backup (£6.99/mo):** Net savings = £37.24/month, break-even = ~27 months
 
 ### Total Cost of Ownership (5 Years)
 
 | Scenario | Calculation | Total |
 |----------|-------------|-------|
-| **Self-hosted (no backup)** | £760 + (£7.21 × 60 months) | **£1,193** |
-| **Self-hosted (with iCloud)** | £760 + (£14.20 × 60 months) | **£1,612** |
+| **Self-hosted (no backup)** | £1,000 + (£7.21 × 60 months) | **£1,433** |
+| **Self-hosted (with iCloud)** | £1,000 + (£14.20 × 60 months) | **£1,852** |
 | **Subscriptions only** | £51.44 × 60 months | **£3,086** |
-| **Savings (no backup)** | | **£1,893 saved** |
-| **Savings (with iCloud)** | | **£1,474 saved** |
+| **Savings (no backup)** | | **£1,653 saved** |
+| **Savings (with iCloud)** | | **£1,234 saved** |
 
 ---
 
@@ -1483,4 +1472,4 @@ All software used in this project with links to official sources.
 
 ---
 
-*Last Updated: 2026-02-06*
+*Last Updated: 2026-02-07*
