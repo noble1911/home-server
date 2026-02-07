@@ -112,19 +112,29 @@ elif [[ -n "$JELLYFIN_ADMIN_USER" ]] && [[ -n "$JELLYFIN_ADMIN_PASS" ]]; then
         # Add Movies library
         curl -sf -X POST "http://localhost:8096/Library/VirtualFolders?name=Movies&collectionType=movies&refreshLibrary=false" \
             -H "$JF_AUTH" -H "Content-Type: application/json" \
-            -d '{"LibraryOptions":{},"PathInfos":[{"Path":"/media/Movies"}]}' > /dev/null 2>&1 || true
+            -d '{"LibraryOptions":{},"PathInfos":[{"Path":"/media/movies"}]}' > /dev/null 2>&1 || true
 
         # Add TV Shows library
         curl -sf -X POST "http://localhost:8096/Library/VirtualFolders?name=TV%20Shows&collectionType=tvshows&refreshLibrary=false" \
             -H "$JF_AUTH" -H "Content-Type: application/json" \
-            -d '{"LibraryOptions":{},"PathInfos":[{"Path":"/media/TV"}]}' > /dev/null 2>&1 || true
+            -d '{"LibraryOptions":{},"PathInfos":[{"Path":"/media/tv"}]}' > /dev/null 2>&1 || true
+
+        # Add Anime Movies library
+        curl -sf -X POST "http://localhost:8096/Library/VirtualFolders?name=Anime%20Movies&collectionType=movies&refreshLibrary=false" \
+            -H "$JF_AUTH" -H "Content-Type: application/json" \
+            -d '{"LibraryOptions":{},"PathInfos":[{"Path":"/media/anime-movies"}]}' > /dev/null 2>&1 || true
+
+        # Add Anime Series library
+        curl -sf -X POST "http://localhost:8096/Library/VirtualFolders?name=Anime%20Series&collectionType=tvshows&refreshLibrary=false" \
+            -H "$JF_AUTH" -H "Content-Type: application/json" \
+            -d '{"LibraryOptions":{},"PathInfos":[{"Path":"/media/anime-series"}]}' > /dev/null 2>&1 || true
 
         # Add Music library
         curl -sf -X POST "http://localhost:8096/Library/VirtualFolders?name=Music&collectionType=music&refreshLibrary=false" \
             -H "$JF_AUTH" -H "Content-Type: application/json" \
-            -d '{"LibraryOptions":{},"PathInfos":[{"Path":"/media/Music"}]}' > /dev/null 2>&1 || true
+            -d '{"LibraryOptions":{},"PathInfos":[{"Path":"/media/music"}]}' > /dev/null 2>&1 || true
 
-        echo -e "  ${GREEN}✓${NC} Jellyfin libraries added (Movies, TV Shows, Music)"
+        echo -e "  ${GREEN}✓${NC} Jellyfin libraries added (Movies, TV Shows, Anime Movies, Anime Series, Music)"
 
         # Save Jellyfin API key to credentials file for Butler
         JELLYFIN_API_KEY="$JELLYFIN_TOKEN"
@@ -147,14 +157,22 @@ echo ""
 echo -e "${BLUE}==>${NC} Configuring Radarr..."
 
 if [[ -n "$RADARR_API_KEY" ]]; then
-    # Root folder
+    # Root folders
     EXISTING_RF=$(arr_api_get "http://localhost:7878/api/v3/rootfolder" "$RADARR_API_KEY")
     if echo "$EXISTING_RF" | grep -q '"/movies"'; then
-        echo -e "  ${GREEN}✓${NC} Radarr root folder already set"
+        echo -e "  ${GREEN}✓${NC} Radarr root folder /movies already set"
     else
         arr_api_post "http://localhost:7878/api/v3/rootfolder" "$RADARR_API_KEY" \
             '{"path":"/movies","accessible":true}' > /dev/null
         echo -e "  ${GREEN}✓${NC} Radarr root folder: /movies"
+    fi
+
+    if echo "$EXISTING_RF" | grep -q '"/anime-movies"'; then
+        echo -e "  ${GREEN}✓${NC} Radarr root folder /anime-movies already set"
+    else
+        arr_api_post "http://localhost:7878/api/v3/rootfolder" "$RADARR_API_KEY" \
+            '{"path":"/anime-movies","accessible":true}' > /dev/null
+        echo -e "  ${GREEN}✓${NC} Radarr root folder: /anime-movies"
     fi
 
     # Download client
@@ -177,14 +195,22 @@ echo ""
 echo -e "${BLUE}==>${NC} Configuring Sonarr..."
 
 if [[ -n "$SONARR_API_KEY" ]]; then
-    # Root folder
+    # Root folders
     EXISTING_RF=$(arr_api_get "http://localhost:8989/api/v3/rootfolder" "$SONARR_API_KEY")
     if echo "$EXISTING_RF" | grep -q '"/tv"'; then
-        echo -e "  ${GREEN}✓${NC} Sonarr root folder already set"
+        echo -e "  ${GREEN}✓${NC} Sonarr root folder /tv already set"
     else
         arr_api_post "http://localhost:8989/api/v3/rootfolder" "$SONARR_API_KEY" \
             '{"path":"/tv","accessible":true}' > /dev/null
         echo -e "  ${GREEN}✓${NC} Sonarr root folder: /tv"
+    fi
+
+    if echo "$EXISTING_RF" | grep -q '"/anime-series"'; then
+        echo -e "  ${GREEN}✓${NC} Sonarr root folder /anime-series already set"
+    else
+        arr_api_post "http://localhost:8989/api/v3/rootfolder" "$SONARR_API_KEY" \
+            '{"path":"/anime-series","accessible":true}' > /dev/null
+        echo -e "  ${GREEN}✓${NC} Sonarr root folder: /anime-series"
     fi
 
     # Download client

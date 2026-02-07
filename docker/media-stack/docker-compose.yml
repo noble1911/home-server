@@ -9,7 +9,11 @@ services:
     volumes:
       - jellyfin-config:/config
       - jellyfin-cache:/cache
-      - ${DRIVE_PATH:-/Volumes/HomeServer}/Media:/media:ro
+      - ${DRIVE_PATH:-/Volumes/HomeServer}/Media/Movies:/media/movies:ro
+      - ${DRIVE_PATH:-/Volumes/HomeServer}/Media/TV:/media/tv:ro
+      - ${DRIVE_PATH:-/Volumes/HomeServer}/Media/Anime/Movies:/media/anime-movies:ro
+      - ${DRIVE_PATH:-/Volumes/HomeServer}/Media/Anime/Series:/media/anime-series:ro
+      - ${DRIVE_PATH:-/Volumes/HomeServer}/Media/Music:/media/music:ro
     ports:
       - "8096:8096"
     networks:
@@ -32,6 +36,7 @@ services:
     volumes:
       - radarr-config:/config
       - ${DRIVE_PATH:-/Volumes/HomeServer}/Media/Movies:/movies
+      - ${DRIVE_PATH:-/Volumes/HomeServer}/Media/Anime/Movies:/anime-movies
       - ${DRIVE_PATH:-/Volumes/HomeServer}/Downloads:/downloads
     ports:
       - "7878:7878"
@@ -55,6 +60,7 @@ services:
     volumes:
       - sonarr-config:/config
       - ${DRIVE_PATH:-/Volumes/HomeServer}/Media/TV:/tv
+      - ${DRIVE_PATH:-/Volumes/HomeServer}/Media/Anime/Series:/anime-series
       - ${DRIVE_PATH:-/Volumes/HomeServer}/Downloads:/downloads
     ports:
       - "8989:8989"
@@ -79,6 +85,8 @@ services:
       - bazarr-config:/config
       - ${DRIVE_PATH:-/Volumes/HomeServer}/Media/Movies:/movies
       - ${DRIVE_PATH:-/Volumes/HomeServer}/Media/TV:/tv
+      - ${DRIVE_PATH:-/Volumes/HomeServer}/Media/Anime/Movies:/anime-movies
+      - ${DRIVE_PATH:-/Volumes/HomeServer}/Media/Anime/Series:/anime-series
     ports:
       - "6767:6767"
     networks:

@@ -954,6 +954,9 @@ Nanobot is already minimal (~4k lines), but we further harden it:
 │   ├── TV/                             # Sonarr root folder
 │   │   ├── 4K/                         # 4K shows
 │   │   └── HD/                         # 1080p shows
+│   ├── Anime/                          # Separate anime libraries
+│   │   ├── Movies/                     # Radarr root folder (anime films)
+│   │   └── Series/                     # Sonarr root folder (anime series)
 │   └── Music/                          # Future: Lidarr
 │
 ├── Books/                              # 350GB allocated
@@ -977,6 +980,7 @@ Nanobot is already minimal (~4k lines), but we further harden it:
 │   ├── Complete/                       # qBittorrent completed
 │   │   ├── Movies/                     # Radarr picks up from here
 │   │   ├── TV/                         # Sonarr picks up from here
+│   │   ├── Anime/                      # Radarr/Sonarr picks up anime
 │   │   └── Books/                      # Readarr picks up from here
 │   └── Incomplete/                     # qBittorrent in-progress
 │
