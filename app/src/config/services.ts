@@ -52,8 +52,8 @@ export const services: Service[] = [
         'Start watching! Progress syncs across all your devices',
       ],
       mobileApp: {
-        name: 'Jellyfin',
-        ios: 'https://apps.apple.com/app/jellyfin-mobile/id1480732313',
+        name: 'Swiftfin',
+        ios: 'https://apps.apple.com/app/swiftfin/id1604098728',
         android: 'https://play.google.com/store/apps/details?id=org.jellyfin.mobile',
       },
       tips: [
@@ -79,8 +79,8 @@ export const services: Service[] = [
         'Browse the library and tap any book to start listening',
       ],
       mobileApp: {
-        name: 'Audiobookshelf',
-        ios: 'https://apps.apple.com/app/audiobookshelf/id1642275455',
+        name: 'ShelfPlayer',
+        ios: 'https://apps.apple.com/app/shelfplayer/id6475221163',
         android: 'https://play.google.com/store/apps/details?id=com.audiobookshelf.app',
       },
       tips: [
@@ -144,7 +144,7 @@ export const services: Service[] = [
       ],
       mobileApp: {
         name: 'Immich',
-        ios: 'https://apps.apple.com/app/immich/id1613945686',
+        ios: 'https://apps.apple.com/app/immich/id1613945652',
         android: 'https://play.google.com/store/apps/details?id=app.alextran.immich',
       },
       tips: [
