@@ -98,11 +98,17 @@ if [[ -n "$PROWLARR_API_KEY" ]]; then
         fi
     }
 
+    # General
     add_public_indexer "1337x" "1337x"
     add_public_indexer "YTS" "yts"
     add_public_indexer "EZTV" "eztv"
     add_public_indexer "The Pirate Bay" "thepiratebay"
     add_public_indexer "LimeTorrents" "limetorrents"
+
+    # Japanese / Anime
+    add_public_indexer "Nyaa.si" "nyaasi"
+    add_public_indexer "Tokyo Toshokan" "tokyotosho"
+    add_public_indexer "Shana Project" "shanaproject"
 else
     echo -e "  ${YELLOW}⚠${NC} No Prowlarr API key — add indexers manually at http://localhost:9696"
 fi
