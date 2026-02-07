@@ -96,6 +96,18 @@ class SoulConfig(BaseModel):
     customInstructions: str | None = None
 
 
+class NotificationPrefs(BaseModel):
+    enabled: bool = True
+    categories: list[str] = Field(
+        default_factory=lambda: [
+            "download", "reminder", "weather",
+            "smart_home", "calendar", "general",
+        ]
+    )
+    quietHoursStart: str | None = None  # "HH:MM" format
+    quietHoursEnd: str | None = None    # "HH:MM" format
+
+
 class UserFact(BaseModel):
     id: str
     content: str
@@ -107,17 +119,24 @@ class UserProfile(BaseModel):
     id: str
     name: str
     email: str | None = None
+    phone: str | None = None
     butlerName: str = "Butler"
     role: str = "user"
     permissions: list[str] = Field(default_factory=lambda: ["media", "home"])
     createdAt: str
     soul: SoulConfig = Field(default_factory=SoulConfig)
     facts: list[UserFact] = Field(default_factory=list)
+    notificationPrefs: NotificationPrefs = Field(default_factory=NotificationPrefs)
 
 
 class UpdateProfileRequest(BaseModel):
     name: str | None = None
     email: str | None = None
+
+
+class UpdateNotificationsRequest(BaseModel):
+    phone: str | None = Field(None, pattern=r'^$|^\+[1-9]\d{1,14}$')
+    notificationPrefs: NotificationPrefs | None = None
 
 
 class UpdateButlerNameRequest(BaseModel):

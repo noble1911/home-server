@@ -12,6 +12,9 @@ CREATE TABLE IF NOT EXISTS butler.users (
     id TEXT PRIMARY KEY,                    -- Unique identifier (phone number, telegram id, etc.)
     name TEXT NOT NULL,                     -- Display name
     soul JSONB DEFAULT '{}',                -- Personality/preference config
+    phone TEXT,                             -- E.164 phone number for WhatsApp notifications
+    notification_prefs JSONB NOT NULL       -- WhatsApp notification settings
+        DEFAULT '{"enabled": true, "categories": ["download", "reminder", "weather", "smart_home", "calendar", "general"]}',
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );

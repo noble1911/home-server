@@ -13,6 +13,7 @@ export interface User {
   id: string
   name: string
   email?: string
+  phone?: string
   butlerName: string
   role: UserRole
   permissions: ToolPermission[]
@@ -26,9 +27,25 @@ export interface SoulConfig {
   customInstructions?: string
 }
 
+export type NotificationCategory =
+  | 'download'
+  | 'reminder'
+  | 'weather'
+  | 'smart_home'
+  | 'calendar'
+  | 'general'
+
+export interface NotificationPrefs {
+  enabled: boolean
+  categories: NotificationCategory[]
+  quietHoursStart?: string
+  quietHoursEnd?: string
+}
+
 export interface UserProfile extends User {
   soul: SoulConfig
   facts: UserFact[]
+  notificationPrefs: NotificationPrefs
 }
 
 export interface UserFact {

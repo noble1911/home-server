@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { api } from '../services/api'
-import type { UserProfile, SoulConfig, UserFact } from '../types/user'
+import type { UserProfile, SoulConfig, UserFact, NotificationPrefs } from '../types/user'
 
 /**
  * User store - manages user profile data synced from API
@@ -18,6 +18,7 @@ interface UserState {
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>
   updateButlerName: (name: string) => Promise<void>
   updateSoul: (soul: Partial<SoulConfig>) => Promise<void>
+  updateNotifications: (phone?: string, prefs?: Partial<NotificationPrefs>) => Promise<void>
   addFact: (content: string, category: UserFact['category']) => Promise<void>
   removeFact: (factId: string) => Promise<void>
   clearAllFacts: () => void
@@ -90,6 +91,31 @@ export const useUserStore = create<UserState>((set, get) => ({
       set({
         profile: current,
         error: error instanceof Error ? error.message : 'Failed to update soul config'
+      })
+    }
+  },
+
+  updateNotifications: async (phone, prefs) => {
+    const current = get().profile
+    if (!current) return
+
+    const optimistic = { ...current }
+    if (phone !== undefined) optimistic.phone = phone
+    if (prefs) {
+      optimistic.notificationPrefs = { ...current.notificationPrefs, ...prefs }
+    }
+    set({ profile: optimistic })
+
+    try {
+      const body: Record<string, unknown> = {}
+      if (phone !== undefined) body.phone = phone
+      if (prefs) body.notificationPrefs = { ...current.notificationPrefs, ...prefs }
+      const updated = await api.put<UserProfile>('/user/notifications', body)
+      set({ profile: updated })
+    } catch (error) {
+      set({
+        profile: current,
+        error: error instanceof Error ? error.message : 'Failed to update notifications'
       })
     }
   },

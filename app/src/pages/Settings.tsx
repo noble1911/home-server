@@ -32,7 +32,7 @@ interface AdminUserListResponse {
 
 export default function Settings() {
   const { logout, role } = useAuthStore()
-  const { profile, updateButlerName, updateSoul, clearAllFacts, clearProfile, isLoading } = useUserStore()
+  const { profile, updateButlerName, updateSoul, updateNotifications, clearAllFacts, clearProfile, isLoading } = useUserStore()
   const { voiceMode, setVoiceMode } = useSettingsStore()
   const { clearMessages } = useConversationStore()
   const push = usePushNotifications()
@@ -56,6 +56,17 @@ export default function Settings() {
   const [serviceCredentials, setServiceCredentials] = useState<ServiceCredential[]>([])
   const [credentialsLoading, setCredentialsLoading] = useState(true)
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set())
+
+  // WhatsApp notification state
+  const [phoneInput, setPhoneInput] = useState(profile?.phone || '')
+  const [phoneError, setPhoneError] = useState<string | null>(null)
+  const [whatsappTestResult, setWhatsappTestResult] = useState<string | null>(null)
+  const [isSendingWhatsappTest, setIsSendingWhatsappTest] = useState(false)
+
+  // Sync phone input when profile changes externally
+  useEffect(() => {
+    setPhoneInput(profile?.phone || '')
+  }, [profile?.phone])
 
   // Deletion state
   const [showClearFactsConfirm, setShowClearFactsConfirm] = useState(false)
@@ -737,6 +748,129 @@ export default function Settings() {
             )}
           </div>
         )}
+      </section>
+
+      {/* WhatsApp Notifications - synced */}
+      <section className="card p-4">
+        <h2 className="text-sm font-medium text-butler-400 uppercase tracking-wide mb-4">
+          WhatsApp Notifications
+          <span className="text-butler-600 ml-2 text-xs normal-case">synced</span>
+        </h2>
+
+        <div className="space-y-4">
+          {/* Phone number */}
+          <div>
+            <label htmlFor="whatsapp-phone" className="block text-sm text-butler-300 mb-1">
+              Phone Number
+            </label>
+            <input
+              id="whatsapp-phone"
+              type="tel"
+              value={phoneInput}
+              onChange={(e) => { setPhoneInput(e.target.value); setPhoneError(null) }}
+              onBlur={() => {
+                if (phoneInput && !/^\+[1-9]\d{1,14}$/.test(phoneInput)) {
+                  setPhoneError('Use international format: +447123456789')
+                  return
+                }
+                setPhoneError(null)
+                if (phoneInput !== (profile?.phone || '')) {
+                  updateNotifications(phoneInput)
+                }
+              }}
+              placeholder="+447123456789"
+              className="input"
+            />
+            {phoneError && (
+              <p className="text-xs text-red-400 mt-1">{phoneError}</p>
+            )}
+            <p className="text-xs text-butler-500 mt-1">
+              International format with country code (E.164)
+            </p>
+          </div>
+
+          {/* Master toggle */}
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm text-butler-100">Notifications</div>
+              <div className="text-xs text-butler-500">
+                {profile?.notificationPrefs.enabled ? 'Receiving WhatsApp alerts' : 'WhatsApp alerts are paused'}
+              </div>
+            </div>
+            <button
+              onClick={() => updateNotifications(undefined, { enabled: !profile?.notificationPrefs.enabled })}
+              className="relative"
+            >
+              <div className={`w-10 h-6 rounded-full transition-colors ${
+                profile?.notificationPrefs.enabled ? 'bg-accent' : 'bg-butler-600'
+              }`}>
+                <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
+                  profile?.notificationPrefs.enabled ? 'translate-x-5' : 'translate-x-1'
+                }`} />
+              </div>
+            </button>
+          </div>
+
+          {/* Category toggles */}
+          {profile?.notificationPrefs.enabled && (
+            <div className="space-y-2">
+              <label className="block text-sm text-butler-300 mb-1">Categories</label>
+              {(['download', 'reminder', 'weather', 'smart_home', 'calendar', 'general'] as const).map(cat => {
+                const isOn = profile.notificationPrefs.categories.includes(cat)
+                return (
+                  <button
+                    key={cat}
+                    onClick={() => {
+                      const current = profile.notificationPrefs.categories
+                      const updated = isOn
+                        ? current.filter(c => c !== cat)
+                        : [...current, cat]
+                      updateNotifications(undefined, { categories: updated })
+                    }}
+                    className="w-full flex items-center justify-between p-3 bg-butler-800 rounded-lg hover:bg-butler-700 transition-colors"
+                  >
+                    <span className="text-sm text-butler-100 capitalize">{cat.replace('_', ' ')}</span>
+                    <div className={`w-10 h-6 rounded-full relative transition-colors ${
+                      isOn ? 'bg-accent' : 'bg-butler-600'
+                    }`}>
+                      <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
+                        isOn ? 'translate-x-5' : 'translate-x-1'
+                      }`} />
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
+          {/* Test button */}
+          {profile?.phone && profile.notificationPrefs.enabled && (
+            <button
+              onClick={async () => {
+                setIsSendingWhatsappTest(true)
+                setWhatsappTestResult(null)
+                try {
+                  const data = await api.post<{ result: string }>('/user/notifications/test')
+                  setWhatsappTestResult(data.result)
+                } catch {
+                  setWhatsappTestResult('Failed to send test message')
+                } finally {
+                  setIsSendingWhatsappTest(false)
+                }
+              }}
+              disabled={isSendingWhatsappTest}
+              className="w-full btn bg-butler-700 text-butler-300 hover:bg-butler-600 text-sm disabled:opacity-50"
+            >
+              {isSendingWhatsappTest ? 'Sending...' : 'Send Test Message'}
+            </button>
+          )}
+
+          {whatsappTestResult && (
+            <p className={`text-xs ${/error|failed/i.test(whatsappTestResult) ? 'text-red-400' : 'text-green-400'}`}>
+              {whatsappTestResult}
+            </p>
+          )}
+        </div>
       </section>
 
       {/* Data Management */}
