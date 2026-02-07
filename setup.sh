@@ -226,7 +226,6 @@ echo ""
 if [[ "$SKIP_VOICE" == "false" ]]; then
 echo "  Voice:"
 echo "    - LiveKit:         ws://localhost:7880"
-echo "    - Whisper:         http://localhost:9000"
 echo "    - Kokoro TTS:      http://localhost:8880"
 echo ""
 fi

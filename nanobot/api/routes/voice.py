@@ -41,7 +41,7 @@ async def process_voice(
     """Process a voice transcript and return an AI response.
 
     This is the core voice pipeline endpoint that LiveKit Agents calls
-    after Whisper transcribes the user's speech. The flow:
+    after Groq Whisper (cloud STT) transcribes the user's speech. The flow:
     1. Determine user_id (from JWT or request body for internal calls)
     2. Load user context (soul config, facts, conversation history)
     3. Call Claude with available tools

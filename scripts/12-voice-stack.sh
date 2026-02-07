@@ -1,5 +1,5 @@
 #!/bin/bash
-# Step 12: Deploy Voice Stack (LiveKit + Whisper + Kokoro TTS)
+# Step 12: Deploy Voice Stack (LiveKit + Kokoro TTS)
 set -e
 
 GREEN='\033[0;32m'
@@ -42,13 +42,6 @@ else
     echo -e "  ${YELLOW}⚠${NC} LiveKit may still be starting..."
 fi
 
-# Whisper
-if curl -s http://localhost:9000/health &>/dev/null 2>&1 || curl -s http://localhost:9000 &>/dev/null; then
-    echo -e "  ${GREEN}✓${NC} Whisper (STT) running at http://localhost:9000"
-else
-    echo -e "  ${YELLOW}⚠${NC} Whisper may still be loading model..."
-fi
-
 # Kokoro
 if curl -s http://localhost:8880/health &>/dev/null 2>&1 || curl -s http://localhost:8880 &>/dev/null; then
     echo -e "  ${GREEN}✓${NC} Kokoro (TTS) running at http://localhost:8880"
@@ -65,11 +58,6 @@ echo "  LiveKit Server:"
 echo "    - WebSocket: ws://localhost:7880"
 echo "    - Keys configured in docker/voice-stack/.env"
 echo "    - Config: docker/voice-stack/livekit.yaml"
-echo ""
-echo "  Whisper (Speech-to-Text):"
-echo "    - URL: http://localhost:9000"
-echo "    - Model: small (good balance of speed/accuracy)"
-echo "    - Test: curl -X POST http://localhost:9000/asr -F 'audio_file=@test.wav'"
 echo ""
 echo "  Kokoro (Text-to-Speech):"
 echo "    - URL: http://localhost:8880"

@@ -30,7 +30,7 @@ Nanobot connects to multiple services:
 |---------|---------|---------|
 | PostgreSQL | photos-files-stack | Memory storage (butler schema) |
 | LiveKit | voice-stack | Real-time voice |
-| Whisper | voice-stack | Speech-to-text |
+| Groq Whisper | Cloud API (free tier) | Speech-to-text |
 | Kokoro | voice-stack | Text-to-speech |
 | Home Assistant | smart-home-stack | Smart home control |
 
