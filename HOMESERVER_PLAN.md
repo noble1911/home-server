@@ -873,7 +873,7 @@ Nanobot is already minimal (~4k lines), but we further harden it:
 | | | | |
 | **Total Used** | **~147GB** | | |
 | **Reserved (30%)** | **~150GB** | | macOS health + future growth |
-| **Available** | **~200GB** | | Buffer for unexpected needs |
+| **Available** | **~203GB** | | Buffer for unexpected needs |
 
 #### 🔴 Critical: What MUST Stay on SSD
 
@@ -1283,7 +1283,6 @@ This does NOT protect against: Mac Mini theft/fire (use cloud for that).
 - [ ] Test Alexa → Home Assistant commands
 
 ### Phase 7: AI Butler (Day 6-7)
-- [ ] Deploy Whisper Turbo
 - [ ] Deploy Kokoro TTS
 - [ ] Build Butler Agent with Claude API
 - [ ] Define function schemas for all services
