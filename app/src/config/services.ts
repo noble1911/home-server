@@ -26,13 +26,21 @@ function serviceUrl(envVar: string, port: number, localDefault: string): string 
   return localDefault
 }
 
+// Pre-compute service URLs so guide text can reference them
+const jellyfinUrl = serviceUrl('VITE_JELLYFIN_URL', 8096, 'http://jellyfin.local')
+const audiobookshelfUrl = serviceUrl('VITE_AUDIOBOOKSHELF_URL', 13378, 'http://audiobooks.local')
+const calibreUrl = serviceUrl('VITE_CALIBRE_URL', 8083, 'http://books.local')
+const immichUrl = serviceUrl('VITE_IMMICH_URL', 2283, 'http://photos.local')
+const nextcloudUrl = serviceUrl('VITE_NEXTCLOUD_URL', 80, 'http://files.local')
+const homeAssistantUrl = serviceUrl('VITE_HOMEASSISTANT_URL', 8123, 'http://ha.local')
+
 export const services: Service[] = [
   {
     id: 'jellyfin',
     name: 'Jellyfin',
     description: 'Movies & TV Shows',
     icon: '🎬',
-    url: serviceUrl('VITE_JELLYFIN_URL', 8096, 'http://jellyfin.local'),
+    url: jellyfinUrl,
     mobileUrl: 'jellyfin://',
     category: 'media',
     guide: {
@@ -59,14 +67,14 @@ export const services: Service[] = [
     name: 'Audiobookshelf',
     description: 'Audiobooks & Podcasts',
     icon: '🎧',
-    url: serviceUrl('VITE_AUDIOBOOKSHELF_URL', 13378, 'http://audiobooks.local'),
+    url: audiobookshelfUrl,
     mobileUrl: 'audiobookshelf://',
     category: 'media',
     guide: {
       whatItDoes: 'Listen to audiobooks and podcasts with progress tracking, sleep timer, and offline downloads.',
       steps: [
         'Install the Audiobookshelf app on your phone',
-        'Enter the server address when prompted',
+        `Enter the server address when prompted: ${audiobookshelfUrl}`,
         'Log in with your credentials',
         'Browse the library and tap any book to start listening',
       ],
@@ -86,18 +94,33 @@ export const services: Service[] = [
     name: 'Calibre-Web',
     description: 'E-Books Library',
     icon: '📚',
-    url: serviceUrl('VITE_CALIBRE_URL', 8083, 'http://books.local'),
+    url: calibreUrl,
     category: 'books',
     guide: {
       whatItDoes: 'Browse, read, and download ebooks from your home library. Connect reader apps via OPDS for the best mobile experience.',
       steps: [
         'Open Calibre-Web in your browser and log in with your credentials',
         'Find a book and tap its cover — use "Read in Browser" or download it',
-        'For mobile apps, add the OPDS feed in your reader: use your server URL followed by /opds',
+        `For mobile apps, add the OPDS feed in your reader: ${calibreUrl}/opds`,
         'Enter your Calibre-Web username and password when the reader app asks',
       ],
+      recommendedApps: [
+        {
+          name: 'FBReader',
+          ios: 'https://apps.apple.com/app/fbreader-ebook-reader/id1067172178',
+          android: 'https://play.google.com/store/apps/details?id=org.geometerplus.zlibrary.ui.android',
+        },
+        {
+          name: 'Moon+ Reader',
+          android: 'https://play.google.com/store/apps/details?id=com.flyersoft.moonreader',
+        },
+        {
+          name: 'Panels',
+          ios: 'https://apps.apple.com/app/panels-comic-reader/id1236567663',
+        },
+      ],
       tips: [
-        'OPDS lets reader apps like KOReader, Moon+ Reader, and FBReader browse and download books directly — no browser needed',
+        'OPDS lets reader apps browse and download books directly — no browser needed',
         'EPUB format works best on most devices — use the Convert button if you need a different format',
         'Apple Books (iOS) and Moon+ Reader (Android) give the best reading experience for downloaded books',
       ],
@@ -108,14 +131,14 @@ export const services: Service[] = [
     name: 'Immich',
     description: 'Photo Backup',
     icon: '📷',
-    url: serviceUrl('VITE_IMMICH_URL', 2283, 'http://photos.local'),
+    url: immichUrl,
     mobileUrl: 'immich://',
     category: 'photos',
     guide: {
       whatItDoes: 'Automatically back up photos and videos from your phone, and browse them in a beautiful timeline.',
       steps: [
         'Install the Immich app on your phone',
-        'Enter the server URL when prompted',
+        `Enter the server URL when prompted: ${immichUrl}`,
         'Log in with your credentials',
         'Enable auto-backup in the app settings to protect your photos',
       ],
@@ -135,7 +158,7 @@ export const services: Service[] = [
     name: 'Nextcloud',
     description: 'Files & Documents',
     icon: '📁',
-    url: serviceUrl('VITE_NEXTCLOUD_URL', 80, 'http://files.local'),
+    url: nextcloudUrl,
     mobileUrl: 'nextcloud://',
     category: 'files',
     guide: {
@@ -162,7 +185,7 @@ export const services: Service[] = [
     name: 'Home Assistant',
     description: 'Smart Home Control',
     icon: '🏠',
-    url: serviceUrl('VITE_HOMEASSISTANT_URL', 8123, 'http://ha.local'),
+    url: homeAssistantUrl,
     mobileUrl: 'homeassistant://',
     category: 'smart-home',
     guide: {

@@ -125,7 +125,7 @@ export default function ServiceDetail({ service, credentials, onClose }: Service
             </section>
           )}
 
-          {/* Mobile App */}
+          {/* Mobile App — single official app */}
           {guide?.mobileApp && (
             <section>
               <h3 className="text-sm font-medium text-butler-400 uppercase tracking-wide mb-3">
@@ -154,6 +154,44 @@ export default function ServiceDetail({ service, credentials, onClose }: Service
                     Play Store
                   </a>
                 )}
+              </div>
+            </section>
+          )}
+
+          {/* Recommended Apps — multiple third-party options */}
+          {guide?.recommendedApps && guide.recommendedApps.length > 0 && (
+            <section>
+              <h3 className="text-sm font-medium text-butler-400 uppercase tracking-wide mb-3">
+                Recommended Reader Apps
+              </h3>
+              <div className="space-y-2">
+                {guide.recommendedApps.map((app) => (
+                  <div key={app.name} className="flex items-center gap-2">
+                    <span className="text-sm text-butler-200 min-w-28 shrink-0">{app.name}</span>
+                    {app.ios && (
+                      <a
+                        href={app.ios}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-butler-800 text-butler-300 hover:bg-butler-700 text-xs transition-colors"
+                      >
+                        <AppleIcon className="w-3.5 h-3.5" />
+                        iOS
+                      </a>
+                    )}
+                    {app.android && (
+                      <a
+                        href={app.android}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-butler-800 text-butler-300 hover:bg-butler-700 text-xs transition-colors"
+                      >
+                        <PlayStoreIcon className="w-3.5 h-3.5" />
+                        Android
+                      </a>
+                    )}
+                  </div>
+                ))}
               </div>
             </section>
           )}

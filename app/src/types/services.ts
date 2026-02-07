@@ -8,6 +8,7 @@ export interface ServiceGuide {
   whatItDoes: string
   steps: string[]
   mobileApp?: MobileApp
+  recommendedApps?: MobileApp[]
   tips?: string[]
 }
 

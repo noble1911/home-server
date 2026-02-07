@@ -88,7 +88,7 @@ gh issue edit <number> --add-assignee @me  # Claim an issue
 - Smart home (Home Assistant + Alexa via haaska)
 
 **Owner:** Ron (GitHub: noble1911)
-**Hardware:** Mac Mini M4 (24GB RAM, 512GB SSD) + 8TB external drive
+**Hardware:** Mac Mini M4 (24GB RAM, 512GB SSD) + external USB drive
 **Status:** Pre-hardware - Mac Mini not yet purchased/arrived
 
 ## Current Progress
