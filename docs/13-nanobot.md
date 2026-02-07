@@ -298,7 +298,7 @@ Nanobot connects to multiple Docker networks:
 |---------|---------|---------|
 | `photos-files-stack_default` | immich-postgres | Database storage |
 | `smart-home-stack_default` | homeassistant | Smart home control |
-| `voice-stack_default` | livekit, whisper, kokoro | Voice features |
+| `voice-stack_default` | livekit, kokoro | Voice features |
 
 ## Resource Usage
 

@@ -39,7 +39,7 @@
 │  │  └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘  │   │
 │  │  ┌──────────┐ ┌──────────┐ ┌───────────────────────────────────┐   │   │
 │  │  │ Calibre  │ │Audiobook │ │         AI BUTLER                 │   │   │
-│  │  │   Web    │ │  shelf   │ │  Whisper + Agent + Kokoro         │   │   │
+│  │  │   Web    │ │  shelf   │ │  Agent + Kokoro TTS               │   │   │
 │  │  └──────────┘ └──────────┘ └───────────────────────────────────┘   │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
 │                                    │                                        │
@@ -1203,7 +1203,6 @@ This does NOT protect against: Mac Mini theft/fire (use cloud for that).
 | 8081 | qBittorrent | LAN only |
 | 8100 | Butler Agent | LAN only |
 | 8880 | Kokoro TTS | LAN only |
-| 9000 | Whisper | LAN only |
 
 ### Service Communication
 
@@ -1381,7 +1380,7 @@ All software used in this project with links to official sources.
 |----------|----------|---------|---------|
 | [LiveKit](https://livekit.io/) | [livekit.io](https://livekit.io/) | Open-source WebRTC server for real-time audio/video | Apache 2.0 |
 | [LiveKit Agents](https://github.com/livekit/agents) | [GitHub](https://github.com/livekit/agents) | Python framework for building voice AI agents | Apache 2.0 |
-| [OpenAI Whisper](https://github.com/openai/whisper) | [GitHub](https://github.com/openai/whisper) | Local speech-to-text model | MIT |
+| [Groq Whisper](https://console.groq.com/) | [groq.com](https://console.groq.com/) | Cloud speech-to-text (Whisper large-v3-turbo, free tier) | Commercial |
 | [Kokoro TTS](https://github.com/remsky/Kokoro-FastAPI) | [GitHub](https://github.com/remsky/Kokoro-FastAPI) | High-quality local text-to-speech | Apache 2.0 |
 | [Claude API](https://www.anthropic.com/api) | [anthropic.com](https://www.anthropic.com/api) | LLM for understanding, reasoning, function calling | Commercial |
 | [Nanobot](https://github.com/HKUDS/nanobot) | [GitHub](https://github.com/HKUDS/nanobot) | Ultra-lightweight AI agent framework (~4k lines) | MIT |

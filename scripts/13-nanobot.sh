@@ -219,7 +219,7 @@ if is_placeholder "$current_val"; then
     echo ""
     echo -e "${YELLOW}Groq API Key (for Voice)${NC}"
     echo "Free tier — sign up at: https://console.groq.com/keys"
-    echo "Provides fast speech-to-text via Whisper. Required for voice features."
+    echo "Provides fast cloud speech-to-text via Groq Whisper. Required for voice features."
     echo ""
     read -p "Enter your Groq API key (gsk_...) or press Enter to skip: " groq_key
 
