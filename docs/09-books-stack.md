@@ -127,16 +127,14 @@ Calibre-Web or Audiobookshelf shows in library
 
 ## Send to Kindle
 
-Calibre-Web can send ebooks directly to your Kindle:
+Calibre-Web can send ebooks directly to your Kindle with one click. This requires:
+1. SMTP email settings configured in Calibre-Web (Gmail App Password)
+2. Your Kindle email address set in your user profile
+3. Your sending email approved in Amazon's settings
 
-1. **In Calibre-Web Admin:**
-   - Enable "Enable Kobo sync" if you have a Kobo
-   - Configure SMTP for Kindle email delivery
-2. **Get your Kindle email:**
-   - Amazon > Manage Content and Devices > Preferences > Personal Document Settings
-   - Your address: `yourname@kindle.com`
-3. **Add approved sender:**
-   - Add your sending email to "Approved Personal Document E-mail List"
+See the **[Kindle Email Delivery Setup Guide](./kindle-email-setup.md)** for full step-by-step instructions.
+
+> **Quick start:** If you added `CALIBRE_SMTP_*` variables to `~/.homeserver-credentials` before running setup, SMTP is already configured. Just set your Kindle email in your Calibre-Web profile.
 
 ## Docker Commands
 
@@ -177,6 +175,7 @@ Add root folders in Settings > Media Management before searching for books.
 
 - [Ebook Reading Guide](./ebook-reading-guide.md) — Read your library on phones, tablets, and e-readers
 - [OPDS Feed Setup](./opds-setup.md) — Connect mobile reading apps to browse and download books
+- [Kindle Email Delivery](./kindle-email-setup.md) — Send books directly to your Kindle
 - [Prowlarr Indexer Setup](./prowlarr-indexers.md) — Configure indexers for Readarr book search
 
 ## Next Step

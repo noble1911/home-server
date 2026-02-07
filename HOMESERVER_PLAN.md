@@ -1262,7 +1262,7 @@ This does NOT protect against: Mac Mini theft/fire (use cloud for that).
 - [ ] Deploy Audiobookshelf
 - [ ] Deploy Readarr
 - [ ] Configure OPDS catalog feed for mobile reading apps (#111)
-- [ ] Configure Kindle email delivery (Send-to-Kindle via SMTP) (#112)
+- [x] Configure Kindle email delivery (Send-to-Kindle via SMTP) (#112)
 - [ ] Write ebook reading setup guide — browser, OPDS, Kindle, direct download (#110)
 
 ### Phase 5: Photos & Files (Day 4-5)
