@@ -175,6 +175,7 @@ Add root folders in Settings > Media Management before searching for books.
 
 ## Related Guides
 
+- [Ebook Reading Guide](./ebook-reading-guide.md) — Read your library on phones, tablets, and e-readers
 - [OPDS Feed Setup](./opds-setup.md) — Connect mobile reading apps to browse and download books
 - [Prowlarr Indexer Setup](./prowlarr-indexers.md) — Configure indexers for Readarr book search
 
