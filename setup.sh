@@ -253,9 +253,10 @@ echo "  2. Home Assistant: Create account at http://localhost:8123"
 echo "  3. Calibre-Web: Change default password (admin/admin123)"
 echo "  4. Install mobile apps (Jellyfin, Immich, Audiobookshelf, Nextcloud)"
 echo "  5. (Optional) Add private indexers to Prowlarr at http://localhost:9696"
+echo "  6. (Optional) Set up Kindle email — see docs/kindle-email-setup.md"
 echo ""
 if [[ "$SKIP_NANOBOT" == "false" ]]; then
-echo "  6. Access Butler PWA at http://localhost:3000"
+echo "  7. Access Butler PWA at http://localhost:3000"
 if [[ "$SKIP_VOICE" == "false" ]]; then
 echo "     See docs/VOICE_ARCHITECTURE.md for voice integration details"
 fi

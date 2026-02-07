@@ -178,6 +178,43 @@ else
 fi
 
 # ─────────────────────────────────────────────
+# Calibre-Web: SMTP for Kindle email delivery
+# ─────────────────────────────────────────────
+echo ""
+echo -e "${BLUE}==>${NC} Configuring Calibre-Web SMTP..."
+
+if [[ -n "$CALIBRE_SMTP_SERVER" ]]; then
+    CURRENT_SMTP=$(docker exec calibre-web sh -c \
+        'sqlite3 /config/app.db "SELECT config_mail_server FROM settings WHERE id=1;" 2>/dev/null' 2>/dev/null)
+
+    if [[ -n "$CURRENT_SMTP" ]] && [[ "$CURRENT_SMTP" != "None" ]]; then
+        echo -e "  ${GREEN}✓${NC} Calibre-Web SMTP already configured (${CURRENT_SMTP})"
+    else
+        SMTP_PORT="${CALIBRE_SMTP_PORT:-587}"
+        SMTP_TYPE="${CALIBRE_SMTP_ENCRYPTION:-1}"
+
+        if docker exec calibre-web sh -c \
+            "sqlite3 /config/app.db \"UPDATE settings SET \
+                config_mail_server = '${CALIBRE_SMTP_SERVER}', \
+                config_mail_port = ${SMTP_PORT}, \
+                config_mail_login = '${CALIBRE_SMTP_LOGIN}', \
+                config_mail_password = '${CALIBRE_SMTP_PASSWORD}', \
+                config_mail_from = '${CALIBRE_SMTP_FROM}', \
+                config_mail_size = 25600000, \
+                config_mail_server_type = ${SMTP_TYPE} \
+            WHERE id = 1;\"" 2>/dev/null; then
+            echo -e "  ${GREEN}✓${NC} Calibre-Web SMTP configured (${CALIBRE_SMTP_SERVER})"
+        else
+            echo -e "  ${YELLOW}⚠${NC} Could not configure SMTP — set up manually"
+            echo "     See docs/kindle-email-setup.md"
+        fi
+    fi
+else
+    echo -e "  ${YELLOW}⚠${NC} No SMTP credentials — Kindle email not configured"
+    echo "     See docs/kindle-email-setup.md for setup instructions"
+fi
+
+# ─────────────────────────────────────────────
 # Prowlarr: Connect to Readarr
 # ─────────────────────────────────────────────
 echo ""
