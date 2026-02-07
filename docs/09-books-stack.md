@@ -135,6 +135,8 @@ Calibre-Web can send ebooks directly to your Kindle with one click. This require
 See the **[Kindle Email Delivery Setup Guide](./kindle-email-setup.md)** for full step-by-step instructions.
 
 > **Quick start:** If you added `CALIBRE_SMTP_*` variables to `~/.homeserver-credentials` before running setup, SMTP is already configured. Just set your Kindle email in your Calibre-Web profile.
+>
+> The variables are: `CALIBRE_SMTP_SERVER`, `CALIBRE_SMTP_PORT` (default: 587), `CALIBRE_SMTP_ENCRYPTION` (1=STARTTLS), `CALIBRE_SMTP_LOGIN`, `CALIBRE_SMTP_PASSWORD`, `CALIBRE_SMTP_FROM`. See the [Kindle Email Delivery guide](./kindle-email-setup.md) for details.
 
 ## Docker Commands
 

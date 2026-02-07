@@ -94,8 +94,6 @@ gh issue edit <number> --add-assignee @me  # Claim an issue
 ## Current Progress
 
 > **Tasks are tracked in [GitHub Issues](https://github.com/noble1911/home-server/issues)**
->
-> See [TODO.md](TODO.md) for architecture context and decision log.
 
 ### Development Approach
 We're building the software FIRST, then deploying to Mac Mini later:
@@ -135,7 +133,7 @@ Tools (Python class)  →  Code that EXECUTES actions (shell, filesystem, web, e
 - ✅ Basic memory system (`memory.py`)
 - ✅ Weather skill (already exists)
 - ❌ LiveKit/real-time voice (we need to add this)
-- ❌ Local Whisper STT (uses Groq API, we want local)
+- ✅ Groq Whisper STT (cloud API, free tier)
 
 ### How to Extend Nanobot
 
@@ -170,18 +168,40 @@ home-server/
 ├── CLAUDE.md              # This file - context for Claude
 ├── README.md              # User-facing quick start
 ├── HOMESERVER_PLAN.md     # Complete architecture & plan
-├── TODO.md                # Architecture decisions & context
 ├── setup.sh               # All-in-one setup (calls scripts/)
-├── scripts/               # Individual setup scripts
+├── app/                   # Butler PWA (React + Vite + LiveKit)
+├── butler/                # LiveKit agent (voice bridge to Butler API)
+│   └── livekit-agent/     # Custom LLM plugin for LiveKit
+├── nanobot/               # Nanobot gateway + Butler API (FastAPI)
+│   ├── api/               # Butler API (auth, chat, voice, tools)
+│   ├── tools/             # Custom Python tools (15+)
+│   ├── migrations/        # PostgreSQL schema migrations
+│   └── docker-compose.yml # Nanobot + Butler API containers
+├── docker/                # Docker Compose stacks
+│   ├── books-stack/       # Calibre-Web, Audiobookshelf, Readarr
+│   ├── download-stack/    # qBittorrent, Prowlarr
+│   ├── media-stack/       # Jellyfin, Radarr, Sonarr, Bazarr
+│   ├── messaging-stack/   # WhatsApp gateway
+│   ├── photos-files-stack/# Immich, Nextcloud, PostgreSQL
+│   ├── smart-home-stack/  # Home Assistant, Cloudflare Tunnel
+│   └── voice-stack/       # LiveKit, Kokoro TTS
+├── scripts/               # Individual setup scripts (01-15)
 │   ├── 01-homebrew.sh
-│   ├── 02-cloudflare-tunnel.sh
 │   ├── 03-power-settings.sh
-│   └── 04-ssh.sh
+│   ├── ...
+│   ├── 15-alexa-haaska.sh
+│   ├── backup.sh          # Daily backup (via launchd)
+│   ├── restore.sh         # Restore from backup
+│   ├── change-drive.sh    # Migrate to a different external drive
+│   └── lib/               # Shared helper functions
 └── docs/                  # Manual instructions for each step
-    ├── 01-homebrew.md
-    ├── 02-cloudflare-tunnel.md
-    ├── 03-power-settings.md
-    └── 04-ssh.md
+    ├── 01-homebrew.md ... 15-alexa-haaska.md
+    ├── VOICE_ARCHITECTURE.md
+    ├── google-oauth-setup.md
+    ├── kindle-email-setup.md
+    ├── opds-setup.md
+    ├── ebook-reading-guide.md
+    └── prowlarr-indexers.md
 ```
 
 ## Conventions

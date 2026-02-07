@@ -55,7 +55,6 @@ Other flags:
 | Step | Script | Manual | Description |
 |------|--------|--------|-------------|
 | 1 | [01-homebrew.sh](scripts/01-homebrew.sh) | [docs](docs/01-homebrew.md) | Install Homebrew package manager |
-| 2 | [02-cloudflare-tunnel.sh](scripts/02-cloudflare-tunnel.sh) | [docs](docs/02-cloudflare-tunnel.md) | Configure Cloudflare Tunnel for remote access |
 | 3 | [03-power-settings.sh](scripts/03-power-settings.sh) | [docs](docs/03-power-settings.md) | Configure Mac to stay awake 24/7 |
 | 4 | [04-ssh.sh](scripts/04-ssh.sh) | [docs](docs/04-ssh.md) | Enable SSH *(optional)* |
 | 5 | [05-orbstack.sh](scripts/05-orbstack.sh) | [docs](docs/05-orbstack.md) | Install OrbStack (Docker) |
@@ -65,13 +64,13 @@ Other flags:
 | 9 | [09-books-stack.sh](scripts/09-books-stack.sh) | [docs](docs/09-books-stack.md) | Deploy Calibre-Web + Audiobookshelf + Readarr |
 | 10 | [10-photos-files.sh](scripts/10-photos-files.sh) | [docs](docs/10-photos-files.md) | Deploy Immich + Nextcloud |
 | 11 | [11-smart-home.sh](scripts/11-smart-home.sh) | [docs](docs/11-smart-home.md) | Deploy Home Assistant + Cloudflare Tunnel |
-| 12 | [12-voice-stack.sh](scripts/12-voice-stack.sh) | [docs](docs/12-voice-stack.md) | Deploy LiveKit + Whisper + Kokoro TTS |
+| 12 | [12-voice-stack.sh](scripts/12-voice-stack.sh) | [docs](docs/12-voice-stack.md) | Deploy LiveKit + Kokoro TTS |
 | 13 | [13-nanobot.sh](scripts/13-nanobot.sh) | - | Deploy Butler AI agent + API (prompts for API keys) |
 
 Run individual steps:
 ```bash
-# Example: just configure Cloudflare Tunnel
-curl -fsSL https://raw.githubusercontent.com/noble1911/home-server/main/scripts/02-cloudflare-tunnel.sh | bash
+# Example: just install Homebrew
+curl -fsSL https://raw.githubusercontent.com/noble1911/home-server/main/scripts/01-homebrew.sh | bash
 ```
 
 Or follow the manual docs for step-by-step instructions.
@@ -228,8 +227,7 @@ After setting up Home Assistant, generate a **Long-Lived Access Token** (Profile
 | Component | Purpose | Port |
 |-----------|---------|------|
 | [LiveKit](https://livekit.io/) | WebRTC server | 7880 |
-| [Groq Whisper](https://console.groq.com/) | Speech-to-text (cloud) | - |
-| [Whisper](https://github.com/openai/whisper) | Speech-to-text (local fallback) | 9000 |
+| [Groq Whisper](https://console.groq.com/) | Speech-to-text (cloud, free tier) | - |
 | LiveKit Agent | Voice pipeline orchestrator | - |
 | [Kokoro TTS](https://github.com/remsky/Kokoro-FastAPI) | Text-to-speech | 8880 |
 

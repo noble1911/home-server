@@ -5,7 +5,7 @@
 > **Monthly Cost:** ~£7.21 (API + electricity) — backup optional, Alexa via free haaska
 > **Butler Engine:** [Nanobot](https://github.com/HKUDS/nanobot) (~4k lines, skill-based)
 >
-> ⚠️ **Note (2026-02-05):** Nanobot uses a "skills" system (markdown instruction files), not MCP. Skills teach the agent how to use tools; the agent then calls built-in executors (shell, filesystem, web). Custom Python tools can also be registered. See TODO.md for details.
+> ⚠️ **Note (2026-02-05):** Nanobot uses a "skills" system (markdown instruction files) and custom Python tools. Skills teach the agent how to use tools; the agent then calls built-in executors (shell, filesystem, web). Custom Python tools are registered in `nanobot/tools/`.
 
 ---
 
@@ -122,7 +122,7 @@
 |---------|----------|---------|------------|------------|------------|------|
 | [**LiveKit Server**](https://livekit.io/) | [livekit.io](https://livekit.io/) | WebRTC server for real-time audio streaming | Docker container | 200MB | 500MB | 7880 |
 | [**LiveKit Agents**](https://github.com/livekit/agents) | [GitHub](https://github.com/livekit/agents) | Python framework orchestrating STT→LLM→TTS | Docker container | 300MB | 500MB | - |
-| [**Whisper**](https://github.com/openai/whisper) | [GitHub](https://github.com/openai/whisper) | Local speech-to-text (OpenAI model) | Docker container | 500MB | 1.5GB | - |
+| [**Groq Whisper**](https://console.groq.com/) | [groq.com](https://console.groq.com/) | Cloud speech-to-text (Whisper large-v3-turbo via Groq API, free tier) | External API | 0MB | 0MB | - |
 | [**Kokoro TTS**](https://github.com/remsky/Kokoro-FastAPI) | [GitHub](https://github.com/remsky/Kokoro-FastAPI) | Local text-to-speech (natural voices) | Docker container | 400MB | 800MB | 8880 |
 | [**Claude API**](https://www.anthropic.com/api) | [anthropic.com](https://www.anthropic.com/api) | LLM brain for understanding & reasoning | External API | 0MB | 0MB | - |
 
@@ -135,7 +135,7 @@
 | Custom Skills/Tools | Self-built | Skills (markdown) + Tools (Python) for service integrations | Part of Nanobot | Included | Included | - |
 | [**APScheduler**](https://apscheduler.readthedocs.io/) | [Docs](https://apscheduler.readthedocs.io/) | Cron-style task scheduling | Part of Agent | Included | Included | - |
 
-> **Note:** The LLM (Claude) runs in the cloud to preserve local RAM. Voice processing (Whisper, Kokoro) runs locally for low latency.
+> **Note:** The LLM (Claude) and STT (Groq Whisper) run in the cloud to preserve local RAM. TTS (Kokoro) runs locally for low latency.
 
 ### Media & Entertainment
 
@@ -197,7 +197,7 @@
 | Category | Services | Idle Total | Peak Total |
 |----------|----------|------------|------------|
 | **macOS + OrbStack** | System overhead | 3.5GB | 5GB |
-| **Voice Assistant** | LiveKit, Whisper, Nanobot, Kokoro | 1.5GB | 3.6GB |
+| **Voice Assistant** | LiveKit, Kokoro, Nanobot | 1.0GB | 2.1GB |
 | **Media** | Jellyfin, *arrs, qBit | 1.5GB | 5.9GB |
 | **Photos/Files** | Immich, Nextcloud | 1.4GB | 5GB |
 | **Books** | Calibre, Audiobookshelf, Readarr | 0.7GB | 1.2GB |
@@ -213,10 +213,10 @@
 |-----------|------|--------|-------|
 | LiveKit Server | 200MB | 500MB | WebRTC signaling |
 | LiveKit Agent | 300MB | 500MB | Python orchestrator |
-| Whisper (small) | 500MB | 1.5GB | Local STT model |
+| Groq Whisper STT | 0MB | 0MB | Cloud API (free tier) |
 | Kokoro TTS | 400MB | 800MB | Local TTS model |
-| Nanobot | 100MB | 300MB | Agent + MCPs |
-| **Total Voice** | **1.5GB** | **3.6GB** | |
+| Nanobot | 100MB | 300MB | Agent + Python tools |
+| **Total Voice** | **1.0GB** | **2.1GB** | |
 
 ### Peak Scenario Analysis
 
@@ -242,7 +242,7 @@ After evaluating options, **[Nanobot](https://github.com/HKUDS/nanobot)** is the
 |--------|---------|----------|--------|
 | Codebase | ~4,000 lines | 430,000+ lines | ✅ Nanobot |
 | Auditability | Easy to read entire codebase | Requires significant time | ✅ Nanobot |
-| MCP Support | Native | Native | Tie |
+| Tool Support | Native | Native | Tie |
 | WhatsApp | WebSocket (no public IP) | Yes | ✅ Nanobot |
 | Voice | Groq Whisper (free tier) | Various | ✅ Nanobot |
 | Scheduling | Cron + intervals | Yes | Tie |
@@ -253,12 +253,12 @@ After evaluating options, **[Nanobot](https://github.com/HKUDS/nanobot)** is the
 
 ### Design Philosophy
 
-The Butler is built on **Nanobot with custom MCPs**, keeping the codebase minimal and auditable:
+The Butler is built on **Nanobot with custom Python tools**, keeping the codebase minimal and auditable:
 
 | Principle | Implementation |
 |-----------|----------------|
 | **No external skills** | Skill download capability removed from codebase |
-| **Custom MCPs only** | All integrations built and audited by us |
+| **Custom tools only** | All integrations built and audited by us |
 | **Network isolation** | Cloudflare Tunnel for remote access, admin services LAN-only |
 | **Read-only where possible** | Calendar, email, location = read-only access |
 | **Multi-user** | Supports both household members |
@@ -314,16 +314,16 @@ The Butler is built on **Nanobot with custom MCPs**, keeping the codebase minima
 │  │  │                    VOICE AGENT (Python)                         │ │ │
 │  │  │                                                                 │ │ │
 │  │  │  ┌───────────┐ ┌───────────┐ ┌───────────┐ ┌───────────┐       │ │ │
-│  │  │  │  Whisper  │ │  Claude   │ │  Kokoro   │ │ Scheduler │       │ │ │
-│  │  │  │  (LOCAL)  │ │   API     │ │   TTS     │ │  (Cron)   │       │ │ │
-│  │  │  │   STT     │ │ (Sonnet)  │ │  (LOCAL)  │ │           │       │ │ │
+│  │  │  │ Groq STT │ │  Claude   │ │  Kokoro   │ │ Scheduler │       │ │ │
+│  │  │  │ (CLOUD)  │ │   API     │ │   TTS     │ │  (Cron)   │       │ │ │
+│  │  │  │ Whisper  │ │ (Sonnet)  │ │  (LOCAL)  │ │           │       │ │ │
 │  │  │  └───────────┘ └───────────┘ └───────────┘ └───────────┘       │ │ │
 │  │  │                                                                 │ │ │
 │  │  │  ┌───────────────────────────────────────────────────────────┐ │ │ │
-│  │  │  │           NANOBOT + CUSTOM MCP SERVERS                    │ │ │ │
+│  │  │  │           NANOBOT + CUSTOM PYTHON TOOLS                   │ │ │ │
 │  │  │  │                                                           │ │ │ │
 │  │  │  │  ╔═══════════════════════════════════════════════════╗   │ │ │ │
-│  │  │  │  ║  READ-ONLY MCPs                                   ║   │ │ │ │
+│  │  │  │  ║  READ-ONLY TOOLS                                   ║   │ │ │ │
 │  │  │  │  ║  ┌──────────┐ ┌──────────┐ ┌──────────┐          ║   │ │ │ │
 │  │  │  │  ║  │ Google   │ │  Gmail   │ │ Location │          ║   │ │ │ │
 │  │  │  │  ║  │ Calendar │ │          │ │  (×N)    │          ║   │ │ │ │
@@ -335,7 +335,7 @@ The Butler is built on **Nanobot with custom MCPs**, keeping the codebase minima
 │  │  │  │  ╚═══════════════════════════════════════════════════╝   │ │ │ │
 │  │  │  │                                                           │ │ │ │
 │  │  │  │  ╔═══════════════════════════════════════════════════╗   │ │ │ │
-│  │  │  │  ║  READ-WRITE MCPs                                  ║   │ │ │ │
+│  │  │  │  ║  READ-WRITE TOOLS                                  ║   │ │ │ │
 │  │  │  │  ║  ┌──────────┐ ┌──────────┐ ┌──────────┐          ║   │ │ │ │
 │  │  │  │  ║  │  Home    │ │  Radarr  │ │  Sonarr  │          ║   │ │ │ │
 │  │  │  │  ║  │Assistant │ │          │ │          │          ║   │ │ │ │
@@ -629,11 +629,11 @@ Custom Python tools interface directly with PostgreSQL (not Nanobot's built-in `
 │   ┌─────────────────────────────────────────────────────────────────────┐  │
 │   │                     MAC MINI SERVER                                 │  │
 │   │                                                                     │  │
-│   │   Audio In ──► Whisper ──► Claude API ──► Nanobot ──► Kokoro ──►   │  │
-│   │                (LOCAL)      (CLOUD)        MCPs      (LOCAL)        │  │
-│   │                 STT          Brain      Orchestrate    TTS          │  │
+│   │   Audio In ──► Groq STT ──► Claude API ──► Butler ──► Kokoro ──►   │  │
+│   │                (CLOUD)       (CLOUD)       Tools      (LOCAL)       │  │
+│   │                Whisper        Brain      Orchestrate    TTS         │  │
 │   │                                                                     │  │
-│   │   Latency: ~500-800ms round-trip (conversational)                  │  │
+│   │   Latency: ~650ms round-trip (conversational)                      │  │
 │   └─────────────────────────────────────────────────────────────────────┘  │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -690,7 +690,7 @@ Custom Python tools interface directly with PostgreSQL (not Nanobot's built-in `
 
 ### Integrations (Custom Skills & Tools)
 
-> **Note:** These are implemented as Nanobot skills (markdown instructions) or custom Python tools, not MCP servers. See TODO.md for implementation approach decisions.
+> **Note:** These are implemented as Nanobot skills (markdown instructions) or custom Python tools in the `nanobot/tools/` directory.
 
 #### Read-Only Integrations
 
@@ -786,7 +786,7 @@ Nanobot is already minimal (~4k lines), but we further harden it:
 | Nanobot Feature | Our Configuration |
 |-----------------|-------------------|
 | External skill loading | ❌ Disabled in config |
-| Tool directory | ⚠️ Locked to our custom MCPs only |
+| Tool directory | ⚠️ Locked to our custom Python tools only |
 | Shell execution | ⚠️ Removed or restricted to allowlist |
 | File system access | ⚠️ Restricted to specific paths |
 | Network access | ⚠️ Cloudflare Tunnel (no public ports) |
@@ -866,13 +866,12 @@ Nanobot is already minimal (~4k lines), but we further harden it:
 | └─ Nextcloud (MySQL/SQLite) | 3GB | 112GB | File metadata |
 | **ML Models** | | | |
 | ├─ Immich ML models | 5GB | 117GB | Face recognition, CLIP |
-| ├─ Whisper Turbo model | 3GB | 120GB | Speech-to-text |
-| └─ Kokoro TTS model | 1GB | 121GB | Text-to-speech |
-| **Docker Volumes (configs)** | 5GB | 126GB | Service configurations |
-| **Homebrew packages** | 4GB | 130GB | CLI tools |
-| **User Applications** | 20GB | 150GB | OrbStack GUI, etc. |
+| └─ Kokoro TTS model | 1GB | 118GB | Text-to-speech |
+| **Docker Volumes (configs)** | 5GB | 123GB | Service configurations |
+| **Homebrew packages** | 4GB | 127GB | CLI tools |
+| **User Applications** | 20GB | 147GB | OrbStack GUI, etc. |
 | | | | |
-| **Total Used** | **~150GB** | | |
+| **Total Used** | **~147GB** | | |
 | **Reserved (30%)** | **~150GB** | | macOS health + future growth |
 | **Available** | **~200GB** | | Buffer for unexpected needs |
 
@@ -1142,7 +1141,7 @@ Percentages scale to any drive size. Example values shown for an 8TB (~7.2TB usa
 
 Keep a rolling backup ON THE MAC'S INTERNAL SSD (not the external drive).
 
-**Implemented:** `scripts/backup.sh` (daily via launchd), `scripts/restore.sh`, `scripts/14-backup-setup.sh`
+**Implemented:** `scripts/backup.sh` (daily via launchd), `scripts/restore.sh`, `scripts/14-backup.sh`
 
 ```
 ~/ServerBackups/
@@ -1318,7 +1317,7 @@ This does NOT protect against: Mac Mini theft/fire (use cloud for that).
 | Electricity | ~£3.70 | Mac Mini 24/7 (~15W avg × 730hrs × 34p/kWh) |
 | [AWS Lambda](https://aws.amazon.com/lambda/) (haaska) | £0 | Free tier (1M requests/month) |
 | [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/) | £0 | Free tier — primary remote access |
-| Voice (Whisper + Kokoro) | £0 | Runs locally on Mac Mini |
+| Voice (Groq Whisper + Kokoro TTS) | £0 | STT via Groq free tier, TTS runs locally |
 | All software | £0 | Open source |
 | **Total Monthly (no backup)** | **~£7.21** | |
 | | | |

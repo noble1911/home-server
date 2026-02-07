@@ -8,7 +8,18 @@ Deploy Nanobot, the AI agent that powers Butler's intelligence.
 curl -fsSL https://raw.githubusercontent.com/noble1911/home-server/main/scripts/13-nanobot.sh | bash
 ```
 
-**Note:** You'll be prompted for your Anthropic API key.
+**Note:** The script will prompt you for several API keys and configuration values. You can skip optional ones by pressing Enter:
+
+| Prompt | Required? | Where to get it |
+|--------|-----------|-----------------|
+| **Anthropic API key** | Yes | [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys) |
+| **Groq API key** | Optional (for voice STT) | [console.groq.com/keys](https://console.groq.com/keys) (free tier) |
+| **OpenWeatherMap API key** | Optional (for weather) | [openweathermap.org/api](https://openweathermap.org/api) (free tier) |
+| **Google OAuth credentials** | Optional (for Calendar/Gmail) | See [Google OAuth Setup](./google-oauth-setup.md) |
+| **Cloudflare Tunnel token** | Optional (for Alexa) | Cloudflare Zero Trust > Networks > Tunnels |
+| **Admin invite code** | Optional (default: BUTLER-001) | You choose — first user becomes admin |
+
+Security secrets (JWT_SECRET, INTERNAL_API_KEY, LIVEKIT keys) are auto-generated.
 
 ## Manual
 
@@ -61,34 +72,31 @@ curl http://localhost:8100/health
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                     NANOBOT                              │
-│                                                          │
-│   ┌─────────────┐    ┌─────────────┐    ┌────────────┐ │
-│   │   Gateway   │────│   Claude    │────│   Tools    │ │
-│   │   :8100     │    │   Sonnet    │    │            │ │
-│   └─────────────┘    └─────────────┘    └────────────┘ │
-│         │                                     │         │
-│         │                                     │         │
-│   ┌─────┴───────────────────────────────────┴─────┐   │
-│   │              Network Connections               │   │
-│   └─────────────────────────────────────────────────┘   │
-│         │              │              │                  │
-└─────────┼──────────────┼──────────────┼──────────────────┘
-          │              │              │
-          ▼              ▼              ▼
-   ┌────────────┐ ┌────────────┐ ┌────────────┐
-   │ PostgreSQL │ │    Home    │ │   Voice    │
-   │  (Immich)  │ │ Assistant  │ │   Stack    │
-   └────────────┘ └────────────┘ └────────────┘
+┌──────────────────────┐    ┌──────────────────────────────┐
+│      NANOBOT          │    │        BUTLER API             │
+│     (Gateway)         │    │        (FastAPI)              │
+│      :8100            │    │         :8000                 │
+│                       │    │                               │
+│  WhatsApp/Telegram    │    │  PWA chat, voice, auth,      │
+│  channel interface    │    │  OAuth, tools, scheduling    │
+└───────────┬───────────┘    └──────────────┬───────────────┘
+            │                               │
+            └───────────┬───────────────────┘
+                        │
+         ┌──────────────┼──────────────┐
+         ▼              ▼              ▼
+  ┌────────────┐ ┌────────────┐ ┌────────────┐
+  │ PostgreSQL │ │    Home    │ │   Voice    │
+  │  (Immich)  │ │ Assistant  │ │   Stack    │
+  └────────────┘ └────────────┘ └────────────┘
 ```
 
 ## Service Details
 
 | Component | URL | Purpose |
 |-----------|-----|---------|
-| Gateway | http://localhost:8100 | API endpoint |
-| Health | http://localhost:8100/health | Status check |
+| Nanobot Gateway | http://localhost:8100 | WhatsApp/Telegram interface |
+| Butler API | http://localhost:8000 | PWA, voice, auth, tools |
 | Model | claude-sonnet-4 | LLM reasoning |
 
 ## Database Schema
@@ -142,12 +150,21 @@ Nanobot loads custom tools from `/nanobot/tools/`:
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `ANTHROPIC_API_KEY` | Yes | Claude API key |
+| `JWT_SECRET` | Auto | JWT signing secret (auto-generated) |
+| `INTERNAL_API_KEY` | Auto | Internal API key for service-to-service auth (auto-generated) |
+| `LIVEKIT_API_KEY` | Auto | LiveKit API key (auto-generated, synced to voice-stack) |
+| `LIVEKIT_API_SECRET` | Auto | LiveKit API secret (auto-generated, synced to voice-stack) |
+| `GROQ_API_KEY` | No | Groq API key for voice STT |
+| `OPENWEATHERMAP_API_KEY` | No | Weather queries |
+| `GOOGLE_CLIENT_ID` | No | Google OAuth (Calendar/Gmail) |
+| `GOOGLE_CLIENT_SECRET` | No | Google OAuth secret |
+| `CLOUDFLARE_TUNNEL_TOKEN` | No | Cloudflare Tunnel for Alexa integration |
+| `INVITE_CODES` | No | Admin invite code (default: BUTLER-001) |
+| `HA_TOKEN` | No | Home Assistant long-lived access token |
 | `DB_USER` | No | PostgreSQL user (default: postgres) |
 | `DB_PASSWORD` | No | PostgreSQL password (default: postgres) |
-| `HA_TOKEN` | No | Home Assistant long-lived token |
-| `TELEGRAM_ENABLED` | No | Enable Telegram (default: false) |
-| `TELEGRAM_TOKEN` | No | Telegram bot token |
-| `WHATSAPP_ENABLED` | No | Enable WhatsApp (default: false) |
+| `RADARR_API_KEY` | No | Auto-synced from `~/.homeserver-credentials` |
+| `SONARR_API_KEY` | No | Auto-synced from `~/.homeserver-credentials` |
 
 ## Docker Commands
 

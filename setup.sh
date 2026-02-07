@@ -146,7 +146,6 @@ export NEXTCLOUD_ADMIN_USER NEXTCLOUD_ADMIN_PASS
 # Phase 1: Foundation
 echo -e "\n${GREEN}Phase 1: Foundation${NC}"
 curl -fsSL "${BASE_URL}/01-homebrew.sh" | bash
-curl -fsSL "${BASE_URL}/02-cloudflare-tunnel.sh" | bash
 curl -fsSL "${BASE_URL}/03-power-settings.sh" | bash
 
 if [[ "$ENABLE_SSH" == "true" ]]; then
