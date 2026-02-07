@@ -36,11 +36,16 @@ docker compose ps
 
 ### Jellyfin
 
+> **Note:** The setup script auto-configures Jellyfin libraries. The manual steps below are only needed if auto-configuration was skipped.
+
 1. Open http://localhost:8096
 2. Complete the setup wizard:
    - Create admin username/password
-   - Add library: **Movies** → `/media/Movies`
-   - Add library: **TV Shows** → `/media/TV`
+   - Add library: **Movies** → `/media/movies`
+   - Add library: **TV Shows** → `/media/tv`
+   - Add library: **Anime Movies** → `/media/anime-movies`
+   - Add library: **Anime Series** → `/media/anime-series`
+   - Add library: **Music** → `/media/music`
    - Configure language/metadata preferences
 3. Install apps on your devices (iOS, Android, TV, etc.)
 
@@ -48,7 +53,8 @@ docker compose ps
 
 1. Open http://localhost:7878
 2. **Settings > Media Management:**
-   - Add Root Folder: `/movies`
+   - Add Root Folder: `/movies` (regular movies)
+   - Add Root Folder: `/anime-movies` (anime films)
    - Enable "Rename Movies"
 3. **Settings > Download Clients:**
    - Add qBittorrent:
@@ -62,7 +68,8 @@ docker compose ps
 
 1. Open http://localhost:8989
 2. **Settings > Media Management:**
-   - Add Root Folder: `/tv`
+   - Add Root Folder: `/tv` (regular TV shows)
+   - Add Root Folder: `/anime-series` (anime series)
    - Enable "Rename Episodes"
 3. **Settings > Download Clients:**
    - Add qBittorrent:
@@ -104,12 +111,18 @@ In Prowlarr (http://localhost:9696):
 
 | Service | Container Path | Host Path |
 |---------|----------------|-----------|
-| Jellyfin | `/media` | `/Volumes/HomeServer/Media` (read-only) |
-| Radarr | `/movies` | `/Volumes/HomeServer/Media/Movies` |
-| Radarr | `/downloads` | `/Volumes/HomeServer/Downloads` |
-| Sonarr | `/tv` | `/Volumes/HomeServer/Media/TV` |
-| Sonarr | `/downloads` | `/Volumes/HomeServer/Downloads` |
-| Bazarr | `/movies`, `/tv` | Media folders |
+| Jellyfin | `/media/movies` | `Media/Movies` (read-only) |
+| Jellyfin | `/media/tv` | `Media/TV` (read-only) |
+| Jellyfin | `/media/anime-movies` | `Media/Anime/Movies` (read-only) |
+| Jellyfin | `/media/anime-series` | `Media/Anime/Series` (read-only) |
+| Jellyfin | `/media/music` | `Media/Music` (read-only) |
+| Radarr | `/movies` | `Media/Movies` |
+| Radarr | `/anime-movies` | `Media/Anime/Movies` |
+| Radarr | `/downloads` | `Downloads` |
+| Sonarr | `/tv` | `Media/TV` |
+| Sonarr | `/anime-series` | `Media/Anime/Series` |
+| Sonarr | `/downloads` | `Downloads` |
+| Bazarr | `/movies`, `/tv`, `/anime-movies`, `/anime-series` | Matching media folders |
 
 ## The Download Flow
 
@@ -120,11 +133,11 @@ Prowlarr provides indexers
         ↓
 Radarr/Sonarr sends to qBittorrent
         ↓
-qBittorrent downloads to /Downloads/Complete/Movies (or TV)
+qBittorrent downloads to /Downloads/Complete/{Movies,TV,Anime}
         ↓
-Radarr/Sonarr moves to /Media/Movies (or TV)
+Radarr/Sonarr moves to /Media/{Movies,TV,Anime/Movies,Anime/Series}
         ↓
-Jellyfin sees it in library
+Jellyfin sees it in the matching library
 ```
 
 ## Quality Profiles
