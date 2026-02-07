@@ -181,5 +181,6 @@ https://books.yourdomain.com/opds
 
 ## Next Steps
 
+- [Ebook Reading Guide](./ebook-reading-guide.md) — All the ways to read on mobile (browser, download, OPDS, audiobooks)
 - [Step 9: Books Stack](./09-books-stack.md) — Full Calibre-Web setup and configuration
 - [Kindle Email Delivery](./kindle-email-setup.md) — Send books directly to your Kindle (Issue #112)
