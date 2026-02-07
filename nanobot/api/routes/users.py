@@ -1,13 +1,15 @@
 """User profile routes.
 
 These endpoints match the PWA's userStore.ts calls exactly:
-  GET  /api/user/profile      -> fetchProfile()
-  PUT  /api/user/profile      -> updateProfile()
-  PUT  /api/user/butler       -> updateButlerName()
-  PUT  /api/user/soul         -> updateSoul()
-  POST /api/user/onboarding   -> completeOnboarding()
-  POST /api/user/facts        -> addFact()
-  DELETE /api/user/facts/{id} -> removeFact()
+  GET  /api/user/profile           -> fetchProfile()
+  PUT  /api/user/profile           -> updateProfile()
+  PUT  /api/user/butler            -> updateButlerName()
+  PUT  /api/user/soul              -> updateSoul()
+  PUT  /api/user/notifications     -> updateNotifications()
+  POST /api/user/notifications/test -> testWhatsAppNotification()
+  POST /api/user/onboarding        -> completeOnboarding()
+  POST /api/user/facts             -> addFact()
+  DELETE /api/user/facts/{id}      -> removeFact()
 
 Also implements GET /api/users/me from issue #30 spec.
 """
@@ -19,16 +21,18 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 
-from tools import DatabasePool
+from tools import DatabasePool, Tool, WhatsAppTool
 
 from ..crypto import decrypt_password
-from ..deps import get_current_user, get_db_pool
+from ..deps import get_current_user, get_db_pool, get_tools
 from ..models import (
     AddFactRequest,
+    NotificationPrefs,
     OnboardingRequest,
     ServiceCredentialsResponse,
     SoulConfig,
     UpdateButlerNameRequest,
+    UpdateNotificationsRequest,
     UpdateProfileRequest,
     UserFact,
     UserProfile,
@@ -41,12 +45,29 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _parse_notification_prefs(raw) -> NotificationPrefs:
+    """Parse notification_prefs JSONB column into the API model."""
+    if raw is None:
+        return NotificationPrefs()
+    data = json.loads(raw) if isinstance(raw, str) else raw
+    return NotificationPrefs(
+        enabled=data.get("enabled", True),
+        categories=data.get("categories", [
+            "download", "reminder", "weather",
+            "smart_home", "calendar", "general",
+        ]),
+        quietHoursStart=data.get("quiet_hours_start"),
+        quietHoursEnd=data.get("quiet_hours_end"),
+    )
+
+
 async def _get_profile(user_id: str, pool: DatabasePool) -> UserProfile:
     """Shared logic for fetching a user profile."""
     db = pool.pool
 
     user = await db.fetchrow(
-        "SELECT id, name, soul, role, permissions, created_at FROM butler.users WHERE id = $1",
+        "SELECT id, name, soul, role, permissions, phone, notification_prefs, created_at "
+        "FROM butler.users WHERE id = $1",
         user_id,
     )
     if not user:
@@ -70,6 +91,7 @@ async def _get_profile(user_id: str, pool: DatabasePool) -> UserProfile:
     return UserProfile(
         id=user["id"],
         name=user["name"],
+        phone=user["phone"],
         butlerName=soul.get("butler_name", "Butler"),
         role=user["role"],
         permissions=permissions,
@@ -89,6 +111,7 @@ async def _get_profile(user_id: str, pool: DatabasePool) -> UserProfile:
             )
             for row in facts
         ],
+        notificationPrefs=_parse_notification_prefs(user["notification_prefs"]),
     )
 
 
@@ -156,6 +179,58 @@ async def update_soul(
         json.dumps(soul_dict),
     )
     return {"status": "ok"}
+
+
+@router.put("/user/notifications", response_model=UserProfile)
+async def update_notifications(
+    req: UpdateNotificationsRequest,
+    user_id: str = Depends(get_current_user),
+    pool: DatabasePool = Depends(get_db_pool),
+):
+    """Update phone number and/or notification preferences."""
+    db = pool.pool
+
+    async with db.transaction():
+        if req.phone is not None:
+            await db.execute(
+                "UPDATE butler.users SET phone = $2 WHERE id = $1",
+                user_id,
+                req.phone if req.phone else None,
+            )
+
+        if req.notificationPrefs is not None:
+            prefs_dict = {
+                "enabled": req.notificationPrefs.enabled,
+                "categories": req.notificationPrefs.categories,
+                "quiet_hours_start": req.notificationPrefs.quietHoursStart,
+                "quiet_hours_end": req.notificationPrefs.quietHoursEnd,
+            }
+            await db.execute(
+                "UPDATE butler.users SET notification_prefs = $2::jsonb WHERE id = $1",
+                user_id,
+                json.dumps(prefs_dict),
+            )
+
+    return await _get_profile(user_id, pool)
+
+
+@router.post("/user/notifications/test")
+async def test_whatsapp_notification(
+    user_id: str = Depends(get_current_user),
+    tools: dict[str, Tool] = Depends(get_tools),
+):
+    """Send a test WhatsApp message to the authenticated user."""
+    whatsapp: WhatsAppTool | None = tools.get("whatsapp")
+    if not whatsapp:
+        raise HTTPException(503, "WhatsApp notifications are not configured")
+
+    result = await whatsapp.execute(
+        action="send_message",
+        user_id=user_id,
+        message="This is a test notification from Butler.",
+        category="general",
+    )
+    return {"result": result}
 
 
 @router.post("/user/onboarding")

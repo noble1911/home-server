@@ -19,32 +19,23 @@ from .whatsapp import WhatsAppTool, MAX_MESSAGES_PER_HOUR, VALID_CATEGORIES
 # Sample data for mocking
 # ---------------------------------------------------------------------------
 
-SAMPLE_USER_SOUL = {
-    "whatsapp_phone": "+447123456789",
-    "notification_preferences": {
-        "enabled": True,
-        "categories": ["download", "reminder", "weather", "smart_home", "calendar", "general"],
-        "quiet_hours_start": "23:00",
-        "quiet_hours_end": "07:00",
-    },
+SAMPLE_PHONE = "+447123456789"
+
+SAMPLE_PREFS = {
+    "enabled": True,
+    "categories": ["download", "reminder", "weather", "smart_home", "calendar", "general"],
+    "quiet_hours_start": "23:00",
+    "quiet_hours_end": "07:00",
 }
 
-SAMPLE_USER_NO_PHONE = {"personality": "friendly"}
-
-SAMPLE_USER_DISABLED = {
-    "whatsapp_phone": "+447123456789",
-    "notification_preferences": {
-        "enabled": False,
-        "categories": [],
-    },
+SAMPLE_PREFS_DISABLED = {
+    "enabled": False,
+    "categories": [],
 }
 
-SAMPLE_USER_LIMITED_CATEGORIES = {
-    "whatsapp_phone": "+447123456789",
-    "notification_preferences": {
-        "enabled": True,
-        "categories": ["download"],
-    },
+SAMPLE_PREFS_LIMITED = {
+    "enabled": True,
+    "categories": ["download"],
 }
 
 SAMPLE_SEND_SUCCESS = {"ok": True, "messageId": "true_447123456789@c.us_ABC123"}
@@ -81,10 +72,12 @@ def tool(mock_pool):
     )
 
 
-def _mock_user_row(soul: dict):
-    """Create a mock database row with the given soul JSONB."""
-    row = {"soul": json.dumps(soul)}
-    return row
+def _mock_user_row(phone, prefs=None):
+    """Create a mock database row with phone and notification_prefs columns."""
+    return {
+        "phone": phone,
+        "notification_prefs": json.dumps(prefs) if prefs else None,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -162,7 +155,7 @@ class TestSendMessage:
     @pytest.mark.asyncio
     async def test_send_success(self, tool, mock_pool):
         mock_pool.pool.fetchrow = AsyncMock(
-            return_value=_mock_user_row(SAMPLE_USER_SOUL)
+            return_value=_mock_user_row(SAMPLE_PHONE, SAMPLE_PREFS)
         )
 
         with patch("tools.whatsapp.aiohttp.ClientSession") as mock_cls:
@@ -183,7 +176,7 @@ class TestSendMessage:
     @pytest.mark.asyncio
     async def test_send_queued_when_disconnected(self, tool, mock_pool):
         mock_pool.pool.fetchrow = AsyncMock(
-            return_value=_mock_user_row(SAMPLE_USER_SOUL)
+            return_value=_mock_user_row(SAMPLE_PHONE, SAMPLE_PREFS)
         )
 
         with patch("tools.whatsapp.aiohttp.ClientSession") as mock_cls:
@@ -223,19 +216,19 @@ class TestSendMessage:
     @pytest.mark.asyncio
     async def test_send_user_no_phone(self, tool, mock_pool):
         mock_pool.pool.fetchrow = AsyncMock(
-            return_value=_mock_user_row(SAMPLE_USER_NO_PHONE)
+            return_value=_mock_user_row("", None)
         )
 
         result = await tool.execute(
             action="send_message", user_id="ron", message="hi"
         )
 
-        assert "whatsapp_phone" in result.lower() or "phone" in result.lower()
+        assert "phone" in result.lower()
 
     @pytest.mark.asyncio
     async def test_send_notifications_disabled(self, tool, mock_pool):
         mock_pool.pool.fetchrow = AsyncMock(
-            return_value=_mock_user_row(SAMPLE_USER_DISABLED)
+            return_value=_mock_user_row(SAMPLE_PHONE, SAMPLE_PREFS_DISABLED)
         )
 
         result = await tool.execute(
@@ -247,7 +240,7 @@ class TestSendMessage:
     @pytest.mark.asyncio
     async def test_send_category_not_opted_in(self, tool, mock_pool):
         mock_pool.pool.fetchrow = AsyncMock(
-            return_value=_mock_user_row(SAMPLE_USER_LIMITED_CATEGORIES)
+            return_value=_mock_user_row(SAMPLE_PHONE, SAMPLE_PREFS_LIMITED)
         )
 
         result = await tool.execute(
@@ -262,7 +255,7 @@ class TestSendMessage:
     @pytest.mark.asyncio
     async def test_send_defaults_to_general_category(self, tool, mock_pool):
         mock_pool.pool.fetchrow = AsyncMock(
-            return_value=_mock_user_row(SAMPLE_USER_SOUL)
+            return_value=_mock_user_row(SAMPLE_PHONE, SAMPLE_PREFS)
         )
 
         with patch("tools.whatsapp.aiohttp.ClientSession") as mock_cls:
@@ -283,7 +276,7 @@ class TestSendMessage:
     @pytest.mark.asyncio
     async def test_send_gateway_error(self, tool, mock_pool):
         mock_pool.pool.fetchrow = AsyncMock(
-            return_value=_mock_user_row(SAMPLE_USER_SOUL)
+            return_value=_mock_user_row(SAMPLE_PHONE, SAMPLE_PREFS)
         )
 
         with patch("tools.whatsapp.aiohttp.ClientSession") as mock_cls:
@@ -304,17 +297,14 @@ class TestSendMessage:
     @pytest.mark.asyncio
     async def test_send_quiet_hours_blocks(self, tool, mock_pool):
         """Quiet hours should block the message."""
-        soul_in_quiet = {
-            "whatsapp_phone": "+447123456789",
-            "notification_preferences": {
-                "enabled": True,
-                "categories": ["general"],
-                "quiet_hours_start": "00:00",
-                "quiet_hours_end": "23:59",  # All day quiet
-            },
+        prefs_all_day_quiet = {
+            "enabled": True,
+            "categories": ["general"],
+            "quiet_hours_start": "00:00",
+            "quiet_hours_end": "23:59",  # All day quiet
         }
         mock_pool.pool.fetchrow = AsyncMock(
-            return_value=_mock_user_row(soul_in_quiet)
+            return_value=_mock_user_row(SAMPLE_PHONE, prefs_all_day_quiet)
         )
 
         result = await tool.execute(
@@ -324,9 +314,9 @@ class TestSendMessage:
         assert "quiet hours" in result.lower()
 
     @pytest.mark.asyncio
-    async def test_send_soul_as_dict(self, tool, mock_pool):
-        """Handle soul field already parsed as dict (not JSON string)."""
-        row = {"soul": SAMPLE_USER_SOUL}  # Already a dict, not a string
+    async def test_send_prefs_as_dict(self, tool, mock_pool):
+        """Handle notification_prefs already parsed as dict (not JSON string)."""
+        row = {"phone": SAMPLE_PHONE, "notification_prefs": SAMPLE_PREFS}
         mock_pool.pool.fetchrow = AsyncMock(return_value=row)
 
         with patch("tools.whatsapp.aiohttp.ClientSession") as mock_cls:
@@ -408,7 +398,7 @@ class TestErrorHandling:
     @pytest.mark.asyncio
     async def test_connection_error(self, tool, mock_pool):
         mock_pool.pool.fetchrow = AsyncMock(
-            return_value=_mock_user_row(SAMPLE_USER_SOUL)
+            return_value=_mock_user_row(SAMPLE_PHONE, SAMPLE_PREFS)
         )
 
         with patch("tools.whatsapp.aiohttp.ClientSession") as mock_cls:
@@ -425,7 +415,7 @@ class TestErrorHandling:
     @pytest.mark.asyncio
     async def test_timeout_error(self, tool, mock_pool):
         mock_pool.pool.fetchrow = AsyncMock(
-            return_value=_mock_user_row(SAMPLE_USER_SOUL)
+            return_value=_mock_user_row(SAMPLE_PHONE, SAMPLE_PREFS)
         )
 
         with patch("tools.whatsapp.aiohttp.ClientSession") as mock_cls:
@@ -452,7 +442,7 @@ class TestRateLimiting:
     async def test_rate_limit_allows_under_limit(self, tool, mock_pool):
         """Messages under the limit should succeed."""
         mock_pool.pool.fetchrow = AsyncMock(
-            return_value=_mock_user_row(SAMPLE_USER_SOUL)
+            return_value=_mock_user_row(SAMPLE_PHONE, SAMPLE_PREFS)
         )
 
         with patch("tools.whatsapp.aiohttp.ClientSession") as mock_cls:
@@ -479,7 +469,7 @@ class TestRateLimiting:
         tool._rate_limits["ron"] = [now - i for i in range(MAX_MESSAGES_PER_HOUR)]
 
         mock_pool.pool.fetchrow = AsyncMock(
-            return_value=_mock_user_row(SAMPLE_USER_SOUL)
+            return_value=_mock_user_row(SAMPLE_PHONE, SAMPLE_PREFS)
         )
 
         result = await tool.execute(
@@ -499,7 +489,7 @@ class TestRateLimiting:
         tool._rate_limits["ron"] = [old - i for i in range(MAX_MESSAGES_PER_HOUR)]
 
         mock_pool.pool.fetchrow = AsyncMock(
-            return_value=_mock_user_row(SAMPLE_USER_SOUL)
+            return_value=_mock_user_row(SAMPLE_PHONE, SAMPLE_PREFS)
         )
 
         with patch("tools.whatsapp.aiohttp.ClientSession") as mock_cls:

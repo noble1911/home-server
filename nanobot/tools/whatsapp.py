@@ -130,7 +130,7 @@ class WhatsAppTool(Tool):
                     "type": "string",
                     "description": (
                         "User ID to send the message to. "
-                        "The user must have a whatsapp_phone in their profile."
+                        "The user must have a phone number configured in their profile."
                     ),
                 },
                 "message": {
@@ -272,26 +272,25 @@ class WhatsAppTool(Tool):
 
         pool = self._db_pool.pool
         row = await pool.fetchrow(
-            "SELECT soul FROM butler.users WHERE id = $1",
+            "SELECT phone, notification_prefs FROM butler.users WHERE id = $1",
             user_id,
         )
 
         if row is None:
             return "", {}, f"Error: User '{user_id}' not found."
 
-        soul = row["soul"]
-        if isinstance(soul, str):
-            soul = json.loads(soul)
-        soul = soul or {}
-
-        phone = soul.get("whatsapp_phone", "")
+        phone = row["phone"] or ""
         if not phone:
             return "", {}, (
                 f"User '{user_id}' does not have a WhatsApp phone configured. "
-                "Set it in their profile (soul.whatsapp_phone)."
+                "Set it in Settings > WhatsApp Notifications."
             )
 
-        prefs = soul.get("notification_preferences", DEFAULT_NOTIFICATION_PREFS)
+        raw_prefs = row["notification_prefs"]
+        prefs = (
+            json.loads(raw_prefs) if isinstance(raw_prefs, str) else raw_prefs
+        ) if raw_prefs is not None else DEFAULT_NOTIFICATION_PREFS
+
         return phone, prefs, None
 
     def _check_preferences(

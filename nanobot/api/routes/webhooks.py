@@ -110,7 +110,7 @@ async def _notify_users(
 ) -> bool:
     """Send a smart_home notification to all eligible users.
 
-    Eligible = whatsapp_phone configured AND smart_home category enabled.
+    Eligible = phone configured AND smart_home category enabled.
     The WhatsApp tool's own execute() handles preference checks, rate
     limiting, and quiet hours for each user individually.
 
@@ -120,8 +120,8 @@ async def _notify_users(
     rows = await db.fetch(
         """
         SELECT id FROM butler.users
-        WHERE soul -> 'whatsapp_phone' IS NOT NULL
-          AND soul ->> 'whatsapp_phone' != ''
+        WHERE phone IS NOT NULL
+          AND phone != ''
         """,
     )
 
