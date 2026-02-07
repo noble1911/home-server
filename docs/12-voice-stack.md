@@ -1,6 +1,6 @@
 # Step 12: Deploy Voice Stack
 
-Deploy LiveKit (WebRTC), Whisper (speech-to-text), and Kokoro (text-to-speech).
+Deploy LiveKit (WebRTC) and Kokoro (text-to-speech). Speech-to-text uses Groq's cloud API (free tier).
 
 ## Automated
 
@@ -8,7 +8,7 @@ Deploy LiveKit (WebRTC), Whisper (speech-to-text), and Kokoro (text-to-speech).
 curl -fsSL https://raw.githubusercontent.com/noble1911/home-server/main/scripts/12-voice-stack.sh | bash
 ```
 
-**Note:** First run downloads ~2-3GB of ML models. Be patient!
+**Note:** First run downloads ~1GB of TTS models. Be patient!
 
 ## Manual
 
@@ -30,8 +30,9 @@ docker compose ps
 | Service | URL | Purpose | RAM (Peak) |
 |---------|-----|---------|------------|
 | LiveKit | ws://localhost:7880 | WebRTC server | 500MB |
-| Whisper | http://localhost:9000 | Speech-to-text | 1.5GB |
+| Groq Whisper | Cloud API | Speech-to-text (free tier) | 0MB |
 | Kokoro | http://localhost:8880 | Text-to-speech | 800MB |
+| LiveKit Agent | (internal) | Voice pipeline orchestrator | 500MB |
 
 ## How Voice Works
 
@@ -40,11 +41,11 @@ You speak into PWA app
         ↓
 Audio streams via WebRTC to LiveKit
         ↓
-LiveKit forwards to Whisper
+LiveKit Agent sends audio to Groq Whisper API (cloud)
         ↓
-Whisper transcribes to text
+Groq transcribes to text (~50ms)
         ↓
-Text goes to Claude API (via Nanobot)
+Text goes to Butler API → Claude (SSE streaming)
         ↓
 Claude's response goes to Kokoro
         ↓
@@ -55,22 +56,9 @@ Audio streams back via LiveKit
 You hear the response
 ```
 
-Total latency: ~500-800ms for conversational feel.
+Total latency: ~650ms for conversational feel.
 
 ## Testing the Services
-
-### Test Whisper (STT)
-
-```bash
-# Record a test audio file
-# Or use any .wav file
-
-curl -X POST "http://localhost:9000/asr" \
-  -H "Content-Type: multipart/form-data" \
-  -F "audio_file=@test.wav"
-
-# Response: {"text": "your transcribed text"}
-```
 
 ### Test Kokoro (TTS)
 
@@ -114,52 +102,40 @@ livekit-cli join-room \
 
 ## Configuration
 
-### LiveKit Keys
+### LiveKit Keys & .env File
 
-The default development keys are:
-- API Key: `devkey`
-- API Secret: `secret`
+The voice stack uses a `.env` file at `docker/voice-stack/.env` for API keys. This file is **auto-generated** by `13-nanobot.sh` to stay in sync with the Nanobot `.env`:
 
-**For production, generate new keys:**
+```
+LIVEKIT_API_KEY=<generated>
+LIVEKIT_API_SECRET=<generated>
+INTERNAL_API_KEY=<generated>
+GROQ_API_KEY=<your-groq-key>
+```
+
+The `13-nanobot.sh` script also updates `docker/voice-stack/livekit.yaml` to replace the default dev keys with production keys.
+
+**If you need to regenerate keys manually:**
 
 ```bash
 docker run --rm livekit/generate
 ```
 
-Update `docker/voice-stack/livekit.yaml`:
-
-```yaml
-keys:
-  YOUR_API_KEY: YOUR_API_SECRET
-```
-
-### Whisper Model Selection
-
-Edit `docker-compose.yml` to change model:
-
-| Model | RAM | Speed | Accuracy |
-|-------|-----|-------|----------|
-| `tiny` | 400MB | Fastest | Lower |
-| `base` | 500MB | Fast | OK |
-| `small` | 1.5GB | Medium | Good ⬅️ Default |
-| `medium` | 3GB | Slow | Better |
-| `large` | 6GB | Slowest | Best |
-
-For Mac Mini M4 (24GB), `small` is the sweet spot.
+Then update both `nanobot/.env` and `docker/voice-stack/.env` with the new values.
 
 ### Kokoro Voices
 
 You can set a default voice or let the application choose per-request.
 
-## Integration with Nanobot
+## Integration with Butler API
 
-The voice stack provides the STT/TTS infrastructure. Nanobot (issue #11) will:
+The voice stack provides the WebRTC and TTS infrastructure. The LiveKit Agent orchestrates the pipeline:
 
-1. Receive transcribed text from Whisper
-2. Process with Claude API
-3. Call tools (Home Assistant, Radarr, etc.)
-4. Send response to Kokoro for audio
-5. Stream back through LiveKit
+1. Captures audio and sends to Groq Whisper for transcription
+2. Sends transcript to Butler API (SSE streaming)
+3. Butler processes with Claude, calls tools (Home Assistant, Radarr, etc.)
+4. Response text sent to Kokoro for audio generation
+5. Audio streams back through LiveKit to the PWA
 
 ## PWA Client
 
@@ -185,12 +161,9 @@ Models are stored on SSD (Docker volumes) for fast loading.
 
 ```bash
 # View logs
-docker logs whisper
 docker logs kokoro-tts
 docker logs livekit
-
-# Check model loading progress
-docker logs whisper -f
+docker logs livekit-agent
 
 # Restart
 cd docker/voice-stack
@@ -202,15 +175,6 @@ docker compose up -d
 ```
 
 ## Troubleshooting
-
-### Whisper slow or not responding
-
-Model may still be loading. Check:
-```bash
-docker logs whisper -f
-```
-
-If memory is an issue, try `tiny` or `base` model.
 
 ### Kokoro audio quality issues
 
@@ -230,17 +194,15 @@ cat docker/voice-stack/livekit.yaml
 
 ### Out of memory
 
-Voice stack needs ~3-4GB RAM at peak. If running with other stacks:
+Voice stack needs ~2GB RAM at peak. If running with other stacks:
 1. Stop ML-intensive services temporarily
-2. Use smaller Whisper model
-3. Stagger service startup
+2. Stagger service startup
 
 ## Performance Tips
 
-1. **Keep models warm:** Don't stop/start frequently
-2. **Use smaller model for quick interactions**
-3. **Schedule heavy ML tasks (Immich) for off-hours**
-4. **Monitor with:** `docker stats`
+1. **Keep Kokoro warm:** Don't stop/start frequently — model loading is slow
+2. **Schedule heavy ML tasks (Immich) for off-hours**
+3. **Monitor with:** `docker stats`
 
 ## What's Next?
 

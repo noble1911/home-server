@@ -114,6 +114,7 @@ lsof -i :8081
 - **Creates `homeserver` network:** A shared Docker network enabling all containers to communicate by hostname
 - **qBittorrent:** Downloads torrents to the external drive
 - **Prowlarr:** Manages indexers and syncs them to *arr apps
+- **Auto-configures public indexers:** 1337x, RARBG, YTS, EZTV, LimeTorrents, plus anime indexers (Nyaa.si, Tokyo Toshokan, Shana Project)
 
 The *arr apps (Radarr, Sonarr, etc.) will tell qBittorrent what to download and where to save it.
 

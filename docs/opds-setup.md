@@ -43,7 +43,7 @@ Once enabled, the OPDS feed is available at:
 | Local network | `http://localhost:8083/opds` |
 | Cloudflare Tunnel (remote) | `https://books.yourdomain.com/opds` |
 
-Replace `books.yourdomain.com` with the hostname you configured in your Cloudflare Tunnel for Calibre-Web ([Step 2](./02-cloudflare-tunnel.md)).
+Replace `books.yourdomain.com` with the hostname you configured in your Cloudflare Tunnel for Calibre-Web ([Step 11](./11-smart-home.md)).
 
 > **Note:** OPDS uses HTTP Basic Authentication — your Calibre-Web username and password protect the feed. Cloudflare Tunnel provides HTTPS automatically, so credentials are encrypted in transit.
 

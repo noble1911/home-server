@@ -90,11 +90,9 @@ Audiobookshelf has dedicated mobile apps with features like progress sync, offli
 
 ## 5. Remote Access
 
-All methods above work from outside your home network using either Cloudflare Tunnel or Tailscale.
+All methods above work from outside your home network using Cloudflare Tunnel.
 
-### Cloudflare Tunnel (recommended for simplicity)
-
-No app install needed on your phone — just use HTTPS URLs:
+Use your configured domain — no app install needed on your phone, just HTTPS URLs:
 
 | Service | Remote URL |
 |---------|-----------|
@@ -103,20 +101,6 @@ No app install needed on your phone — just use HTTPS URLs:
 | OPDS feed | `https://books.yourdomain.com/opds` |
 
 Replace `yourdomain.com` with the domain you configured in your Cloudflare Tunnel.
-
-### Tailscale (for private network access)
-
-Install [Tailscale](https://tailscale.com) on your phone and your server ([Step 2](./02-tailscale.md)). Then use the server's Tailscale IP:
-
-| Service | Tailscale URL |
-|---------|--------------|
-| Calibre-Web | `http://100.x.y.z:8083` |
-| Audiobookshelf | `http://100.x.y.z:13378` |
-| OPDS feed | `http://100.x.y.z:8083/opds` |
-
-Replace `100.x.y.z` with your server's Tailscale IP (find it with `tailscale ip -4` on the server).
-
-> **When to use which:** Cloudflare Tunnel is easier (no app on your phone) and gives you HTTPS. Tailscale is better when you want to access all services by IP without setting up individual hostnames.
 
 ## Choosing a Method
 
@@ -133,8 +117,7 @@ Replace `100.x.y.z` with your server's Tailscale IP (find it with `tailscale ip 
 ### Can't connect remotely
 
 - **Cloudflare Tunnel:** Verify the tunnel is running: `docker logs cloudflared`
-- **Tailscale:** Ensure Tailscale is running on both your phone and server: `tailscale status`
-- **Both:** Confirm Calibre-Web is running: `docker ps | grep calibre-web`
+- Confirm Calibre-Web is running: `docker ps | grep calibre-web`
 
 ### Downloaded book won't open
 

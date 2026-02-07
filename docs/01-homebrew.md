@@ -40,4 +40,4 @@ brew --version
 
 ## Next Step
 
-→ [Step 2: Configure Cloudflare Tunnel](./02-cloudflare-tunnel.md)
+→ [Step 3: Power Settings](./03-power-settings.md)

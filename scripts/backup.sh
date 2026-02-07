@@ -1,7 +1,7 @@
 #!/bin/bash
 # HomeServer Backup Script
 # Backs up PostgreSQL databases and Docker config volumes to ~/ServerBackups/
-# Run manually or via launchd (installed by 14-backup-setup.sh)
+# Run manually or via launchd (installed by 14-backup.sh)
 set -eo pipefail
 
 GREEN='\033[0;32m'

@@ -33,6 +33,8 @@ mkdir -p "$DRIVE/Media/Movies/4K"
 mkdir -p "$DRIVE/Media/Movies/HD"
 mkdir -p "$DRIVE/Media/TV/4K"
 mkdir -p "$DRIVE/Media/TV/HD"
+mkdir -p "$DRIVE/Media/Anime/Movies"
+mkdir -p "$DRIVE/Media/Anime/Series"
 mkdir -p "$DRIVE/Media/Music"
 
 # Books
@@ -50,6 +52,7 @@ mkdir -p "$DRIVE/Documents/Nextcloud"
 # Downloads
 mkdir -p "$DRIVE/Downloads/Complete/Movies"
 mkdir -p "$DRIVE/Downloads/Complete/TV"
+mkdir -p "$DRIVE/Downloads/Complete/Anime"
 mkdir -p "$DRIVE/Downloads/Complete/Books"
 mkdir -p "$DRIVE/Downloads/Incomplete"
 
@@ -71,13 +74,16 @@ tree -L 2 /Volumes/HomeServer
 
 ```
 /Volumes/HomeServer/
-├── Media/              # 5TB - Movies, TV, Music
+├── Media/              # 5TB - Movies, TV, Anime, Music
 │   ├── Movies/
 │   │   ├── 4K/
 │   │   └── HD/
 │   ├── TV/
 │   │   ├── 4K/
 │   │   └── HD/
+│   ├── Anime/
+│   │   ├── Movies/
+│   │   └── Series/
 │   └── Music/
 ├── Books/              # 350GB - eBooks and Audiobooks
 │   ├── eBooks/
@@ -87,7 +93,7 @@ tree -L 2 /Volumes/HomeServer
 ├── Documents/          # 200GB - Nextcloud files
 │   └── Nextcloud/
 ├── Downloads/          # 400GB - Download buffer
-│   ├── Complete/
+│   ├── Complete/       # Subdirs: Movies, TV, Anime, Books
 │   └── Incomplete/
 └── Backups/            # 200GB - Database backups
     ├── Databases/

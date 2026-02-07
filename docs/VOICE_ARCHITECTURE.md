@@ -7,7 +7,7 @@
 
 This document defines how real-time voice works in Butler, integrating LiveKit with Nanobot for AI-powered voice conversations.
 
-**Target latency:** 500-800ms from speech end to first audio response
+**Target latency:** ~650ms from speech end to first audio response
 
 ---
 
@@ -28,7 +28,7 @@ This document defines how real-time voice works in Butler, integrating LiveKit w
 | Service | Handles |
 |---------|---------|
 | **LiveKit Agents** | Audio capture, VAD, STT orchestration, TTS streaming |
-| **Nanobot** | LLM reasoning, tool calling, memory, personality |
+| **Butler API** | LLM reasoning (Claude via SSE), tool calling, memory, personality |
 
 ### 2. How to Share Tools Between Voice and Text?
 
@@ -37,9 +37,9 @@ This document defines how real-time voice works in Butler, integrating LiveKit w
 All channels route through Nanobot's API for tool execution. No duplication of tool logic.
 
 ```
-Voice:    PWA → LiveKit → Whisper → [Nanobot API] → Kokoro → LiveKit → PWA
-Text:     PWA → [Nanobot API] → PWA
-WhatsApp: WhatsApp → [Nanobot built-in] → WhatsApp
+Voice:    PWA → LiveKit → Groq STT → [Butler API] → Kokoro → LiveKit → PWA
+Text:     PWA → [Butler API] → PWA
+WhatsApp: WhatsApp → [Nanobot gateway] → WhatsApp
 ```
 
 ### 3. Session Management Across Channels
@@ -84,12 +84,12 @@ All channels write to the same database, enabling cross-channel continuity.
 │                    │                     │                     │                │
 │                    ▼                     ▼                     ▼                │
 │            ┌─────────────┐      ┌─────────────────┐    ┌─────────────┐         │
-│            │   Whisper   │      │     Nanobot     │    │   Kokoro    │         │
-│            │    :9000    │      │      :8100      │    │    :8880    │         │
-│            │    (STT)    │      │                 │    │    (TTS)    │         │
-│            │             │      │  • Claude API   │    │             │         │
-│            │  small model│      │  • Tool calling │    │  bf_emma    │         │
-│            │  ~200ms     │      │  • Memory       │    │  ~150ms     │         │
+│            │  Groq STT   │      │   Butler API   │    │   Kokoro    │         │
+│            │   (cloud)   │      │     :8000       │    │    :8880    │         │
+│            │             │      │                 │    │    (TTS)    │         │
+│            │  whisper-   │      │  • Claude SSE   │    │             │         │
+│            │  large-v3-  │      │  • Tool calling │    │  bf_emma    │         │
+│            │  turbo ~50ms│      │  • Memory       │    │  ~150ms     │         │
 │            └─────────────┘      │  • Personality  │    └─────────────┘         │
 │                                 └────────┬────────┘                             │
 │                                          │                                       │
@@ -126,13 +126,13 @@ All channels write to the same database, enabling cross-channel continuity.
    └─► Detects speech end (silence threshold)
 
 4. SPEECH-TO-TEXT
-   └─► Audio chunk sent to Whisper (HTTP POST /asr)
-   └─► Whisper returns transcription text
-   └─► ~200ms latency
+   └─► Audio sent to Groq Whisper API (cloud, whisper-large-v3-turbo)
+   └─► Groq returns transcription text
+   └─► ~50ms latency (cloud API, free tier)
 
 5. LLM PROCESSING
-   └─► Transcript sent to Nanobot API (POST /api/voice/process)
-   └─► Nanobot loads user context, personality, recent facts
+   └─► Transcript sent to Butler API (SSE streaming)
+   └─► Butler loads user context, personality, recent facts
    └─► Claude processes with tool definitions
    └─► Tools executed if needed (Home Assistant, etc.)
    └─► Response text generated
@@ -149,7 +149,7 @@ All channels write to the same database, enabling cross-channel continuity.
    └─► PWA subscribes, plays through speaker
    └─► PWA displays transcript bubble
 
-TOTAL: ~800ms from speech end to first audio
+TOTAL: ~650ms from speech end to first audio
 ```
 
 ### Latency Budget
@@ -158,10 +158,10 @@ TOTAL: ~800ms from speech end to first audio
 |------|--------|-------|
 | Audio to LiveKit | 50ms | WebRTC, near-instant |
 | VAD + Buffering | 100ms | Wait for speech end |
-| Whisper STT | 200ms | Using "small" model |
-| Nanobot + Claude | 300ms | API call + reasoning |
+| Groq Whisper STT | 50ms | Cloud API, whisper-large-v3-turbo |
+| Butler API + Claude | 300ms | SSE streaming + reasoning |
 | Kokoro TTS | 150ms | First audio chunk |
-| **Total** | **800ms** | Conversational feel |
+| **Total** | **650ms** | Conversational feel |
 
 ---
 
@@ -195,19 +195,18 @@ GET /api/users/me
 ### LiveKit Agents → Services
 
 ```python
-# STT: Whisper
-POST http://whisper:9000/asr
-  Body: audio file (wav/mp3)
-  Response: { "text": "transcribed text" }
+# STT: Groq Whisper (cloud API, via LiveKit plugin)
+# Uses groq.STT(model="whisper-large-v3-turbo") — no local service needed
 
-# LLM: Nanobot
-POST http://nanobot:8100/api/voice/process
-  Body: { "transcript": "...", "user_id": "...", "session_id": "..." }
-  Response: { "response": "..." }
+# LLM: Butler API (SSE streaming)
+POST http://butler-api:8000/api/chat
+  Headers: Authorization: Bearer <internal_api_key>
+  Body: { "message": "...", "user_id": "...", "session_id": "..." }
+  Response: SSE stream of text chunks
 
-# TTS: Kokoro
+# TTS: Kokoro (OpenAI-compatible endpoint)
 POST http://kokoro-tts:8880/v1/audio/speech
-  Body: { "input": "text", "voice": "bf_emma" }
+  Body: { "input": "text", "model": "kokoro", "voice": "bf_emma" }
   Response: audio stream (mp3)
 ```
 
@@ -215,29 +214,31 @@ POST http://kokoro-tts:8880/v1/audio/speech
 
 ## Docker Configuration
 
-### Addition to voice-stack/docker-compose.yml
+### voice-stack/docker-compose.yml (livekit-agent service)
 
 ```yaml
 services:
-  # ... existing livekit, whisper, kokoro-tts ...
+  # ... livekit server, kokoro-tts ...
 
-  livekit-agents:
+  livekit-agent:
     build: ../../butler/livekit-agent
-    container_name: livekit-agents
+    container_name: livekit-agent
     environment:
       - LIVEKIT_URL=ws://livekit:7880
-      - LIVEKIT_API_KEY=devkey
-      - LIVEKIT_API_SECRET=secret
-      - WHISPER_URL=http://whisper:9000
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY:-devkey}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET:-secret}
+      - GROQ_API_KEY=${GROQ_API_KEY}
       - KOKORO_URL=http://kokoro-tts:8880
-      - NANOBOT_URL=http://nanobot:8100
+      - BUTLER_API_URL=http://butler-api:8000
+      - BUTLER_API_KEY=${INTERNAL_API_KEY:-}
     depends_on:
-      - livekit
-      - whisper
-      - kokoro-tts
-    restart: unless-stopped
+      livekit:
+        condition: service_healthy
+      kokoro-tts:
+        condition: service_healthy
     networks:
-      - butler-net
+      - homeserver
+    restart: unless-stopped
 ```
 
 ---
@@ -287,7 +288,7 @@ function VoiceAssistantUI() {
 ## Security
 
 1. **JWT tokens** - PWA authenticates, receives scoped LiveKit token
-2. **Internal network** - Whisper, Kokoro, Nanobot not exposed externally
+2. **Internal network** - Kokoro, Butler API not exposed externally
 3. **Cloudflare Tunnel** - LiveKit accessible via tunnel, not directly on public internet
 4. **No stored audio** - Audio processed in-memory, not persisted
 
@@ -298,8 +299,8 @@ function VoiceAssistantUI() {
 | Decision | Trade-off | Why Acceptable |
 |----------|-----------|----------------|
 | HTTP between services | Slight latency vs gRPC | Simpler debugging, standard tooling |
-| Single Nanobot instance | No horizontal scaling | Home server, 1-2 users max |
-| Whisper "small" model | Less accurate than "large" | Faster response, good enough for commands |
+| Single Butler API instance | No horizontal scaling | Home server, 1-2 users max |
+| Groq cloud STT | Internet dependency for voice | ~50ms latency, free tier, better accuracy than local small model |
 | No audio storage | Can't replay conversations | Privacy, storage savings |
 
 ---
@@ -316,6 +317,6 @@ function VoiceAssistantUI() {
 ## References
 
 - [LiveKit Agents Documentation](https://docs.livekit.io/agents/)
-- [Whisper ASR Web Service](https://github.com/ahmetoner/whisper-asr-webservice)
+- [Groq API Documentation](https://console.groq.com/docs/speech-text)
 - [Kokoro TTS FastAPI](https://github.com/remsky/Kokoro-FastAPI)
 - [HKUDS/nanobot](https://github.com/HKUDS/nanobot)
