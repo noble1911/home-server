@@ -21,19 +21,22 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 
 from tools import DatabasePool
 
+from ..crypto import decrypt_password
 from ..deps import get_current_user, get_db_pool
-from ..oauth import revoke_google_token
-
-logger = logging.getLogger(__name__)
 from ..models import (
     AddFactRequest,
     OnboardingRequest,
+    ServiceCredentialsResponse,
     SoulConfig,
     UpdateButlerNameRequest,
     UpdateProfileRequest,
     UserFact,
     UserProfile,
 )
+from ..oauth import revoke_google_token
+from ..provisioning import provision_user_accounts
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -161,7 +164,7 @@ async def complete_onboarding(
     user_id: str = Depends(get_current_user),
     pool: DatabasePool = Depends(get_db_pool),
 ):
-    """Save onboarding data: name, butler name, and personality config."""
+    """Save onboarding data and auto-provision service accounts."""
     db = pool.pool
     soul_dict = req.soul.model_dump(exclude_none=True)
     soul_dict["butler_name"] = req.butlerName
@@ -174,7 +177,67 @@ async def complete_onboarding(
         req.name,
         json.dumps(soul_dict),
     )
-    return {"status": "ok"}
+
+    # Auto-provision service accounts if credentials were provided
+    service_accounts: list[dict] = []
+    if req.serviceUsername and req.servicePassword:
+        # Get user permissions (default to ["media", "home"] for new users)
+        raw_perms = await db.fetchval(
+            "SELECT permissions FROM butler.users WHERE id = $1", user_id
+        )
+        permissions = (
+            json.loads(raw_perms) if isinstance(raw_perms, str) else raw_perms
+        ) if raw_perms is not None else ["media", "home"]
+
+        try:
+            service_accounts = await provision_user_accounts(
+                user_id, req.serviceUsername, req.servicePassword, permissions, pool
+            )
+        except Exception:
+            logger.exception("Service provisioning failed for user %s", user_id)
+            service_accounts = [
+                {"service": "all", "username": req.serviceUsername,
+                 "status": "failed", "error": "Provisioning service unavailable"}
+            ]
+
+    return {"status": "ok", "serviceAccounts": service_accounts}
+
+
+@router.get("/user/service-credentials", response_model=ServiceCredentialsResponse)
+async def get_service_credentials(
+    user_id: str = Depends(get_current_user),
+    pool: DatabasePool = Depends(get_db_pool),
+):
+    """Retrieve the user's auto-provisioned service account credentials."""
+    db = pool.pool
+    rows = await db.fetch(
+        """SELECT service, username, password_encrypted, status, error_message, created_at
+           FROM butler.service_credentials
+           WHERE user_id = $1
+           ORDER BY service""",
+        user_id,
+    )
+
+    credentials = []
+    for row in rows:
+        cred: dict = {
+            "service": row["service"],
+            "username": row["username"],
+            "password": None,
+            "status": row["status"],
+            "createdAt": row["created_at"].isoformat(),
+        }
+        if row["password_encrypted"] and row["status"] == "active":
+            try:
+                cred["password"] = decrypt_password(row["password_encrypted"])
+            except Exception:
+                cred["password"] = None
+                cred["status"] = "decrypt_error"
+        if row["error_message"]:
+            cred["errorMessage"] = row["error_message"]
+        credentials.append(cred)
+
+    return {"credentials": credentials}
 
 
 @router.post("/user/facts", response_model=UserFact, status_code=201)

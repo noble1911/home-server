@@ -6,8 +6,8 @@ import { useConversationStore } from '../stores/conversationStore'
 import { usePushNotifications } from '../hooks/usePushNotifications'
 import { api, clearUserFacts, deleteUserAccount } from '../services/api'
 import ConfirmDialog from '../components/ConfirmDialog'
-import type { AdminUser, InviteCode, OAuthConnection, ToolPermission } from '../types/user'
-import { PERMISSION_INFO } from '../types/user'
+import type { AdminUser, InviteCode, OAuthConnection, ServiceCredential, ToolPermission } from '../types/user'
+import { PERMISSION_INFO, SERVICE_DISPLAY_NAMES } from '../types/user'
 
 interface ConnectionsResponse {
   connections: OAuthConnection[]
@@ -52,15 +52,21 @@ export default function Settings() {
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
   const [permSaving, setPermSaving] = useState(false)
 
+  // Service credentials state
+  const [serviceCredentials, setServiceCredentials] = useState<ServiceCredential[]>([])
+  const [credentialsLoading, setCredentialsLoading] = useState(true)
+  const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set())
+
   // Deletion state
   const [showClearFactsConfirm, setShowClearFactsConfirm] = useState(false)
   const [showDeleteAccountConfirm, setShowDeleteAccountConfirm] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
 
-  // Fetch OAuth connections on mount
+  // Fetch OAuth connections and service credentials on mount
   useEffect(() => {
     fetchConnections()
+    fetchServiceCredentials()
   }, [])
 
   // Fetch invite codes and user list on mount (admin only)
@@ -100,6 +106,26 @@ export default function Settings() {
     } finally {
       setConnectionsLoading(false)
     }
+  }
+
+  async function fetchServiceCredentials() {
+    try {
+      const data = await api.get<{ credentials: ServiceCredential[] }>('/user/service-credentials')
+      setServiceCredentials(data.credentials)
+    } catch {
+      setServiceCredentials([])
+    } finally {
+      setCredentialsLoading(false)
+    }
+  }
+
+  function togglePasswordVisibility(service: string) {
+    setVisiblePasswords(prev => {
+      const next = new Set(prev)
+      if (next.has(service)) next.delete(service)
+      else next.add(service)
+      return next
+    })
   }
 
   async function fetchInviteCodes() {
@@ -475,6 +501,63 @@ export default function Settings() {
           </div>
         </div>
       </section>
+
+      {/* My Service Accounts */}
+      {!credentialsLoading && serviceCredentials.length > 0 && (
+        <section className="card p-4">
+          <h2 className="text-sm font-medium text-butler-400 uppercase tracking-wide mb-4">
+            My Service Accounts
+            <span className="text-butler-600 ml-2 text-xs normal-case">synced</span>
+          </h2>
+          <p className="text-xs text-butler-500 mb-3">
+            Use these credentials to log into apps directly (web UI or mobile app).
+          </p>
+          <div className="space-y-3">
+            {serviceCredentials.map(cred => {
+              const info = SERVICE_DISPLAY_NAMES[cred.service] || { label: cred.service, description: '' }
+              const showPassword = visiblePasswords.has(cred.service)
+              return (
+                <div key={cred.service} className="p-3 bg-butler-800 rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <div className="text-sm text-butler-100">{info.label}</div>
+                      <div className="text-xs text-butler-500">{info.description}</div>
+                    </div>
+                    {cred.status === 'failed' && (
+                      <span className="px-2 py-0.5 rounded text-xs bg-red-900/50 text-red-300">Failed</span>
+                    )}
+                  </div>
+                  {cred.status === 'active' && (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-butler-400">Username</span>
+                        <span className="font-mono text-xs text-butler-200">{cred.username}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-butler-400">Password</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-xs text-butler-200">
+                            {showPassword ? cred.password : '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022'}
+                          </span>
+                          <button
+                            onClick={() => togglePasswordVisibility(cred.service)}
+                            className="text-xs text-accent hover:text-accent/80"
+                          >
+                            {showPassword ? 'Hide' : 'Show'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {cred.status === 'failed' && cred.errorMessage && (
+                    <div className="text-xs text-red-400 mt-1">{cred.errorMessage}</div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      )}
 
       {/* Your Tool Access - read-only view of permissions */}
       <section className="card p-4">

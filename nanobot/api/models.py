@@ -6,7 +6,7 @@ See: app/src/types/user.ts, app/src/types/conversation.ts
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 # --- Auth ---
@@ -128,11 +128,35 @@ class OnboardingRequest(BaseModel):
     name: str
     butlerName: str
     soul: SoulConfig
+    serviceUsername: str | None = Field(None, pattern=r'^[a-z0-9_]{3,20}$')
+    servicePassword: str | None = Field(None, min_length=6)
+
+    @model_validator(mode='after')
+    def check_credentials_pair(self):
+        if bool(self.serviceUsername) != bool(self.servicePassword):
+            raise ValueError('serviceUsername and servicePassword must both be provided or both omitted')
+        return self
 
 
 class AddFactRequest(BaseModel):
     content: str
     category: str
+
+
+# --- Service Credentials (auto-provisioned app accounts) ---
+
+
+class ServiceCredential(BaseModel):
+    service: str
+    username: str
+    password: str | None = None
+    status: str  # "active", "failed", "decrypt_error"
+    errorMessage: str | None = None
+    createdAt: str
+
+
+class ServiceCredentialsResponse(BaseModel):
+    credentials: list[ServiceCredential]
 
 
 # --- Chat ---

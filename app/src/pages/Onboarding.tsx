@@ -3,13 +3,25 @@ import { useAuthStore } from '../stores/authStore'
 import { useUserStore } from '../stores/userStore'
 import { api } from '../services/api'
 import type { SoulConfig } from '../types/user'
+import { SERVICE_DISPLAY_NAMES } from '../types/user'
 
-type Step = 'welcome' | 'name' | 'butler-name' | 'personality' | 'done'
+type Step = 'welcome' | 'name' | 'butler-name' | 'personality' | 'credentials' | 'done'
+
+const STEPS: Step[] = ['welcome', 'name', 'butler-name', 'personality', 'credentials', 'done']
 
 interface OnboardingData {
   name: string
   butlerName: string
   soul: SoulConfig
+  serviceUsername?: string
+  servicePassword?: string
+}
+
+interface ServiceAccountResult {
+  service: string
+  username: string
+  status: string
+  error?: string
 }
 
 export default function Onboarding() {
@@ -17,10 +29,32 @@ export default function Onboarding() {
   const [userName, setUserName] = useState('')
   const [butlerNameInput, setButlerNameInput] = useState('Jarvis')
   const [personality, setPersonality] = useState<SoulConfig['personality']>('balanced')
+  const [serviceUsername, setServiceUsername] = useState('')
+  const [servicePassword, setServicePassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [provisioningResults, setProvisioningResults] = useState<ServiceAccountResult[] | null>(null)
 
   const { setOnboardingComplete } = useAuthStore()
   const { fetchProfile } = useUserStore()
+
+  const usernameError = serviceUsername && !/^[a-z0-9_]{3,20}$/.test(serviceUsername)
+    ? 'Lowercase letters, numbers, and underscores only (3-20 chars)'
+    : null
+
+  const passwordError = servicePassword && servicePassword.length < 6
+    ? 'Password must be at least 6 characters'
+    : null
+
+  const confirmError = confirmPassword && confirmPassword !== servicePassword
+    ? 'Passwords do not match'
+    : null
+
+  const credentialsValid =
+    serviceUsername.length >= 3 &&
+    !usernameError &&
+    servicePassword.length >= 6 &&
+    servicePassword === confirmPassword
 
   const handleComplete = async () => {
     setIsSubmitting(true)
@@ -37,12 +71,27 @@ export default function Onboarding() {
         },
       }
 
-      await api.post('/user/onboarding', data)
+      // Include service credentials if provided
+      if (credentialsValid) {
+        data.serviceUsername = serviceUsername
+        data.servicePassword = servicePassword
+      }
+
+      const response = await api.post<{ status: string; serviceAccounts: ServiceAccountResult[] }>('/user/onboarding', data)
 
       // Fetch the complete profile
       await fetchProfile()
 
-      // Mark onboarding complete
+      // If service accounts were provisioned and some failed, show results
+      const accounts = response.serviceAccounts || []
+      const hasFailed = accounts.some(a => a.status === 'failed')
+      if (hasFailed) {
+        setProvisioningResults(accounts)
+        setIsSubmitting(false)
+        return
+      }
+
+      // All good — proceed
       setOnboardingComplete(true)
     } catch {
       // For development: allow mock completion
@@ -57,11 +106,11 @@ export default function Onboarding() {
       <div className="w-full max-w-md">
         {/* Progress Dots */}
         <div className="flex justify-center gap-2 mb-8">
-          {(['welcome', 'name', 'butler-name', 'personality', 'done'] as Step[]).map((s, i) => (
+          {STEPS.map((s, i) => (
             <div
               key={s}
               className={`w-2 h-2 rounded-full transition-colors ${
-                step === s ? 'bg-accent' : i < ['welcome', 'name', 'butler-name', 'personality', 'done'].indexOf(step) ? 'bg-accent/50' : 'bg-butler-700'
+                step === s ? 'bg-accent' : i < STEPS.indexOf(step) ? 'bg-accent/50' : 'bg-butler-700'
               }`}
             />
           ))}
@@ -177,14 +226,100 @@ export default function Onboarding() {
               <button onClick={() => setStep('butler-name')} className="btn btn-secondary flex-1">
                 Back
               </button>
-              <button onClick={() => setStep('done')} className="btn btn-primary flex-1">
+              <button onClick={() => setStep('credentials')} className="btn btn-primary flex-1">
                 Continue
               </button>
             </div>
           </div>
         )}
 
-        {step === 'done' && (
+        {step === 'credentials' && (
+          <div>
+            <h2 className="text-xl font-bold text-butler-100 mb-2">Create your app login</h2>
+            <p className="text-butler-400 mb-6">
+              This login will work across Jellyfin, Nextcloud, Immich, and other apps on your server.
+            </p>
+
+            <div className="space-y-4 mb-6">
+              <div>
+                <label htmlFor="service-username" className="block text-sm text-butler-300 mb-1">
+                  Username
+                </label>
+                <input
+                  id="service-username"
+                  type="text"
+                  value={serviceUsername}
+                  onChange={(e) => setServiceUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+                  placeholder="e.g., ron"
+                  className="input"
+                  autoFocus
+                  autoComplete="off"
+                />
+                {usernameError && (
+                  <p className="text-xs text-red-400 mt-1">{usernameError}</p>
+                )}
+              </div>
+
+              <div>
+                <label htmlFor="service-password" className="block text-sm text-butler-300 mb-1">
+                  Password
+                </label>
+                <input
+                  id="service-password"
+                  type="password"
+                  value={servicePassword}
+                  onChange={(e) => setServicePassword(e.target.value)}
+                  placeholder="At least 6 characters"
+                  className="input"
+                  autoComplete="new-password"
+                />
+                {passwordError && (
+                  <p className="text-xs text-red-400 mt-1">{passwordError}</p>
+                )}
+              </div>
+
+              <div>
+                <label htmlFor="confirm-password" className="block text-sm text-butler-300 mb-1">
+                  Confirm Password
+                </label>
+                <input
+                  id="confirm-password"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Re-enter your password"
+                  className="input"
+                  autoComplete="new-password"
+                />
+                {confirmError && (
+                  <p className="text-xs text-red-400 mt-1">{confirmError}</p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button onClick={() => setStep('personality')} className="btn btn-secondary flex-1">
+                Back
+              </button>
+              <button
+                onClick={() => setStep('done')}
+                disabled={!credentialsValid}
+                className="btn btn-primary flex-1 disabled:opacity-50"
+              >
+                Continue
+              </button>
+            </div>
+
+            <button
+              onClick={() => setStep('done')}
+              className="w-full mt-3 text-sm text-butler-500 hover:text-butler-300 transition-colors"
+            >
+              Skip for now
+            </button>
+          </div>
+        )}
+
+        {step === 'done' && !provisioningResults && (
           <div className="text-center">
             <div className="w-20 h-20 rounded-full bg-gradient-to-br from-green-500 to-green-700 flex items-center justify-center mx-auto mb-6">
               <svg className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
@@ -200,7 +335,41 @@ export default function Onboarding() {
               disabled={isSubmitting}
               className="btn btn-primary w-full py-3 disabled:opacity-50"
             >
-              {isSubmitting ? 'Setting up...' : 'Start Using Butler'}
+              {isSubmitting ? 'Creating your accounts...' : 'Start Using Butler'}
+            </button>
+          </div>
+        )}
+
+        {step === 'done' && provisioningResults && (
+          <div>
+            <h2 className="text-xl font-bold text-butler-100 mb-2">Account Setup Results</h2>
+            <p className="text-butler-400 mb-4">
+              Some service accounts couldn't be created. You can retry from Settings later.
+            </p>
+            <div className="space-y-2 mb-6">
+              {provisioningResults.map(result => {
+                const info = SERVICE_DISPLAY_NAMES[result.service] || { label: result.service, description: '' }
+                const ok = result.status === 'active'
+                return (
+                  <div key={result.service} className="flex items-center justify-between p-3 bg-butler-800 rounded-lg">
+                    <div>
+                      <div className="text-sm text-butler-100">{info.label}</div>
+                      <div className="text-xs text-butler-500">{info.description}</div>
+                    </div>
+                    {ok ? (
+                      <span className="text-xs text-green-400">Created</span>
+                    ) : (
+                      <span className="text-xs text-red-400">Failed</span>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+            <button
+              onClick={() => setOnboardingComplete(true)}
+              className="btn btn-primary w-full py-3"
+            >
+              Continue to Butler
             </button>
           </div>
         )}

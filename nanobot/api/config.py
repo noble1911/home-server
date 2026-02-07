@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     jwt_expire_hours: int = 1  # Access token: 1 hour (auto-refreshed by PWA)
     jwt_refresh_expire_hours: int = 4320  # Refresh token: 180 days
 
+    # Encryption key for service credentials (Fernet).
+    # Defaults to jwt_secret if not set. Use a separate key so JWT rotation
+    # doesn't break stored credentials.
+    encryption_key: str = ""
+
     # Invite codes (comma-separated, for household registration)
     invite_codes: str = "BUTLER-001"
 
@@ -60,6 +65,20 @@ class Settings(BaseSettings):
 
     # Ollama (for local embeddings)
     ollama_url: str = ""
+
+    # Audiobookshelf (user provisioning)
+    audiobookshelf_url: str = ""
+    audiobookshelf_admin_token: str = ""
+
+    # Nextcloud (user provisioning via OCS API)
+    nextcloud_url: str = ""
+    nextcloud_admin_user: str = ""
+    nextcloud_admin_password: str = ""
+
+    # Calibre-Web (user provisioning via admin form)
+    calibreweb_url: str = ""
+    calibreweb_admin_user: str = ""
+    calibreweb_admin_password: str = ""
 
     # Health & storage monitoring
     external_drive_path: str = "/mnt/external"
