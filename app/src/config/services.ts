@@ -89,16 +89,17 @@ export const services: Service[] = [
     url: serviceUrl('VITE_CALIBRE_URL', 8083, 'http://books.local'),
     category: 'books',
     guide: {
-      whatItDoes: 'Browse, read, and download ebooks from your home library right in the browser.',
+      whatItDoes: 'Browse, read, and download ebooks from your home library. Connect reader apps via OPDS for the best mobile experience.',
       steps: [
-        'Open Calibre-Web in your browser',
-        'Log in with your credentials',
-        'Find a book and tap its cover for details',
-        'Tap "Read in Browser" for instant reading, or download to your device',
+        'Open Calibre-Web in your browser and log in with your credentials',
+        'Find a book and tap its cover — use "Read in Browser" or download it',
+        'For mobile apps, add the OPDS feed in your reader: use your server URL followed by /opds',
+        'Enter your Calibre-Web username and password when the reader app asks',
       ],
       tips: [
+        'OPDS lets reader apps like KOReader, Moon+ Reader, and FBReader browse and download books directly — no browser needed',
         'EPUB format works best on most devices — use the Convert button if you need a different format',
-        'For the best mobile reading experience, download books and open them in Apple Books or Moon+ Reader',
+        'Apple Books (iOS) and Moon+ Reader (Android) give the best reading experience for downloaded books',
       ],
     },
   },
