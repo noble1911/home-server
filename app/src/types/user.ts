@@ -62,6 +62,23 @@ export interface OAuthConnection {
   connectedAt?: string
 }
 
+export interface ServiceCredential {
+  service: string
+  username: string
+  password?: string | null
+  status: 'active' | 'failed' | 'decrypt_error'
+  errorMessage?: string
+  createdAt: string
+}
+
+export const SERVICE_DISPLAY_NAMES: Record<string, { label: string; description: string }> = {
+  jellyfin: { label: 'Jellyfin', description: 'Movies, TV, Music' },
+  audiobookshelf: { label: 'Audiobookshelf', description: 'Audiobooks & Podcasts' },
+  nextcloud: { label: 'Nextcloud', description: 'File Sync & Storage' },
+  immich: { label: 'Immich', description: 'Photo Management' },
+  calibreweb: { label: 'Calibre-Web', description: 'E-Book Library' },
+}
+
 export interface AdminUser {
   id: string
   name: string

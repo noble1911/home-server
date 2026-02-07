@@ -425,6 +425,25 @@ The system supports **N users** with individual settings and preferences.
 | **Permissions** | Control what each user can access |
 | **Notification preferences** | Which WhatsApp updates to receive |
 | **Soul/Personality** | Custom interaction style per user |
+| **Service Accounts** | Auto-provisioned app logins (Jellyfin, Audiobookshelf, Nextcloud, Immich, Calibre-Web) |
+
+#### User Onboarding & Service Provisioning
+
+During first-time setup, new users complete a PWA wizard that collects:
+1. Their name and butler name/personality preferences
+2. A **single username + password** used across all self-hosted services
+
+Butler then **auto-provisions accounts** on each configured service:
+- **`media` permission** → Jellyfin, Audiobookshelf, Immich, Calibre-Web
+- **All users** → Nextcloud
+
+Provisioning details:
+- Each service is provisioned via its admin API (Jellyfin REST, Audiobookshelf REST, Nextcloud OCS, Immich REST)
+- **Calibre-Web** has no REST API — Butler scrapes its Flask admin forms with CSRF tokens
+- Credentials are **encrypted at rest** using Fernet (AES-128-CBC + HMAC-SHA256, keyed from JWT_SECRET)
+- Stored in `butler.service_credentials` table with `UNIQUE(user_id, service)` for idempotency
+- Services are skipped gracefully if admin credentials aren't configured (env vars)
+- Users can view their service accounts (with show/hide password toggle) on the Settings page
 
 ### Memory System
 
@@ -508,6 +527,20 @@ CREATE TABLE butler.conversation_history (
     content TEXT NOT NULL,
     summary TEXT,        -- AI-generated summary for context injection
     created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Auto-provisioned service account credentials (encrypted)
+CREATE TABLE butler.service_credentials (
+    id SERIAL PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES butler.users(id) ON DELETE CASCADE,
+    service TEXT NOT NULL,       -- 'jellyfin', 'audiobookshelf', 'nextcloud', 'immich', 'calibreweb'
+    username TEXT NOT NULL,
+    password_encrypted TEXT,     -- Fernet-encrypted, decrypted only at runtime
+    external_id TEXT,            -- service-specific user ID
+    status TEXT NOT NULL DEFAULT 'active',  -- 'active', 'failed', 'decrypt_error'
+    error_message TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE (user_id, service)
 );
 
 -- Indexes for fast retrieval

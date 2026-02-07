@@ -61,6 +61,20 @@ class Settings(BaseSettings):
     # Ollama (for local embeddings)
     ollama_url: str = ""
 
+    # Audiobookshelf (user provisioning)
+    audiobookshelf_url: str = ""
+    audiobookshelf_admin_token: str = ""
+
+    # Nextcloud (user provisioning via OCS API)
+    nextcloud_url: str = ""
+    nextcloud_admin_user: str = ""
+    nextcloud_admin_password: str = ""
+
+    # Calibre-Web (user provisioning via admin form)
+    calibreweb_url: str = ""
+    calibreweb_admin_user: str = ""
+    calibreweb_admin_password: str = ""
+
     # Health & storage monitoring
     external_drive_path: str = "/mnt/external"
     storage_thresholds: str = "70,80,90"

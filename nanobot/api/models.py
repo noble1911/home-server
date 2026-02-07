@@ -128,11 +128,29 @@ class OnboardingRequest(BaseModel):
     name: str
     butlerName: str
     soul: SoulConfig
+    serviceUsername: str | None = None
+    servicePassword: str | None = None
 
 
 class AddFactRequest(BaseModel):
     content: str
     category: str
+
+
+# --- Service Credentials (auto-provisioned app accounts) ---
+
+
+class ServiceCredential(BaseModel):
+    service: str
+    username: str
+    password: str | None = None
+    status: str  # "active", "failed", "decrypt_error"
+    errorMessage: str | None = None
+    createdAt: str
+
+
+class ServiceCredentialsResponse(BaseModel):
+    credentials: list[ServiceCredential]
 
 
 # --- Chat ---
