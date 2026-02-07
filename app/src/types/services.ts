@@ -1,3 +1,16 @@
+export interface MobileApp {
+  name: string
+  ios?: string
+  android?: string
+}
+
+export interface ServiceGuide {
+  whatItDoes: string
+  steps: string[]
+  mobileApp?: MobileApp
+  tips?: string[]
+}
+
 export interface Service {
   id: string
   name: string
@@ -7,6 +20,7 @@ export interface Service {
   mobileUrl?: string // Deep link for mobile apps
   category: ServiceCategory
   status?: 'online' | 'offline' | 'unknown'
+  guide?: ServiceGuide
 }
 
 export type ServiceCategory = 'media' | 'books' | 'photos' | 'files' | 'smart-home'
