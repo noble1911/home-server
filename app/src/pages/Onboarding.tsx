@@ -3,6 +3,7 @@ import { useAuthStore } from '../stores/authStore'
 import { useUserStore } from '../stores/userStore'
 import { api } from '../services/api'
 import type { SoulConfig } from '../types/user'
+import { SERVICE_DISPLAY_NAMES } from '../types/user'
 
 type Step = 'welcome' | 'name' | 'butler-name' | 'personality' | 'credentials' | 'done'
 
@@ -16,6 +17,13 @@ interface OnboardingData {
   servicePassword?: string
 }
 
+interface ServiceAccountResult {
+  service: string
+  username: string
+  status: string
+  error?: string
+}
+
 export default function Onboarding() {
   const [step, setStep] = useState<Step>('welcome')
   const [userName, setUserName] = useState('')
@@ -25,6 +33,7 @@ export default function Onboarding() {
   const [servicePassword, setServicePassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [provisioningResults, setProvisioningResults] = useState<ServiceAccountResult[] | null>(null)
 
   const { setOnboardingComplete } = useAuthStore()
   const { fetchProfile } = useUserStore()
@@ -68,12 +77,21 @@ export default function Onboarding() {
         data.servicePassword = servicePassword
       }
 
-      await api.post('/user/onboarding', data)
+      const response = await api.post<{ status: string; serviceAccounts: ServiceAccountResult[] }>('/user/onboarding', data)
 
       // Fetch the complete profile
       await fetchProfile()
 
-      // Mark onboarding complete
+      // If service accounts were provisioned and some failed, show results
+      const accounts = response.serviceAccounts || []
+      const hasFailed = accounts.some(a => a.status === 'failed')
+      if (hasFailed) {
+        setProvisioningResults(accounts)
+        setIsSubmitting(false)
+        return
+      }
+
+      // All good — proceed
       setOnboardingComplete(true)
     } catch {
       // For development: allow mock completion
@@ -301,7 +319,7 @@ export default function Onboarding() {
           </div>
         )}
 
-        {step === 'done' && (
+        {step === 'done' && !provisioningResults && (
           <div className="text-center">
             <div className="w-20 h-20 rounded-full bg-gradient-to-br from-green-500 to-green-700 flex items-center justify-center mx-auto mb-6">
               <svg className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
@@ -318,6 +336,40 @@ export default function Onboarding() {
               className="btn btn-primary w-full py-3 disabled:opacity-50"
             >
               {isSubmitting ? 'Creating your accounts...' : 'Start Using Butler'}
+            </button>
+          </div>
+        )}
+
+        {step === 'done' && provisioningResults && (
+          <div>
+            <h2 className="text-xl font-bold text-butler-100 mb-2">Account Setup Results</h2>
+            <p className="text-butler-400 mb-4">
+              Some service accounts couldn't be created. You can retry from Settings later.
+            </p>
+            <div className="space-y-2 mb-6">
+              {provisioningResults.map(result => {
+                const info = SERVICE_DISPLAY_NAMES[result.service] || { label: result.service, description: '' }
+                const ok = result.status === 'active'
+                return (
+                  <div key={result.service} className="flex items-center justify-between p-3 bg-butler-800 rounded-lg">
+                    <div>
+                      <div className="text-sm text-butler-100">{info.label}</div>
+                      <div className="text-xs text-butler-500">{info.description}</div>
+                    </div>
+                    {ok ? (
+                      <span className="text-xs text-green-400">Created</span>
+                    ) : (
+                      <span className="text-xs text-red-400">Failed</span>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+            <button
+              onClick={() => setOnboardingComplete(true)}
+              className="btn btn-primary w-full py-3"
+            >
+              Continue to Butler
             </button>
           </div>
         )}

@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     jwt_expire_hours: int = 1  # Access token: 1 hour (auto-refreshed by PWA)
     jwt_refresh_expire_hours: int = 4320  # Refresh token: 180 days
 
+    # Encryption key for service credentials (Fernet).
+    # Defaults to jwt_secret if not set. Use a separate key so JWT rotation
+    # doesn't break stored credentials.
+    encryption_key: str = ""
+
     # Invite codes (comma-separated, for household registration)
     invite_codes: str = "BUTLER-001"
 

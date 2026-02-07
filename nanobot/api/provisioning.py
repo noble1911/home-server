@@ -21,6 +21,9 @@ from .crypto import encrypt_password
 
 logger = logging.getLogger(__name__)
 
+# Timeout for external service API calls (seconds)
+_HTTP_TIMEOUT = aiohttp.ClientTimeout(total=15)
+
 # Permission-to-service mapping
 PERMISSION_SERVICE_MAP: dict[str, list[str]] = {
     "media": ["jellyfin", "audiobookshelf", "immich", "calibreweb"],
@@ -80,14 +83,14 @@ async def provision_user_accounts(
             logger.info("Skipping %s provisioning (not configured)", service)
             continue
 
-        # Idempotency check
-        existing = await db.fetchval(
-            "SELECT 1 FROM butler.service_credentials WHERE user_id = $1 AND service = $2",
+        # Idempotency check — only skip if already active
+        existing_status = await db.fetchval(
+            "SELECT status FROM butler.service_credentials WHERE user_id = $1 AND service = $2",
             user_id,
             service,
         )
-        if existing:
-            logger.info("User %s already has %s credentials, skipping", user_id, service)
+        if existing_status == "active":
+            logger.info("User %s already has active %s credentials, skipping", user_id, service)
             continue
 
         try:
@@ -95,9 +98,14 @@ async def provision_user_accounts(
             external_id = await provisioner(username, password)
             await db.execute(
                 """INSERT INTO butler.service_credentials
-                   (user_id, service, username, password_encrypted, external_id, status)
-                   VALUES ($1, $2, $3, $4, $5, 'active')
-                   ON CONFLICT (user_id, service) DO NOTHING""",
+                   (user_id, service, username, password_encrypted, external_id, status, error_message)
+                   VALUES ($1, $2, $3, $4, $5, 'active', NULL)
+                   ON CONFLICT (user_id, service) DO UPDATE SET
+                     username = EXCLUDED.username,
+                     password_encrypted = EXCLUDED.password_encrypted,
+                     external_id = EXCLUDED.external_id,
+                     status = 'active',
+                     error_message = NULL""",
                 user_id,
                 service,
                 username,
@@ -114,7 +122,10 @@ async def provision_user_accounts(
                 """INSERT INTO butler.service_credentials
                    (user_id, service, username, status, error_message)
                    VALUES ($1, $2, $3, 'failed', $4)
-                   ON CONFLICT (user_id, service) DO NOTHING""",
+                   ON CONFLICT (user_id, service) DO UPDATE SET
+                     username = EXCLUDED.username,
+                     status = 'failed',
+                     error_message = EXCLUDED.error_message""",
                 user_id,
                 service,
                 username,
@@ -137,7 +148,7 @@ async def provision_user_accounts(
 
 async def _provision_jellyfin(username: str, password: str) -> str:
     """Create Jellyfin user. Returns the Jellyfin user ID."""
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(timeout=_HTTP_TIMEOUT) as session:
         headers = {
             "Authorization": f'MediaBrowser Token="{settings.jellyfin_api_key}"',
         }
@@ -156,16 +167,33 @@ async def _provision_jellyfin(username: str, password: str) -> str:
             data = await resp.json()
             jellyfin_user_id = data["Id"]
 
-        # 2. Set password
-        async with session.post(
-            f"{settings.jellyfin_url}/Users/{jellyfin_user_id}/Password",
-            json={"NewPw": password},
-            headers=headers,
-        ) as resp:
-            if resp.status not in (200, 204):
-                raise RuntimeError(
-                    f"Jellyfin password set failed: HTTP {resp.status}"
+        # 2. Set password (clean up orphaned user on failure)
+        try:
+            async with session.post(
+                f"{settings.jellyfin_url}/Users/{jellyfin_user_id}/Password",
+                json={"NewPw": password},
+                headers=headers,
+            ) as resp:
+                if resp.status not in (200, 204):
+                    raise RuntimeError(
+                        f"Jellyfin password set failed: HTTP {resp.status}"
+                    )
+        except Exception:
+            # Best-effort cleanup: delete the orphaned user so retries can succeed
+            try:
+                async with session.delete(
+                    f"{settings.jellyfin_url}/Users/{jellyfin_user_id}",
+                    headers=headers,
+                ) as del_resp:
+                    logger.info(
+                        "Cleaned up orphaned Jellyfin user %s (HTTP %s)",
+                        jellyfin_user_id, del_resp.status,
+                    )
+            except Exception:
+                logger.warning(
+                    "Failed to clean up orphaned Jellyfin user %s", jellyfin_user_id
                 )
+            raise
 
         # 3. Set policies (enable all libraries, disable admin)
         async with session.post(
@@ -187,7 +215,7 @@ async def _provision_jellyfin(username: str, password: str) -> str:
 
 async def _provision_audiobookshelf(username: str, password: str) -> str:
     """Create Audiobookshelf user. Returns the ABS user ID."""
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(timeout=_HTTP_TIMEOUT) as session:
         headers = {"Authorization": f"Bearer {settings.audiobookshelf_admin_token}"}
 
         async with session.post(
@@ -206,7 +234,7 @@ async def _provision_audiobookshelf(username: str, password: str) -> str:
 
 async def _provision_nextcloud(username: str, password: str) -> str:
     """Create Nextcloud user via OCS API. Returns the username."""
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(timeout=_HTTP_TIMEOUT) as session:
         auth_str = (
             f"{settings.nextcloud_admin_user}:{settings.nextcloud_admin_password}"
         )
@@ -219,7 +247,7 @@ async def _provision_nextcloud(username: str, password: str) -> str:
 
         async with session.post(
             f"{settings.nextcloud_url}/ocs/v1.php/cloud/users",
-            data=f"userid={username}&password={password}",
+            data={"userid": username, "password": password},
             headers=headers,
             params={"format": "json"},
         ) as resp:
@@ -239,7 +267,7 @@ async def _provision_nextcloud(username: str, password: str) -> str:
 
 async def _provision_immich(username: str, password: str) -> str:
     """Create Immich user. Returns the Immich user ID."""
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(timeout=_HTTP_TIMEOUT) as session:
         headers = {"x-api-key": settings.immich_api_key}
 
         # Immich requires an email for user creation
@@ -265,7 +293,7 @@ async def _provision_calibreweb(username: str, password: str) -> str:
     Calibre-Web has no REST API, so we log in as admin and submit
     the user creation form with CSRF tokens.
     """
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(timeout=_HTTP_TIMEOUT) as session:
         base = settings.calibreweb_url
 
         # 1. GET login page to extract CSRF token
@@ -296,9 +324,19 @@ async def _provision_calibreweb(username: str, password: str) -> str:
                 raise RuntimeError(
                     f"Calibre-Web admin login failed: HTTP {resp.status}"
                 )
+            # Verify login succeeded — a failed login redirects back to /login
+            if resp.url and str(resp.url).rstrip("/").endswith("/login"):
+                raise RuntimeError(
+                    "Calibre-Web admin login failed: bad credentials (redirected back to login)"
+                )
 
         # 3. GET new user page to extract CSRF token
         async with session.get(f"{base}/admin/user/new") as resp:
+            # If we're not authenticated, this redirects to /login
+            if resp.url and str(resp.url).rstrip("/").endswith("/login"):
+                raise RuntimeError(
+                    "Calibre-Web admin session invalid: not authenticated"
+                )
             if resp.status != 200:
                 raise RuntimeError(
                     f"Calibre-Web new user page failed: HTTP {resp.status}"

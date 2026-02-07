@@ -195,6 +195,10 @@ async def complete_onboarding(
             )
         except Exception:
             logger.exception("Service provisioning failed for user %s", user_id)
+            service_accounts = [
+                {"service": "all", "username": req.serviceUsername,
+                 "status": "failed", "error": "Provisioning service unavailable"}
+            ]
 
     return {"status": "ok", "serviceAccounts": service_accounts}
 

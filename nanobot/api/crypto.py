@@ -1,6 +1,7 @@
 """Symmetric encryption for service credentials.
 
-Uses Fernet (AES-128-CBC + HMAC-SHA256) with a key derived from JWT_SECRET.
+Uses Fernet (AES-128-CBC + HMAC-SHA256) with a key derived from
+ENCRYPTION_KEY (falls back to JWT_SECRET for backwards compatibility).
 """
 
 import base64
@@ -12,8 +13,9 @@ from .config import settings
 
 
 def _derive_fernet_key() -> bytes:
-    """Derive a 32-byte Fernet key from JWT_SECRET via SHA-256."""
-    digest = hashlib.sha256(settings.jwt_secret.encode()).digest()
+    """Derive a 32-byte Fernet key from ENCRYPTION_KEY (or JWT_SECRET fallback)."""
+    secret = settings.encryption_key or settings.jwt_secret
+    digest = hashlib.sha256(secret.encode()).digest()
     return base64.urlsafe_b64encode(digest)
 
 
