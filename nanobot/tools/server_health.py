@@ -110,10 +110,6 @@ DEFAULT_SERVICES: dict[str, dict[str, Any]] = {
         "url": "http://livekit:7880",
         "stack": "voice",
     },
-    "whisper": {
-        "url": "http://whisper:9000/health",
-        "stack": "voice",
-    },
     "kokoro-tts": {
         "url": "http://kokoro-tts:8880/health",
         "stack": "voice",

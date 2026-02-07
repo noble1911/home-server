@@ -19,24 +19,6 @@ services:
       retries: 3
       start_period: 15s
 
-  whisper:
-    image: onerahmet/openai-whisper-asr-webservice:v1.9.1
-    container_name: whisper
-    environment:
-      - ASR_MODEL=small
-      - ASR_ENGINE=openai_whisper
-    ports:
-      - "9000:9000"
-    networks:
-      - homeserver
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 120s
-
   kokoro-tts:
     image: ghcr.io/remsky/kokoro-fastapi-cpu:v0.2.4
     container_name: kokoro-tts
