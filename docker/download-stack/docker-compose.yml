@@ -51,4 +51,6 @@ networks:
 
 volumes:
   qbittorrent-config:
+    name: qbittorrent-config
   prowlarr-config:
+    name: prowlarr-config

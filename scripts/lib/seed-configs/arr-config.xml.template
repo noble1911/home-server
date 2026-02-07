@@ -1,0 +1,11 @@
+<Config>
+  <ApiKey>__API_KEY__</ApiKey>
+  <AuthenticationMethod>None</AuthenticationMethod>
+  <Port>__PORT__</Port>
+  <BindAddress>*</BindAddress>
+  <SslPort>6969</SslPort>
+  <EnableSsl>False</EnableSsl>
+  <LaunchBrowser>False</LaunchBrowser>
+  <LogLevel>info</LogLevel>
+  <AnalyticsEnabled>False</AnalyticsEnabled>
+</Config>

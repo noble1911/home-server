@@ -13,6 +13,11 @@ DRIVE_PATH="${DRIVE_PATH:-/Volumes/HomeServer}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 COMPOSE_DIR="${SCRIPT_DIR}/../docker/books-stack"
 
+# Source shared helpers
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib/configure-helpers.sh"
+load_credentials || true
+
 echo -e "${BLUE}==>${NC} Deploying Books Stack..."
 
 # Check prerequisites
@@ -29,6 +34,32 @@ fi
 # Export for docker-compose
 export DRIVE_PATH
 
+# ─────────────────────────────────────────────
+# Pre-seed configs (before containers start)
+# ─────────────────────────────────────────────
+echo -e "${BLUE}==>${NC} Pre-seeding app configs..."
+
+if [[ -n "$READARR_API_KEY" ]] && ! volume_has_data "readarr-config"; then
+    CONFIG_XML=$(sed "s/__API_KEY__/${READARR_API_KEY}/; s/__PORT__/8787/" \
+        "$SCRIPT_DIR/lib/seed-configs/arr-config.xml.template")
+    seed_volume_file "readarr-config" "config.xml" "$CONFIG_XML"
+    echo -e "  ${GREEN}✓${NC} Readarr config.xml seeded"
+else
+    echo -e "  ${GREEN}✓${NC} Readarr config already exists (or no API key available)"
+fi
+
+# Create empty Calibre metadata.db if missing
+CALIBRE_LIB="${DRIVE_PATH}/Books/eBooks/Calibre Library"
+if [[ ! -f "${CALIBRE_LIB}/metadata.db" ]]; then
+    mkdir -p "${CALIBRE_LIB}"
+    # Create a minimal valid Calibre metadata.db using SQLite via Docker
+    docker run --rm -v "${CALIBRE_LIB}:/lib" alpine sh -c \
+        'apk add --no-cache sqlite >/dev/null 2>&1 && sqlite3 /lib/metadata.db "CREATE TABLE IF NOT EXISTS books(id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL DEFAULT \"Unknown\"); CREATE TABLE IF NOT EXISTS data(id INTEGER PRIMARY KEY, book INTEGER, format TEXT, uncompressed_size INTEGER, name TEXT);"' 2>/dev/null
+    echo -e "  ${GREEN}✓${NC} Empty Calibre metadata.db created"
+else
+    echo -e "  ${GREEN}✓${NC} Calibre metadata.db already exists"
+fi
+
 # Deploy containers and wait for health checks
 echo -e "${BLUE}==>${NC} Starting containers (waiting for health checks)..."
 cd "$COMPOSE_DIR"
@@ -38,50 +69,136 @@ else
     echo -e "  ${YELLOW}⚠${NC} Some services may still be starting..."
 fi
 
-# Check health
+# ─────────────────────────────────────────────
+# Audiobookshelf: Init admin + create libraries
+# ─────────────────────────────────────────────
 echo ""
-echo -e "${BLUE}==>${NC} Checking services..."
+echo -e "${BLUE}==>${NC} Configuring Audiobookshelf..."
 
-services=(
-    "Calibre-Web:8083"
-    "Audiobookshelf:13378"
-    "Readarr:8787"
-)
+ABS_STATUS=$(curl -sf http://localhost:13378/api/status 2>/dev/null)
 
-for service in "${services[@]}"; do
-    name="${service%%:*}"
-    port="${service##*:}"
-    if curl -s "http://localhost:${port}" &>/dev/null; then
-        echo -e "  ${GREEN}✓${NC} ${name} running at http://localhost:${port}"
+if echo "$ABS_STATUS" | grep -q '"isInit":true'; then
+    echo -e "  ${GREEN}✓${NC} Audiobookshelf already initialized"
+elif [[ -n "$ABS_ADMIN_USER" ]] && [[ -n "$ABS_ADMIN_PASS" ]]; then
+    # Create root admin user
+    curl -sf -X POST http://localhost:13378/init \
+        -H "Content-Type: application/json" \
+        -d "$(jq -n --arg u "$ABS_ADMIN_USER" --arg p "$ABS_ADMIN_PASS" \
+            '{newRoot: {username: $u, password: $p}}')" > /dev/null 2>&1
+
+    # Login to get token for library creation
+    ABS_LOGIN=$(curl -sf -X POST http://localhost:13378/login \
+        -H "Content-Type: application/json" \
+        -d "$(jq -n --arg u "$ABS_ADMIN_USER" --arg p "$ABS_ADMIN_PASS" \
+            '{username: $u, password: $p}')" 2>/dev/null)
+    ABS_TOKEN=$(echo "$ABS_LOGIN" | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
+
+    if [[ -n "$ABS_TOKEN" ]]; then
+        # Create audiobooks library
+        curl -sf -X POST http://localhost:13378/api/libraries \
+            -H "Authorization: Bearer ${ABS_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '{"name":"Audiobooks","folders":[{"fullPath":"/audiobooks"}],"mediaType":"book"}' > /dev/null 2>&1 || true
+
+        # Create ebooks library
+        curl -sf -X POST http://localhost:13378/api/libraries \
+            -H "Authorization: Bearer ${ABS_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '{"name":"eBooks","folders":[{"fullPath":"/books"}],"mediaType":"book"}' > /dev/null 2>&1 || true
+
+        echo -e "  ${GREEN}✓${NC} Audiobookshelf initialized with admin + libraries (Audiobooks, eBooks)"
     else
-        echo -e "  ${YELLOW}⚠${NC} ${name} may still be starting..."
+        echo -e "  ${YELLOW}⚠${NC} Audiobookshelf init succeeded but login failed — add libraries manually"
     fi
-done
+else
+    echo -e "  ${YELLOW}⚠${NC} No Audiobookshelf credentials — configure manually at http://localhost:13378"
+fi
+
+# ─────────────────────────────────────────────
+# Readarr: Root folders + download client
+# ─────────────────────────────────────────────
+echo ""
+echo -e "${BLUE}==>${NC} Configuring Readarr..."
+
+if [[ -n "$READARR_API_KEY" ]]; then
+    # Root folders (Readarr uses API v1)
+    EXISTING_RF=$(arr_api_get "http://localhost:8787/api/v1/rootfolder" "$READARR_API_KEY")
+
+    if echo "$EXISTING_RF" | grep -q '"/books/eBooks"'; then
+        echo -e "  ${GREEN}✓${NC} Readarr eBooks root folder already set"
+    else
+        arr_api_post "http://localhost:8787/api/v1/rootfolder" "$READARR_API_KEY" \
+            '{"path":"/books/eBooks","name":"eBooks","defaultMetadataProfileId":1,"defaultQualityProfileId":1}' > /dev/null 2>&1 || true
+        echo -e "  ${GREEN}✓${NC} Readarr root folder: /books/eBooks"
+    fi
+
+    if echo "$EXISTING_RF" | grep -q '"/books/Audiobooks"'; then
+        echo -e "  ${GREEN}✓${NC} Readarr Audiobooks root folder already set"
+    else
+        arr_api_post "http://localhost:8787/api/v1/rootfolder" "$READARR_API_KEY" \
+            '{"path":"/books/Audiobooks","name":"Audiobooks","defaultMetadataProfileId":1,"defaultQualityProfileId":1}' > /dev/null 2>&1 || true
+        echo -e "  ${GREEN}✓${NC} Readarr root folder: /books/Audiobooks"
+    fi
+
+    # Download client
+    EXISTING_DC=$(arr_api_get "http://localhost:8787/api/v1/downloadclient" "$READARR_API_KEY")
+    if echo "$EXISTING_DC" | grep -q 'QBittorrent'; then
+        echo -e "  ${GREEN}✓${NC} Readarr download client already set"
+    else
+        arr_api_post "http://localhost:8787/api/v1/downloadclient" "$READARR_API_KEY" \
+            '{"name":"qBittorrent","implementation":"QBittorrent","configContract":"QBittorrentSettings","protocol":"torrent","enable":true,"fields":[{"name":"host","value":"qbittorrent"},{"name":"port","value":8081},{"name":"username","value":"admin"},{"name":"password","value":"adminadmin"},{"name":"bookCategory","value":"books"}]}' > /dev/null 2>&1 || true
+        echo -e "  ${GREEN}✓${NC} Readarr download client: qBittorrent"
+    fi
+else
+    echo -e "  ${YELLOW}⚠${NC} No Readarr API key — configure manually at http://localhost:8787"
+fi
+
+# ─────────────────────────────────────────────
+# Calibre-Web: Set library path via SQLite
+# ─────────────────────────────────────────────
+echo ""
+echo -e "${BLUE}==>${NC} Configuring Calibre-Web..."
+
+# Calibre-Web needs a moment to create its app.db on first boot
+sleep 3
+
+CALIBRE_CONFIGURED=$(docker exec calibre-web sh -c \
+    'sqlite3 /config/app.db "SELECT config_calibre_dir FROM settings WHERE id=1;" 2>/dev/null' 2>/dev/null)
+
+if [[ "$CALIBRE_CONFIGURED" == "/books/Calibre Library" ]]; then
+    echo -e "  ${GREEN}✓${NC} Calibre-Web library path already set"
+elif docker exec calibre-web sh -c \
+    'sqlite3 /config/app.db "UPDATE settings SET config_calibre_dir = \"/books/Calibre Library\" WHERE id = 1;" 2>/dev/null' 2>/dev/null; then
+    echo -e "  ${GREEN}✓${NC} Calibre-Web library path set to /books/Calibre Library"
+    echo -e "  ${YELLOW}⚠${NC} Default login: admin / admin123 — change the password!"
+else
+    echo -e "  ${YELLOW}⚠${NC} Could not configure Calibre-Web — set library path manually"
+    echo "     Login at http://localhost:8083 (admin/admin123)"
+    echo "     Set database location to: /books/Calibre Library/metadata.db"
+fi
+
+# ─────────────────────────────────────────────
+# Prowlarr: Connect to Readarr
+# ─────────────────────────────────────────────
+echo ""
+echo -e "${BLUE}==>${NC} Connecting Prowlarr to Readarr..."
+
+if [[ -n "$PROWLARR_API_KEY" ]] && [[ -n "$READARR_API_KEY" ]]; then
+    EXISTING_APPS=$(arr_api_get "http://localhost:9696/api/v1/applications" "$PROWLARR_API_KEY")
+
+    if echo "$EXISTING_APPS" | grep -q 'Readarr'; then
+        echo -e "  ${GREEN}✓${NC} Prowlarr → Readarr already connected"
+    else
+        arr_api_post "http://localhost:9696/api/v1/applications" "$PROWLARR_API_KEY" \
+            "{\"name\":\"Readarr\",\"syncLevel\":\"fullSync\",\"implementation\":\"Readarr\",\"configContract\":\"ReadarrSettings\",\"fields\":[{\"name\":\"prowlarrUrl\",\"value\":\"http://prowlarr:9696\"},{\"name\":\"baseUrl\",\"value\":\"http://readarr:8787\"},{\"name\":\"apiKey\",\"value\":\"${READARR_API_KEY}\"}]}" > /dev/null
+        echo -e "  ${GREEN}✓${NC} Prowlarr → Readarr connected"
+    fi
+else
+    echo -e "  ${YELLOW}⚠${NC} Missing API keys — configure Prowlarr → Readarr manually"
+fi
 
 echo ""
-echo -e "${GREEN}✓${NC} Books stack deployed"
-echo ""
-echo -e "${YELLOW}Initial Setup Required:${NC}"
-echo ""
-echo "  1. Calibre-Web (http://localhost:8083):"
-echo "     - Default login: admin / admin123"
-echo "     - Set database location: /books/Calibre Library/metadata.db"
-echo "     - Enable uploads and Kindle email sending"
-echo ""
-echo "  2. Audiobookshelf (http://localhost:13378):"
-echo "     - Create admin account"
-echo "     - Add library: Audiobooks → /audiobooks"
-echo "     - Install mobile app for offline listening"
-echo ""
-echo "  3. Readarr (http://localhost:8787):"
-echo "     - Settings > Media Management > Root Folders:"
-echo "       - /books/eBooks (for ebooks)"
-echo "       - /books/Audiobooks (for audiobooks)"
-echo "     - Settings > Download Clients > Add qBittorrent"
-echo "     - Settings > General > Copy API key for Prowlarr"
-echo ""
-echo "  4. Prowlarr (http://localhost:9696):"
-echo "     - Settings > Apps > Add Readarr"
+echo -e "${GREEN}✓${NC} Books stack deployed and configured"
 echo ""
 echo -e "${YELLOW}Next:${NC} Deploy photos stack with:"
 echo "  ./scripts/10-photos-files.sh"

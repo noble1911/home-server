@@ -1,0 +1,5 @@
+[Preferences]
+WebUI\Port=8081
+Downloads\SavePath=/downloads/Complete
+Downloads\TempPath=/downloads/Incomplete
+Downloads\TempPathEnabled=true

@@ -13,6 +13,11 @@ DRIVE_PATH="${DRIVE_PATH:-/Volumes/HomeServer}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 COMPOSE_DIR="${SCRIPT_DIR}/../docker/photos-files-stack"
 
+# Source shared helpers
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib/configure-helpers.sh"
+load_credentials || true
+
 echo -e "${BLUE}==>${NC} Deploying Photos & Files Stack..."
 
 # Check prerequisites
@@ -38,22 +43,7 @@ else
     echo -e "  ${YELLOW}⚠${NC} Some services may still be starting..."
 fi
 
-# Check health
 echo ""
-echo -e "${BLUE}==>${NC} Checking services..."
-
-if curl -s http://localhost:2283/api/server-info/ping &>/dev/null; then
-    echo -e "  ${GREEN}✓${NC} Immich running at http://localhost:2283"
-else
-    echo -e "  ${YELLOW}⚠${NC} Immich may still be starting..."
-fi
-
-if curl -s http://localhost:8080 &>/dev/null; then
-    echo -e "  ${GREEN}✓${NC} Nextcloud running at http://localhost:8080"
-else
-    echo -e "  ${YELLOW}⚠${NC} Nextcloud may still be starting..."
-fi
-
 if docker exec immich-postgres pg_isready &>/dev/null; then
     echo -e "  ${GREEN}✓${NC} PostgreSQL running (port 5432)"
 else
@@ -65,27 +55,48 @@ echo ""
 echo -e "${BLUE}==>${NC} Setting up Butler schema for AI memory..."
 "$SCRIPT_DIR/init-butler-schema.sh"
 
+# ─────────────────────────────────────────────
+# Nextcloud: Auto-install via occ CLI
+# ─────────────────────────────────────────────
+echo ""
+echo -e "${BLUE}==>${NC} Configuring Nextcloud..."
+
+NC_STATUS=$(docker exec -u www-data nextcloud php occ status --output=json 2>/dev/null || echo '{}')
+
+if echo "$NC_STATUS" | grep -q '"installed":true'; then
+    echo -e "  ${GREEN}✓${NC} Nextcloud already installed"
+elif [[ -n "$NEXTCLOUD_ADMIN_USER" ]] && [[ -n "$NEXTCLOUD_ADMIN_PASS" ]]; then
+    docker exec -u www-data nextcloud php occ maintenance:install \
+        --database=pgsql \
+        --database-host=immich-postgres \
+        --database-name=nextcloud \
+        --database-user=postgres \
+        --database-pass=postgres \
+        --admin-user="${NEXTCLOUD_ADMIN_USER}" \
+        --admin-pass="${NEXTCLOUD_ADMIN_PASS}" \
+        --data-dir=/var/www/html/data \
+        2>/dev/null \
+        && echo -e "  ${GREEN}✓${NC} Nextcloud installed with admin account" \
+        || echo -e "  ${YELLOW}⚠${NC} Nextcloud install may have failed — check http://localhost:8080"
+
+    # Set trusted domains (localhost + container name + common LAN access)
+    docker exec -u www-data nextcloud php occ config:system:set trusted_domains 0 --value="localhost" 2>/dev/null
+    docker exec -u www-data nextcloud php occ config:system:set trusted_domains 1 --value="nextcloud" 2>/dev/null
+    docker exec -u www-data nextcloud php occ config:system:set trusted_domains 2 --value="localhost:8080" 2>/dev/null
+    echo -e "  ${GREEN}✓${NC} Nextcloud trusted domains configured"
+else
+    echo -e "  ${YELLOW}⚠${NC} No Nextcloud credentials — configure manually at http://localhost:8080"
+fi
+
 echo ""
 echo -e "${GREEN}✓${NC} Photos & Files stack deployed"
 echo ""
-echo -e "${YELLOW}Initial Setup Required:${NC}"
+echo -e "${YELLOW}Still needs manual setup:${NC}"
 echo ""
 echo "  1. Immich (http://localhost:2283):"
 echo "     - Create admin account on first visit"
 echo "     - Install mobile app (iOS/Android)"
 echo "     - Enable auto-backup in app settings"
-echo "     - ML processing runs automatically for face recognition"
-echo ""
-echo "  2. Nextcloud (http://localhost:8080):"
-echo "     - Create admin account on first visit"
-echo "     - Install desktop sync client"
-echo "     - Install mobile app for file access"
-echo ""
-echo -e "${YELLOW}PostgreSQL shared database:${NC}"
-echo "  - Host: localhost:5432 or immich-postgres:5432 (from containers)"
-echo "  - Immich DB: immich"
-echo "  - Nextcloud DB: nextcloud"
-echo "  - Butler schema: butler.* (users, user_facts, conversation_history, scheduled_tasks)"
 echo ""
 echo -e "${YELLOW}Next:${NC} Deploy smart home stack with:"
 echo "  ./scripts/11-smart-home.sh"

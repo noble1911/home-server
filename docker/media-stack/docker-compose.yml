@@ -97,7 +97,12 @@ networks:
 
 volumes:
   jellyfin-config:
+    name: jellyfin-config
   jellyfin-cache:
+    name: jellyfin-cache
   radarr-config:
+    name: radarr-config
   sonarr-config:
+    name: sonarr-config
   bazarr-config:
+    name: bazarr-config

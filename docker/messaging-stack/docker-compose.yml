@@ -25,6 +25,7 @@ services:
 
 volumes:
   whatsapp-data:
+    name: whatsapp-data
 
 networks:
   homeserver:
