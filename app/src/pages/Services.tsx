@@ -1,7 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import ServiceCard from '../components/services/ServiceCard'
+import ServiceDetail from '../components/services/ServiceDetail'
+import type { Service } from '../types/services'
 import type { ServiceCategory } from '../types/services'
-import { getSystemHealth, type ServiceStatus } from '../services/api'
+import type { ServiceCredential } from '../types/user'
+import { getSystemHealth, api, type ServiceStatus } from '../services/api'
 import { services as defaultServices, categoryLabels, applyHealthStatus } from '../config/services'
 
 const REFRESH_INTERVAL = 60_000
@@ -9,6 +12,8 @@ const REFRESH_INTERVAL = 60_000
 export default function Services() {
   const [healthData, setHealthData] = useState<ServiceStatus[] | null>(null)
   const [error, setError] = useState('')
+  const [selectedService, setSelectedService] = useState<Service | null>(null)
+  const [credentials, setCredentials] = useState<ServiceCredential[]>([])
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -26,6 +31,12 @@ export default function Services() {
     return () => clearInterval(id)
   }, [fetchStatus])
 
+  useEffect(() => {
+    api.get<{ credentials: ServiceCredential[] }>('/user/service-credentials')
+      .then(data => setCredentials(data.credentials))
+      .catch(() => setCredentials([]))
+  }, [])
+
   const services = healthData
     ? applyHealthStatus(defaultServices, healthData)
     : defaultServices
@@ -36,7 +47,7 @@ export default function Services() {
     <div className="p-4 space-y-6">
       <div>
         <h1 className="text-xl font-bold text-butler-100">Services</h1>
-        <p className="text-sm text-butler-400">Quick access to your home server apps</p>
+        <p className="text-sm text-butler-400">Tap a service to learn how to connect, or use the link icon to open it directly</p>
       </div>
 
       {error && (
@@ -54,11 +65,23 @@ export default function Services() {
             {services
               .filter(s => s.category === category)
               .map(service => (
-                <ServiceCard key={service.id} service={service} />
+                <ServiceCard
+                  key={service.id}
+                  service={service}
+                  onSelect={setSelectedService}
+                />
               ))}
           </div>
         </div>
       ))}
+
+      {selectedService && (
+        <ServiceDetail
+          service={selectedService}
+          credentials={credentials}
+          onClose={() => setSelectedService(null)}
+        />
+      )}
     </div>
   )
 }
