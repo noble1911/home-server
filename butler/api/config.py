@@ -16,6 +16,10 @@ class Settings(BaseSettings):
     max_tokens: int = 4096
     max_history_messages: int = 20
 
+    # Web search (Anthropic server-side tool)
+    web_search_enabled: bool = True
+    web_search_max_uses: int = 5
+
     # LiveKit (must match voice-stack/livekit.yaml)
     livekit_url: str = "ws://livekit:7880"
     livekit_api_key: str = "devkey"
