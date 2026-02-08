@@ -675,11 +675,13 @@ Custom Python tools interface directly with PostgreSQL (not Butler API's built-i
 | Voice | [@livekit/components-react](https://docs.livekit.io/realtime/client-sdks/react/) | Pre-built voice UI |
 | Styling | [Tailwind CSS](https://tailwindcss.com/) | Responsive design |
 | PWA | [Vite PWA Plugin](https://vite-pwa-org.netlify.app/) | Installable, offline-capable |
+| Markdown | [react-markdown](https://github.com/remarkjs/react-markdown) + [rehype-highlight](https://github.com/rehypejs/rehype-highlight) | Rich text & code highlighting |
 
 **Features:**
 - Push-to-talk (hold button to speak)
 - Tap-to-talk (toggle on/off)
 - Voice activity visualization
+- Markdown chat rendering (code blocks, lists, links)
 - Conversation history
 - User settings & preferences
 - PWA install prompt

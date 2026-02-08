@@ -1,4 +1,5 @@
 import type { Message } from '../../types/conversation'
+import MarkdownContent from '../chat/MarkdownContent'
 
 interface TranscriptBubbleProps {
   message: Message
@@ -24,8 +25,10 @@ export default function TranscriptBubble({ message, butlerName }: TranscriptBubb
         )}
         {message.role === 'assistant' && !message.content && !message.toolStatus ? (
           <p className="text-sm text-butler-400 animate-pulse">...</p>
-        ) : (
+        ) : isUser ? (
           <p className="text-sm">{message.content}</p>
+        ) : (
+          <MarkdownContent content={message.content} />
         )}
         {message.toolStatus && (
           <p className="text-xs text-butler-400 italic mt-1 animate-pulse">
