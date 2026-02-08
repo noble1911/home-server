@@ -27,7 +27,7 @@ import aiohttp
 from .base import Tool
 
 # Default timeout for HTTP requests (seconds)
-DEFAULT_TIMEOUT = 10
+DEFAULT_TIMEOUT = 30
 
 
 class ReadarrTool(Tool):
@@ -51,7 +51,7 @@ class ReadarrTool(Tool):
         Args:
             base_url: Readarr URL (e.g. http://readarr:8787)
             api_key: Readarr API key (Settings > General > Security)
-            timeout: HTTP request timeout in seconds (default: 10)
+            timeout: HTTP request timeout in seconds (default: 30)
         """
         self.base_url = (base_url or "").rstrip("/")
         self.api_key = api_key or ""
@@ -178,7 +178,11 @@ class ReadarrTool(Tool):
         except aiohttp.ClientError as e:
             return f"Error connecting to Readarr: {e}"
         except TimeoutError:
-            return "Error: Readarr request timed out"
+            return (
+                "Error: Readarr metadata lookup timed out. "
+                "This can happen with certain search terms. "
+                "Try a shorter or simpler search query (e.g. just the book title without author)."
+            )
         except Exception as e:
             return f"Error: {e}"
 

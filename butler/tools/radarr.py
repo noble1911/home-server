@@ -27,7 +27,7 @@ import aiohttp
 from .base import Tool
 
 # Default timeout for HTTP requests (seconds)
-DEFAULT_TIMEOUT = 10
+DEFAULT_TIMEOUT = 30
 
 
 class RadarrTool(Tool):
@@ -51,7 +51,7 @@ class RadarrTool(Tool):
         Args:
             base_url: Radarr URL (e.g. http://radarr:7878)
             api_key: Radarr API key (Settings > General > Security)
-            timeout: HTTP request timeout in seconds (default: 10)
+            timeout: HTTP request timeout in seconds (default: 30)
         """
         self.base_url = (base_url or "").rstrip("/")
         self.api_key = api_key or ""
