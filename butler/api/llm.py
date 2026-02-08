@@ -54,6 +54,25 @@ def tool_to_anthropic_schema(tool: Tool) -> dict:
     }
 
 
+def _build_tool_definitions(tools: dict[str, Tool]) -> list[dict]:
+    """Build the tools array for the Anthropic API.
+
+    Combines custom tool schemas with server-side tools (web search).
+    Server-side tools use a different format — they have a ``type`` key
+    and are executed by Anthropic's servers, not by us.
+    """
+    defs: list[dict] = [tool_to_anthropic_schema(t) for t in tools.values()]
+
+    if settings.web_search_enabled:
+        defs.append({
+            "type": "web_search_20250305",
+            "name": "web_search",
+            "max_uses": settings.web_search_max_uses,
+        })
+
+    return defs
+
+
 def _build_messages(
     user_message: str,
     history: list[dict] | None = None,
@@ -160,7 +179,7 @@ async def chat_with_tools(
         Claude's final text response
     """
     client = _get_client()
-    tool_definitions = [tool_to_anthropic_schema(t) for t in tools.values()]
+    tool_definitions = _build_tool_definitions(tools)
     messages = _build_messages(user_message, history, image=image)
 
     for round_num in range(max_tool_rounds):
@@ -168,12 +187,21 @@ async def chat_with_tools(
             model=settings.anthropic_model,
             max_tokens=settings.max_tokens,
             system=system_prompt,
-            tools=tool_definitions if tools else [],
+            tools=tool_definitions,
             messages=messages,
         )
 
-        # Extract tool use blocks
+        # Extract custom tool use blocks (server-side tools like web_search
+        # have type "server_tool_use" and are handled by Anthropic automatically)
         tool_use_blocks = [b for b in response.content if b.type == "tool_use"]
+
+        # Server-side tool pause — Anthropic needs another round-trip to
+        # finish processing (e.g. web search). Send the partial response
+        # back without executing any custom tools.
+        if not tool_use_blocks and response.stop_reason == "pause_turn":
+            logger.info("Server-side tool pause (round %d), continuing", round_num + 1)
+            messages.append({"role": "assistant", "content": response.content})
+            continue
 
         if not tool_use_blocks:
             # No tool use — extract text and return
@@ -245,7 +273,7 @@ async def stream_chat_with_tools(
         Text chunks as they arrive from Claude's streaming API
     """
     client = _get_client()
-    tool_definitions = [tool_to_anthropic_schema(t) for t in tools.values()]
+    tool_definitions = _build_tool_definitions(tools)
     messages = _build_messages(user_message, history, image=image)
 
     for round_num in range(max_tool_rounds):
@@ -253,16 +281,29 @@ async def stream_chat_with_tools(
             model=settings.anthropic_model,
             max_tokens=settings.max_tokens,
             system=system_prompt,
-            tools=tool_definitions if tools else [],
+            tools=tool_definitions,
             messages=messages,
         ) as stream:
-            async for text in stream.text_stream:
-                yield text
+            # Iterate raw events (instead of text_stream) so we can detect
+            # server-side tool activity and yield spoken feedback for TTS.
+            async for event in stream:
+                if event.type == "content_block_start":
+                    block = event.content_block
+                    if block.type == "server_tool_use":
+                        yield "Let me look that up. "
+                elif event.type == "content_block_delta":
+                    if event.delta.type == "text_delta":
+                        yield event.delta.text
 
             response = await stream.get_final_message()
 
-        # Check if Claude requested tool use
+        # Check if Claude requested custom tool use
         tool_use_blocks = [b for b in response.content if b.type == "tool_use"]
+
+        if not tool_use_blocks and response.stop_reason == "pause_turn":
+            logger.info("Server-side tool pause in voice stream (round %d)", round_num + 1)
+            messages.append({"role": "assistant", "content": response.content})
+            continue
 
         if not tool_use_blocks:
             return  # Done — all text has been yielded
@@ -321,23 +362,46 @@ async def stream_chat_with_events(
     Used by the PWA chat streaming endpoint to surface tool activity in the UI.
     """
     client = _get_client()
-    tool_definitions = [tool_to_anthropic_schema(t) for t in tools.values()]
+    tool_definitions = _build_tool_definitions(tools)
     messages = _build_messages(user_message, history, image=image)
 
     for round_num in range(max_tool_rounds):
+        web_search_active = False
+
         async with client.messages.stream(
             model=settings.anthropic_model,
             max_tokens=settings.max_tokens,
             system=system_prompt,
-            tools=tool_definitions if tools else [],
+            tools=tool_definitions,
             messages=messages,
         ) as stream:
-            async for text in stream.text_stream:
-                yield {"type": "text_delta", "delta": text}
+            # Iterate raw streaming events instead of text_stream so we can
+            # detect server-side tool activity (web search) and emit UI events.
+            async for event in stream:
+                if event.type == "content_block_start":
+                    block = event.content_block
+                    if block.type == "server_tool_use":
+                        web_search_active = True
+                        yield {"type": "tool_start", "tool": block.name}
+                    elif block.type == "web_search_tool_result" and web_search_active:
+                        web_search_active = False
+                        yield {"type": "tool_end", "tool": "web_search"}
+                elif event.type == "content_block_delta":
+                    if event.delta.type == "text_delta":
+                        yield {"type": "text_delta", "delta": event.delta.text}
+
+            # Safety: close indicator if stream ended mid-search
+            if web_search_active:
+                yield {"type": "tool_end", "tool": "web_search"}
 
             response = await stream.get_final_message()
 
         tool_use_blocks = [b for b in response.content if b.type == "tool_use"]
+
+        if not tool_use_blocks and response.stop_reason == "pause_turn":
+            logger.info("Server-side tool pause in event stream (round %d)", round_num + 1)
+            messages.append({"role": "assistant", "content": response.content})
+            continue
 
         if not tool_use_blocks:
             return

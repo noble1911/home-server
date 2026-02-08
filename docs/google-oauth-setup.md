@@ -38,8 +38,8 @@ This guide walks you through creating Google OAuth credentials so Butler can acc
 
 ## 4. Create OAuth 2.0 Credentials
 
-1. Go to **APIs & Services > Credentials**
-2. Click **Create Credentials > OAuth client ID**
+1. Go to **Clients** (in the left sidebar under your project)
+2. Click **Create OAuth client ID**
 3. Choose **Web application** as the application type
 4. Name it `Butler Web`
 5. Under **Authorized redirect URIs**, add:

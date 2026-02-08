@@ -49,6 +49,21 @@ BLUE='\033[0;34m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
+# Run a remote script with TTY access preserved.
+# Downloading to a temp file and running it (instead of curl | bash) ensures
+# stdin stays connected to the terminal so scripts can prompt for sudo passwords
+# and interactive input.
+run_script() {
+    local url="$1"
+    shift
+    local tmp
+    tmp=$(mktemp)
+    curl -fsSL "$url" -o "$tmp"
+    chmod +x "$tmp"
+    bash "$tmp" "$@" < /dev/tty
+    rm -f "$tmp"
+}
+
 echo -e "${GREEN}"
 echo "╔═══════════════════════════════════════════════════════════╗"
 echo "║            Mac Mini Home Server Setup                     ║"
@@ -145,42 +160,42 @@ export NEXTCLOUD_ADMIN_USER NEXTCLOUD_ADMIN_PASS
 
 # Phase 1: Foundation
 echo -e "\n${GREEN}Phase 1: Foundation${NC}"
-curl -fsSL "${BASE_URL}/01-homebrew.sh" | bash
-curl -fsSL "${BASE_URL}/03-power-settings.sh" | bash
+run_script "${BASE_URL}/01-homebrew.sh"
+run_script "${BASE_URL}/03-power-settings.sh"
 
 if [[ "$ENABLE_SSH" == "true" ]]; then
-    curl -fsSL "${BASE_URL}/04-ssh.sh" | bash
+    run_script "${BASE_URL}/04-ssh.sh"
 else
     echo -e "\n${GREEN}==>${NC} Skipping SSH setup (--no-ssh flag)"
 fi
 
-curl -fsSL "${BASE_URL}/05-orbstack.sh" | bash
-curl -fsSL "${BASE_URL}/06-external-drive.sh" | bash -s -- --drive-name="$DRIVE_NAME"
+run_script "${BASE_URL}/05-orbstack.sh"
+run_script "${BASE_URL}/06-external-drive.sh" --drive-name="$DRIVE_NAME"
 
 # Phase 2: Download Infrastructure
 echo -e "\n${GREEN}Phase 2: Download Infrastructure${NC}"
-curl -fsSL "${BASE_URL}/07-download-stack.sh" | bash
+run_script "${BASE_URL}/07-download-stack.sh"
 
 # Phase 3: Media Stack
 echo -e "\n${GREEN}Phase 3: Media Stack${NC}"
-curl -fsSL "${BASE_URL}/08-media-stack.sh" | bash
+run_script "${BASE_URL}/08-media-stack.sh"
 
 # Phase 4: Books & Audio
 echo -e "\n${GREEN}Phase 4: Books & Audio${NC}"
-curl -fsSL "${BASE_URL}/09-books-stack.sh" | bash
+run_script "${BASE_URL}/09-books-stack.sh"
 
 # Phase 5: Photos & Files
 echo -e "\n${GREEN}Phase 5: Photos & Files${NC}"
-curl -fsSL "${BASE_URL}/10-photos-files.sh" | bash
+run_script "${BASE_URL}/10-photos-files.sh"
 
 # Phase 6: Smart Home
 echo -e "\n${GREEN}Phase 6: Smart Home${NC}"
-curl -fsSL "${BASE_URL}/11-smart-home.sh" | bash
+run_script "${BASE_URL}/11-smart-home.sh"
 
 # Phase 7: Voice (optional)
 if [[ "$SKIP_VOICE" == "false" ]]; then
     echo -e "\n${GREEN}Phase 7: Voice Stack${NC}"
-    curl -fsSL "${BASE_URL}/12-voice-stack.sh" | bash
+    run_script "${BASE_URL}/12-voice-stack.sh"
 else
     echo -e "\n${YELLOW}==>${NC} Skipping voice stack (--skip-voice flag)"
 fi
@@ -188,7 +203,7 @@ fi
 # Phase 8: Butler API
 if [[ "$SKIP_BUTLER" == "false" ]]; then
     echo -e "\n${GREEN}Phase 8: Butler API${NC}"
-    curl -fsSL "${BASE_URL}/13-butler.sh" | bash
+    run_script "${BASE_URL}/13-butler.sh"
 else
     echo -e "\n${YELLOW}==>${NC} Skipping Butler API (--skip-butler flag)"
 fi

@@ -157,3 +157,39 @@ def create_push_channel(pool: Any):
         return count > 0
 
     return channel
+
+
+def create_whatsapp_channel(pool: Any, gateway_url: str):
+    """Create a NotificationDispatcher-compatible WhatsApp channel.
+
+    Sends alerts to all admin users via WhatsApp.
+
+    Returns:
+        Async callable with signature (severity, title, message) -> bool.
+    """
+    from tools import WhatsAppTool
+
+    tool = WhatsAppTool(gateway_url=gateway_url, db_pool=pool)
+
+    async def channel(severity: str, title: str, message: str) -> bool:
+        db = pool.pool
+        admins = await db.fetch(
+            "SELECT id FROM butler.users WHERE role = 'admin'"
+        )
+        sent = False
+        for row in admins:
+            try:
+                await tool.execute(
+                    action="send_message",
+                    user_id=row["id"],
+                    message=f"{title}\n{message}",
+                    category="general",
+                )
+                sent = True
+            except Exception:
+                logger.exception(
+                    "WhatsApp alert failed for user=%s", row["id"]
+                )
+        return sent
+
+    return channel

@@ -7,6 +7,7 @@ Same pipeline as voice but with 'pwa' channel tag.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import uuid
@@ -17,6 +18,7 @@ from starlette.responses import StreamingResponse
 
 from tools import DatabasePool, Tool
 
+from ..auto_learn import extract_and_store_facts
 from ..context import load_user_context
 from ..deps import get_current_user, get_db_pool, get_embedding_service, get_tools, get_user_tools
 from ..llm import chat_with_tools, stream_chat_with_events
@@ -93,6 +95,13 @@ async def text_chat(
             response_text,
             json.dumps({"message_id": message_id}),
         )
+
+    # Auto-learn: extract facts in the background (fire-and-forget)
+    asyncio.create_task(
+        extract_and_store_facts(
+            pool, user_id, req.message, response_text, get_embedding_service()
+        )
+    )
 
     return ChatResponse(response=response_text, message_id=message_id)
 
@@ -218,6 +227,13 @@ async def stream_text_chat(
                             full_text,
                             json.dumps({"message_id": message_id}),
                         )
+                    # Auto-learn: extract facts in the background
+                    asyncio.create_task(
+                        extract_and_store_facts(
+                            pool, user_id, req.message, full_text,
+                            get_embedding_service(),
+                        )
+                    )
                 except Exception:
                     logger.exception(
                         "Failed to save chat conversation history for user=%s",

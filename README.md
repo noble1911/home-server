@@ -2,84 +2,381 @@
 
 Self-hosted media server with AI voice assistant on Mac Mini M4.
 
-## Prerequisites
+---
 
-- **macOS on Apple Silicon** (Mac Mini M4 recommended)
-- **8TB external drive** plugged in and formatted (APFS or Mac OS Extended)
-- **API keys** to have ready (the setup script will prompt for each):
+## Installation Guide
 
-| Key | Required? | Where to get it |
-|-----|-----------|-----------------|
-| Anthropic API Key | **Yes** | [console.anthropic.com](https://console.anthropic.com/settings/keys) |
-| Groq API Key | Recommended | [console.groq.com](https://console.groq.com/keys) (free — for voice STT) |
-| OpenWeatherMap API Key | Optional | [openweathermap.org](https://openweathermap.org/api) (free tier) |
-| Home Assistant Token | Optional | Generated in HA after setup |
-| Google OAuth credentials | Optional | [Google Cloud Console](https://console.cloud.google.com/apis/credentials) — see [setup guide](docs/google-oauth-setup.md) |
-| Cloudflare Tunnel Token | **Recommended** | [Cloudflare Zero Trust](https://dash.cloudflare.com) — remote access for all services |
+This guide walks through everything needed to set up your home server from scratch. There are four phases:
 
-> Security secrets (JWT, LiveKit keys, internal API key) are **auto-generated** during setup.
+1. **Hardware Prep** — plug in, format drive
+2. **External Accounts** — create accounts and API keys that `setup.sh` will prompt for
+3. **Run setup.sh** — the automated installation
+4. **Post-Setup** — first-time login for each service, mobile apps, Alexa
 
-## Quick Start
+> **Time estimate:** Phase 2 takes ~30-45 minutes of web-based setup. Phase 3 runs for ~15-20 minutes (mostly unattended). Phase 4 takes ~20-30 minutes.
 
-Run everything at once:
+---
+
+## Phase 1: Hardware Prep
+
+### 1.1 External Drive
+
+Plug in your external USB drive and format it:
+
+1. Open **Disk Utility** (Spotlight → search "Disk Utility")
+2. Select your external drive in the sidebar
+3. Click **Erase**
+4. Set:
+   - **Name:** `HomeServer` (or your choice — pass `--drive-name=YourName` to setup.sh later)
+   - **Format:** APFS (recommended) or Mac OS Extended (Journaled)
+5. Click **Erase** and wait for it to finish
+
+Verify it appears at `/Volumes/HomeServer` (or your chosen name).
+
+### 1.2 Network
+
+Connect the Mac Mini to your router via **Ethernet cable** (recommended over Wi-Fi for media streaming).
+
+### 1.3 Find Your Local IP
+
+You'll need this throughout setup:
+
+```bash
+ipconfig getifaddr en0
+```
+
+Note this IP — all services will be accessible at `http://<this-ip>:<port>`.
+
+---
+
+## Phase 2: External Accounts & API Keys
+
+Set up these accounts **before** running `setup.sh`. The script will prompt for each key interactively.
+
+> **Tip:** Open a notes app and paste each key as you go — you'll enter them all at once during Phase 3.
+
+### Step 1: Anthropic API Key (Required)
+
+Butler's AI brain runs on Claude. You need an API key with credit loaded.
+
+1. Go to [console.anthropic.com](https://console.anthropic.com/)
+2. Create an account or sign in
+3. Go to **Settings → API Keys**
+4. Click **Create Key**, name it `butler`
+5. Copy the key (starts with `sk-ant-...`)
+6. Go to **Settings → Billing** and add credit (£5-10 to start)
+
+> **Cost:** ~£7/month for typical household use (~500 requests/month with multi-turn history).
+
+### Step 2: Groq API Key (Recommended)
+
+Groq provides free speech-to-text for the voice assistant.
+
+1. Go to [console.groq.com](https://console.groq.com/)
+2. Create an account
+3. Go to **API Keys** in the sidebar
+4. Click **Create API Key**, name it `butler`
+5. Copy the key (starts with `gsk_...`)
+
+> **Cost:** Free tier gives 8 hours of audio transcription per day — more than enough.
+
+### Step 3: Cloudflare Tunnel (Recommended)
+
+Cloudflare Tunnel lets you access all services remotely (phone, laptop, anywhere) without opening ports.
+
+#### 3a. Create Cloudflare Account
+
+1. Go to [dash.cloudflare.com](https://dash.cloudflare.com/)
+2. Sign up for a free account
+
+#### 3b. Add a Domain (optional but recommended)
+
+If you own a domain, add it to Cloudflare:
+
+1. Click **Add a site** in the dashboard
+2. Enter your domain and follow the setup steps
+3. Update your domain's nameservers to Cloudflare's
+
+> If you don't have a domain, Cloudflare can generate a free `*.cfargotunnel.com` subdomain — but a custom domain is nicer for URLs like `jellyfin.yourdomain.com`.
+
+#### 3c. Create the Tunnel
+
+1. In the Cloudflare dashboard, go to **Zero Trust → Networks → Tunnels**
+2. Click **Create a tunnel**
+3. Choose **Cloudflared** as the connector type
+4. Name it `homeserver`
+5. On the "Install connector" step, copy the **tunnel token** (a long string)
+6. Don't close this page yet — you'll add routes after setup.sh runs
+
+#### 3d. Plan Your Subdomains
+
+Decide which services you want accessible remotely. Example mapping:
+
+| Subdomain | Service | Port |
+|-----------|---------|------|
+| `butler.yourdomain.com` | Butler PWA | 3000 |
+| `jellyfin.yourdomain.com` | Jellyfin | 8096 |
+| `photos.yourdomain.com` | Immich | 2283 |
+| `books.yourdomain.com` | Audiobookshelf | 13378 |
+| `files.yourdomain.com` | Nextcloud | 8080 |
+| `ha.yourdomain.com` | Home Assistant | 8123 |
+| `ebooks.yourdomain.com` | Calibre-Web | 8083 |
+
+You'll configure these routes in the Cloudflare dashboard after `setup.sh` has deployed the services.
+
+### Step 4: Google OAuth Credentials (Optional)
+
+Required if you want Butler to read your Google Calendar and Gmail.
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project called `Butler Home Server`
+3. Go to **APIs & Services → Library**
+4. Enable **Google Calendar API** and **Gmail API**
+5. Go to **APIs & Services → OAuth consent screen**
+6. Choose **External**, fill in app name (`Butler`), your email
+7. Add scopes:
+   - `https://www.googleapis.com/auth/calendar.readonly`
+   - `https://www.googleapis.com/auth/gmail.readonly`
+   - `https://www.googleapis.com/auth/userinfo.email`
+8. Add your household Google accounts as **test users**
+9. Go to **APIs & Services → Credentials**
+10. Click **Create Credentials → OAuth client ID**
+11. Choose **Web application**, name it `Butler Web`
+12. Add **Authorized redirect URIs**:
+    - `http://localhost:8000/api/oauth/google/callback`
+    - `https://butler.yourdomain.com/api/oauth/google/callback` (if using Cloudflare Tunnel)
+13. Copy the **Client ID** and **Client Secret**
+
+> See [docs/google-oauth-setup.md](docs/google-oauth-setup.md) for detailed walkthrough with screenshots.
+
+### Step 5: OpenWeatherMap API Key (Optional)
+
+Required if you want Butler to answer weather questions.
+
+1. Go to [openweathermap.org/api](https://openweathermap.org/api)
+2. Sign up for a free account
+3. Go to **API keys** in your profile
+4. Copy your API key
+
+> **Cost:** Free tier gives 1,000 API calls/day — plenty for personal use.
+
+### Step 6: Gmail App Password for Kindle Delivery (Optional)
+
+Required if you want one-click "Send to Kindle" from Calibre-Web.
+
+1. Go to [myaccount.google.com](https://myaccount.google.com) → **Security**
+2. Enable **2-Step Verification** (required for App Passwords)
+3. Go to [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)
+4. Create an App Password named `Calibre-Web`
+5. Copy the 16-character password
+6. On Amazon, go to [Manage Your Content and Devices](https://www.amazon.co.uk/hz/mycd/myx#/home/settings/payment) → **Preferences** → **Personal Document Settings**
+7. Add your Gmail address to the **Approved Personal Document E-mail List**
+
+> See [docs/kindle-email-setup.md](docs/kindle-email-setup.md) for the full setup guide.
+
+### Checklist Before Running setup.sh
+
+Confirm you have these ready:
+
+| Item | Status |
+|------|--------|
+| External drive plugged in and formatted | ☐ |
+| Mac Mini connected via Ethernet | ☐ |
+| Anthropic API key | ☐ |
+| Groq API key (or skip voice) | ☐ |
+| Cloudflare Tunnel token (or skip remote access) | ☐ |
+| Google OAuth Client ID + Secret (optional) | ☐ |
+| OpenWeatherMap API key (optional) | ☐ |
+
+---
+
+## Phase 3: Run setup.sh
+
+### Quick Start
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/noble1911/home-server/main/setup.sh | bash
 ```
 
-Skip SSH if managing Mac Mini directly:
+The script will:
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/noble1911/home-server/main/setup.sh | bash -s -- --no-ssh
-```
+1. **Prompt for admin credentials** — usernames/passwords for Jellyfin, Audiobookshelf, and Nextcloud
+2. **Install Homebrew** and CLI tools
+3. **Configure power settings** — prevent sleep, auto-restart after power failure
+4. **Install OrbStack** — Docker runtime optimized for Apple Silicon
+5. **Set up external drive** — create directory structure on `/Volumes/HomeServer`
+6. **Deploy all Docker stacks** — downloads images and starts containers
+7. **Auto-configure services** — connects Radarr/Sonarr to Prowlarr and qBittorrent, creates admin accounts, sets up media libraries
+8. **Prompt for API keys** — enter the keys you collected in Phase 2
 
-Use a different external drive name:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/noble1911/home-server/main/setup.sh | bash -s -- --drive-name=MyDrive
-```
-
-Other flags:
+### Options
 
 | Flag | Description |
 |------|-------------|
-| `--no-ssh` | Skip SSH setup |
+| `--no-ssh` | Skip SSH setup (if managing Mac Mini directly) |
 | `--drive-name=NAME` | External drive name (default: `HomeServer`) |
-| `--skip-voice` | Skip voice stack deployment |
+| `--skip-voice` | Skip voice stack (LiveKit + Kokoro TTS) |
 | `--skip-butler` | Skip Butler API deployment |
+
+Examples:
+
+```bash
+# Skip SSH, use a different drive name
+curl -fsSL https://raw.githubusercontent.com/noble1911/home-server/main/setup.sh | bash -s -- --no-ssh --drive-name=MyDrive
+
+# Minimal install (no voice, no Butler)
+curl -fsSL https://raw.githubusercontent.com/noble1911/home-server/main/setup.sh | bash -s -- --skip-voice --skip-butler
+```
+
+### What Gets Deployed
+
+| Step | Script | Services |
+|------|--------|----------|
+| 1 | `01-homebrew.sh` | Homebrew package manager |
+| 2 | `03-power-settings.sh` | macOS power & sleep settings |
+| 3 | `04-ssh.sh` | SSH access (optional) |
+| 4 | `05-orbstack.sh` | OrbStack (Docker) |
+| 5 | `06-external-drive.sh` | External drive directory structure |
+| 6 | `07-download-stack.sh` | qBittorrent + Prowlarr |
+| 7 | `08-media-stack.sh` | Jellyfin + Radarr + Sonarr + Bazarr |
+| 8 | `09-books-stack.sh` | Calibre-Web + Audiobookshelf + Readarr |
+| 9 | `10-photos-files.sh` | Immich + Nextcloud |
+| 10 | `11-smart-home.sh` | Home Assistant + Cloudflare Tunnel |
+| 11 | `12-voice-stack.sh` | LiveKit + Kokoro TTS |
+| 12 | `13-butler.sh` | Butler API + PWA |
+
+Run individual steps if needed:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/noble1911/home-server/main/scripts/08-media-stack.sh | bash
+```
+
+Each step also has a manual guide in [docs/](docs/).
+
+### Credentials File
+
+Setup generates `~/.homeserver-credentials` with admin passwords and auto-generated API keys. This file is used by the scripts and is **not committed to git**. Keep it safe.
 
 ---
 
-## Setup Guide
+## Phase 4: Post-Setup Configuration
 
-| Step | Script | Manual | Description |
-|------|--------|--------|-------------|
-| 1 | [01-homebrew.sh](scripts/01-homebrew.sh) | [docs](docs/01-homebrew.md) | Install Homebrew package manager |
-| 3 | [03-power-settings.sh](scripts/03-power-settings.sh) | [docs](docs/03-power-settings.md) | Configure Mac to stay awake 24/7 |
-| 4 | [04-ssh.sh](scripts/04-ssh.sh) | [docs](docs/04-ssh.md) | Enable SSH *(optional)* |
-| 5 | [05-orbstack.sh](scripts/05-orbstack.sh) | [docs](docs/05-orbstack.md) | Install OrbStack (Docker) |
-| 6 | [06-external-drive.sh](scripts/06-external-drive.sh) | [docs](docs/06-external-drive.md) | Configure external drive & directories |
-| 7 | [07-download-stack.sh](scripts/07-download-stack.sh) | [docs](docs/07-download-stack.md) | Deploy qBittorrent + Prowlarr |
-| 8 | [08-media-stack.sh](scripts/08-media-stack.sh) | [docs](docs/08-media-stack.md) | Deploy Jellyfin + Radarr + Sonarr + Bazarr |
-| 9 | [09-books-stack.sh](scripts/09-books-stack.sh) | [docs](docs/09-books-stack.md) | Deploy Calibre-Web + Audiobookshelf + Readarr |
-| 10 | [10-photos-files.sh](scripts/10-photos-files.sh) | [docs](docs/10-photos-files.md) | Deploy Immich + Nextcloud |
-| 11 | [11-smart-home.sh](scripts/11-smart-home.sh) | [docs](docs/11-smart-home.md) | Deploy Home Assistant + Cloudflare Tunnel |
-| 12 | [12-voice-stack.sh](scripts/12-voice-stack.sh) | [docs](docs/12-voice-stack.md) | Deploy LiveKit + Kokoro TTS |
-| 13 | [13-butler.sh](scripts/13-butler.sh) | [docs](docs/13-butler.md) | Deploy Butler API (prompts for API keys) |
+Once `setup.sh` finishes, every service needs first-time configuration. Open each URL in a browser on the same network.
 
-Run individual steps:
-```bash
-# Example: just install Homebrew
-curl -fsSL https://raw.githubusercontent.com/noble1911/home-server/main/scripts/01-homebrew.sh | bash
+### 4.1 Configure Cloudflare Tunnel Routes
+
+Now that services are running, go back to the Cloudflare dashboard and add routes:
+
+1. Go to **Zero Trust → Networks → Tunnels** → click your tunnel → **Configure**
+2. For each service you want remotely accessible, click **Add a public hostname**:
+
+| Subdomain | Service (Type: HTTP) | URL |
+|-----------|---------------------|-----|
+| `butler` | `http://localhost:3000` | Butler PWA |
+| `butler-api` | `http://localhost:8000` | Butler API |
+| `jellyfin` | `http://localhost:8096` | Jellyfin |
+| `photos` | `http://localhost:2283` | Immich |
+| `books` | `http://localhost:13378` | Audiobookshelf |
+| `files` | `http://localhost:8080` | Nextcloud |
+| `ha` | `http://localhost:8123` | Home Assistant |
+| `ebooks` | `http://localhost:8083` | Calibre-Web |
+
+3. After adding routes, verify each service loads via its `https://subdomain.yourdomain.com` URL
+
+### 4.2 Set Up Butler (AI Assistant)
+
+Butler uses **invite codes** for registration. The first person to log in becomes the admin.
+
+1. Open `http://<server-ip>:3000`
+2. Enter your admin invite code (default: `BUTLER-001`, or what you chose during setup)
+3. Complete onboarding (set your name, preferences)
+4. To add household members: **Settings → Generate Invite Code** → share the 6-character code
+
+### 4.3 Set Up Media Services
+
+| Service | URL | First-Time Setup |
+|---------|-----|-----------------|
+| **Jellyfin** | `http://<server-ip>:8096` | Auto-configured by setup — verify libraries (Movies, TV, Music) are present |
+| **Radarr** | `http://<server-ip>:7878` | Auto-configured — add password in Settings → General → Security |
+| **Sonarr** | `http://<server-ip>:8989` | Auto-configured — add password in Settings → General → Security |
+| **Prowlarr** | `http://<server-ip>:9696` | Auto-configured with public indexers — optionally add private indexers ([guide](docs/prowlarr-indexers.md)) |
+| **qBittorrent** | `http://<server-ip>:8081` | Auto-configured — check container logs for temp password if needed |
+| **Bazarr** | `http://<server-ip>:6767` | Auto-configured — connected to Radarr + Sonarr |
+
+> Radarr, Sonarr, Prowlarr, and qBittorrent are admin-only. Household members interact with media through Jellyfin.
+
+### 4.4 Set Up Books & Audio
+
+| Service | URL | First-Time Setup |
+|---------|-----|-----------------|
+| **Audiobookshelf** | `http://<server-ip>:13378` | Auto-configured — create accounts for household members |
+| **Calibre-Web** | `http://<server-ip>:8083` | Default login: `admin` / `admin123` — **change password immediately** |
+| **Readarr** | `http://<server-ip>:8787` | Auto-configured — add password in Settings |
+
+### 4.5 Set Up Photos & Files
+
+| Service | URL | First-Time Setup |
+|---------|-----|-----------------|
+| **Immich** | `http://<server-ip>:2283` | Create admin account, invite household members, install mobile app and enable auto-backup |
+| **Nextcloud** | `http://<server-ip>:8080` | Auto-configured — install desktop/mobile sync clients |
+
+### 4.6 Set Up Home Assistant
+
+1. Open `http://<server-ip>:8123`
+2. Create admin account, set location/timezone/units
+3. Add smart device integrations: **Settings → Devices & Services → Add Integration**
+4. Generate a **Long-Lived Access Token**: click your profile (bottom left) → **Security** → **Create Token**
+5. Add the token to `butler/.env` as `HA_TOKEN` and restart Butler:
+   ```bash
+   cd butler && docker compose down && docker compose up -d
+   ```
+
+### 4.7 Install Mobile Apps
+
+| App | Platform | Purpose |
+|-----|----------|---------|
+| [Jellyfin](https://jellyfin.org/downloads/) | iOS / Android | Stream movies & TV |
+| [Immich](https://immich.app/docs/features/mobile-app) | iOS / Android | Photo backup & browsing |
+| [Audiobookshelf](https://audiobookshelf.org/) | iOS / Android | Audiobook streaming with offline downloads |
+| [Nextcloud](https://nextcloud.com/install/#install-clients) | iOS / Android / Desktop | File sync |
+| [Home Assistant](https://companion.home-assistant.io/) | iOS / Android | Smart home control |
+
+### 4.8 Set Up Alexa Integration (Optional)
+
+If you have Amazon Echo devices, you can control Home Assistant via Alexa for free using haaska + AWS Lambda.
+
+```
+"Alexa, turn on the lights" → Echo → AWS Lambda (haaska) → Cloudflare Tunnel → Home Assistant
 ```
 
-Or follow the manual docs for step-by-step instructions.
+This requires:
+- A free **AWS account** (Lambda free tier)
+- An **Amazon Developer account** (for the Alexa skill)
+- Home Assistant running with a Cloudflare Tunnel
+
+> See [docs/15-alexa-haaska.md](docs/15-alexa-haaska.md) for the full step-by-step guide.
+
+### Recommended Setup Order
+
+1. **Cloudflare Tunnel routes** — get remote access working first
+2. **Butler PWA** — enter invite code, complete onboarding
+3. **Jellyfin** — verify auto-configured libraries, create household accounts
+4. **Immich** — create admin, install mobile apps, enable photo backup
+5. **Home Assistant** — add devices, generate token for Butler
+6. **Audiobookshelf** — create household accounts
+7. **Prowlarr** — add private indexers if you have any
+8. **Alexa** — set up haaska for voice control (optional)
 
 ---
 
 ## Configuration
 
-All environment variables live in `butler/.env` (created from `.env.example` during step 13). The setup script prompts for each value interactively.
+All environment variables live in `butler/.env` (created from `.env.example` during setup). To reconfigure:
+
+```bash
+cd butler && nano .env
+docker compose down && docker compose up -d
+```
 
 | Variable | Purpose | Auto-generated? |
 |----------|---------|-----------------|
@@ -97,104 +394,22 @@ All environment variables live in `butler/.env` (created from `.env.example` dur
 | `INVITE_CODES` | Admin bootstrap invite code | Defaults to `BUTLER-001` |
 | `DB_USER` / `DB_PASSWORD` | PostgreSQL (shared with Immich) | Defaults to `postgres` |
 
-To reconfigure after setup, edit `butler/.env` and restart:
-```bash
-cd butler && docker compose down && docker compose up -d
-```
-
----
-
-## After Setup: First-Time Login for Each Service
-
-Once `setup.sh` finishes, every service needs its own first-time setup. Open each URL in a browser on the same network (or remotely via your Cloudflare Tunnel domain) and create an admin account.
-
-### Butler (AI Assistant)
-
-Butler uses **invite codes** for registration. The first person to log in becomes the **admin**.
-
-**First-time setup (admin):**
-1. During `setup.sh`, you chose an admin invite code (default: `BUTLER-001`)
-2. Open the PWA at `http://<server-ip>:3000`
-3. Enter your admin invite code — this creates your account with admin privileges
-4. Complete onboarding (set your name, preferences)
-
-**Adding household members:**
-1. Open **Settings** in the PWA (you must be admin)
-2. Tap **Generate Invite Code** — a 6-character code is created (valid for 7 days)
-3. Share the code with the person
-4. They enter it at `http://<server-ip>:3000` to create their account
-5. Used codes cannot be reused. You can revoke unused codes from Settings.
-
-**Sessions & multi-device:**
-- Access tokens expire after 1 hour and refresh automatically in the background
-- Refresh tokens last 180 days — users stay logged in across device restarts
-- No need to re-invite someone just because their session expired
-- To use Butler on a new device, log in with the same invite code (admin code) or ask the admin for a new code
-
-### Media Services
-
-| Service | URL | First Login | Mobile App |
-|---------|-----|-------------|------------|
-| **Jellyfin** | `http://<server-ip>:8096` | Create admin account on first visit, then create accounts for household members | [Jellyfin](https://jellyfin.org/downloads/) (iOS/Android) |
-| **Radarr** | `http://<server-ip>:7878` | No auth by default — add password in Settings > General > Security | Admin only (no mobile app) |
-| **Sonarr** | `http://<server-ip>:8989` | No auth by default — add password in Settings > General > Security | Admin only (no mobile app) |
-| **Prowlarr** | `http://<server-ip>:9696` | No auth by default — add password in Settings > General > Security | Admin only (no mobile app) |
-| **qBittorrent** | `http://<server-ip>:8081` | Default: `admin` / check container logs for temp password | Admin only |
-
-> **Tip:** Radarr, Sonarr, Prowlarr, and qBittorrent are admin-only tools. No need to create accounts for household members — they interact with media through Jellyfin.
-
-### Books & Audio
-
-| Service | URL | First Login | Mobile App |
-|---------|-----|-------------|------------|
-| **Audiobookshelf** | `http://<server-ip>:13378` | Create admin account on first visit, then invite household members | [Audiobookshelf](https://audiobookshelf.org/) (iOS/Android) |
-| **Calibre-Web** | `http://<server-ip>:8083` | Default: `admin` / `admin123` — change immediately | Browser only |
-| **Readarr** | `http://<server-ip>:8787` | No auth by default — add password in Settings | Admin only |
-
-### Photos & Files
-
-| Service | URL | First Login | Mobile App |
-|---------|-----|-------------|------------|
-| **Immich** | `http://<server-ip>:2283` | Create admin account on first visit, then invite household members | [Immich](https://immich.app/docs/features/mobile-app) (iOS/Android) — enable auto-backup |
-| **Nextcloud** | `http://<server-ip>:8080` | Create admin account on first visit | [Nextcloud](https://nextcloud.com/install/#install-clients) (iOS/Android/Desktop) |
-
-### Smart Home
-
-| Service | URL | First Login | Mobile App |
-|---------|-----|-------------|------------|
-| **Home Assistant** | `http://<server-ip>:8123` | Create admin account, configure location/units, add smart devices | [Home Assistant](https://companion.home-assistant.io/) (iOS/Android) |
-
-After setting up Home Assistant, generate a **Long-Lived Access Token** (Profile > Security) and add it to `butler/.env` as `HA_TOKEN` so Butler can control your devices.
-
-### Recommended Setup Order
-
-1. **Jellyfin** — create admin + household accounts
-2. **Immich** — create admin, install mobile apps, enable photo backup
-3. **Home Assistant** — add devices, generate token for Butler
-4. **Audiobookshelf** — create admin + household accounts
-5. **Butler PWA** — enter invite code, complete onboarding
-6. ***arr stack** — configure indexers in Prowlarr, connect to Radarr/Sonarr/Readarr (admin only)
-
----
-
-## Documentation
-
-- **[HOMESERVER_PLAN.md](HOMESERVER_PLAN.md)** - Complete architecture and implementation plan
-- **[docs/](docs/)** - Step-by-step setup guides
-- **[docs/google-oauth-setup.md](docs/google-oauth-setup.md)** - Google OAuth setup for Calendar integration
+> Security secrets (JWT, LiveKit keys, internal API key) are auto-generated during setup.
 
 ---
 
 ## What Gets Installed
 
 ### Infrastructure
+
 | Component | Purpose |
 |-----------|---------|
 | [Homebrew](https://brew.sh/) | Package manager for macOS |
-| [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) | Secure remote access for all user-facing services |
 | [OrbStack](https://orbstack.dev/) | Docker for macOS (optimized for Apple Silicon) |
+| [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) | Secure remote access (no open ports) |
 
 ### Media & Downloads
+
 | Component | Purpose | Port |
 |-----------|---------|------|
 | [Jellyfin](https://jellyfin.org/) | Media streaming server | 8096 |
@@ -205,45 +420,70 @@ After setting up Home Assistant, generate a **Long-Lived Access Token** (Profile
 | [qBittorrent](https://www.qbittorrent.org/) | Torrent client | 8081 |
 
 ### Books & Audio
+
 | Component | Purpose | Port |
 |-----------|---------|------|
-| [Calibre-Web](https://github.com/janeczku/calibre-web) | E-book library | 8083 |
+| [Calibre-Web](https://github.com/janeczku/calibre-web) | E-book library + Kindle delivery | 8083 |
 | [Audiobookshelf](https://www.audiobookshelf.org/) | Audiobook streaming | 13378 |
 | [Readarr](https://readarr.com/) | Book automation | 8787 |
 
 ### Photos & Files
+
 | Component | Purpose | Port |
 |-----------|---------|------|
 | [Immich](https://immich.app/) | Photo management with AI | 2283 |
 | [Nextcloud](https://nextcloud.com/) | File sync & collaboration | 8080 |
 
 ### Smart Home
+
 | Component | Purpose | Port |
 |-----------|---------|------|
 | [Home Assistant](https://www.home-assistant.io/) | Smart home hub | 8123 |
-| Cloudflare Tunnel | Secure remote access for all user-facing services | - |
 
 ### Voice Assistant
+
 | Component | Purpose | Port |
 |-----------|---------|------|
 | [LiveKit](https://livekit.io/) | WebRTC server | 7880 |
-| [Groq Whisper](https://console.groq.com/) | Speech-to-text (cloud, free tier) | - |
-| LiveKit Agent | Voice pipeline orchestrator | - |
-| [Kokoro TTS](https://github.com/remsky/Kokoro-FastAPI) | Text-to-speech | 8880 |
+| [Groq Whisper](https://console.groq.com/) | Speech-to-text (cloud, free) | - |
+| [Kokoro TTS](https://github.com/remsky/Kokoro-FastAPI) | Text-to-speech (local) | 8880 |
 
 ### AI Butler
+
 | Component | Purpose | Port |
 |-----------|---------|------|
-| Butler API | FastAPI backend (chat, voice, auth, tools, OAuth) | 8000 |
+| Butler API | FastAPI backend (chat, voice, auth, tools) | 8000 |
 | Butler PWA | React web app (voice + chat interface) | 3000 |
 
-### Integrations (configured via Butler tools)
-| Component | Purpose | Setup |
-|-----------|---------|-------|
-| Weather | Forecasts via OpenWeatherMap | API key in `.env` |
-| Google Calendar | Calendar queries via OAuth | [setup guide](docs/google-oauth-setup.md) |
-| Home Assistant | Smart home control | HA token in `.env` |
-| Memory | User facts & preferences in PostgreSQL | Automatic |
+---
+
+## Backup
+
+Local database backups run automatically (daily at 3am via launchd) to `~/ServerBackups/` on the Mac's internal SSD. This protects against external drive failure for configs and metadata.
+
+Media files (movies, TV, audiobooks) don't need backup — the *arr stack can re-download them automatically.
+
+For photos and documents, cloud backup is **optional** — see [HOMESERVER_PLAN.md](HOMESERVER_PLAN.md) for options (iCloud 2TB at £6.99/month is recommended if you want off-site protection).
+
+---
+
+## Monthly Costs
+
+| Configuration | Cost |
+|---------------|------|
+| Base (no cloud backup) | ~£10.70 (Claude API + electricity) |
+| With iCloud 2TB backup | ~£17.69 |
+
+---
+
+## Documentation
+
+- **[HOMESERVER_PLAN.md](HOMESERVER_PLAN.md)** — Complete architecture, storage layout, and resource budget
+- **[docs/](docs/)** — Step-by-step manual guides for each setup script
+- **[docs/google-oauth-setup.md](docs/google-oauth-setup.md)** — Google OAuth for Calendar/Gmail
+- **[docs/kindle-email-setup.md](docs/kindle-email-setup.md)** — Send-to-Kindle setup
+- **[docs/prowlarr-indexers.md](docs/prowlarr-indexers.md)** — Adding indexers to Prowlarr
+- **[docs/VOICE_ARCHITECTURE.md](docs/VOICE_ARCHITECTURE.md)** — Voice pipeline technical details
 
 ---
 
@@ -256,44 +496,20 @@ home-server/
 ├── CLAUDE.md                 # Context for Claude agents
 ├── setup.sh                  # Run all setup steps
 ├── app/                      # Butler PWA (React + Vite)
-│   ├── src/
-│   │   ├── pages/            # Dashboard, Home, Login, Settings, etc.
-│   │   ├── stores/           # Auth, user, conversation state
-│   │   └── services/         # API client
-│   ├── Dockerfile
-│   └── docker-compose.yml
 ├── butler/                   # Butler API + tools
-│   ├── api/                  # FastAPI server (auth, chat, voice, OAuth)
-│   ├── tools/                # Custom Python tools (weather, calendar, HA, memory)
-│   ├── migrations/           # PostgreSQL schema migrations
-│   ├── livekit-agent/        # LiveKit Agents worker (STT → LLM → TTS)
-│   ├── .env.example          # All configuration variables
-│   └── docker-compose.yml    # Butler API container
-├── scripts/
-│   ├── 01-homebrew.sh        # Foundation scripts
-│   ├── ...
-│   ├── 12-voice-stack.sh
-│   └── 13-butler.sh          # Butler API setup (prompts for API keys)
-├── docker/
-│   ├── download-stack/       # Docker Compose files
+│   ├── api/                  # FastAPI server
+│   ├── tools/                # Custom Python tools
+│   ├── migrations/           # PostgreSQL schema
+│   ├── livekit-agent/        # Voice pipeline worker
+│   └── .env.example          # Configuration template
+├── scripts/                  # Individual setup scripts (01-14)
+├── docker/                   # Docker Compose stacks
+│   ├── download-stack/
 │   ├── media-stack/
 │   ├── books-stack/
 │   ├── photos-files-stack/
 │   ├── smart-home-stack/
+│   ├── messaging-stack/
 │   └── voice-stack/
-└── docs/
-    ├── 01-homebrew.md        # Manual instructions for each step
-    ├── ...
-    └── google-oauth-setup.md
+└── docs/                     # Manual setup guides
 ```
-
----
-
-## Monthly Costs
-
-| Configuration | Cost |
-|---------------|------|
-| Base (no cloud backup) | ~£7.21 (Claude API + electricity) |
-| With iCloud 2TB backup | ~£14.20 |
-
-See [HOMESERVER_PLAN.md](HOMESERVER_PLAN.md) for detailed cost breakdown.
