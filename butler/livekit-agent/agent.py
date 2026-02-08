@@ -12,6 +12,7 @@ from __future__ import annotations
 import logging
 import uuid
 
+import aiohttp
 from dotenv import load_dotenv
 from livekit import agents
 from livekit.agents import Agent, AgentSession, cli
@@ -19,6 +20,8 @@ from livekit.plugins import groq, openai, silero
 
 from butler_llm import ButlerLLM
 from config import settings
+
+DEFAULT_VOICE = "bf_emma"
 
 load_dotenv()
 
@@ -38,6 +41,26 @@ class ButlerAgent(Agent):
         self.user_id = user_id
 
 
+async def _fetch_user_voice(user_id: str) -> str:
+    """Fetch the user's preferred TTS voice from Butler API.
+
+    Returns the voice ID (e.g. 'bf_emma') or the default on any error.
+    """
+    url = f"{settings.butler_api_url}/api/voice/user-voice/{user_id}"
+    headers = {}
+    if settings.butler_api_key:
+        headers["X-API-Key"] = settings.butler_api_key
+    try:
+        async with aiohttp.ClientSession() as http:
+            async with http.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=5)) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    return data.get("voice") or DEFAULT_VOICE
+    except Exception:
+        logger.warning("Failed to fetch voice preference for user=%s, using default", user_id)
+    return DEFAULT_VOICE
+
+
 async def entrypoint(ctx: agents.JobContext) -> None:
     """Called when a user joins a LiveKit room.
 
@@ -52,7 +75,8 @@ async def entrypoint(ctx: agents.JobContext) -> None:
     user_id = parts.rsplit("_", 1)[0] if "_" in parts else parts
     session_id = str(uuid.uuid4())
 
-    logger.info("Voice session started for user=%s room=%s", user_id, ctx.room.name)
+    voice = await _fetch_user_voice(user_id)
+    logger.info("Voice session started for user=%s room=%s voice=%s", user_id, ctx.room.name, voice)
 
     session = AgentSession(
         # STT: Groq Whisper (cloud, ~50ms, free tier)
@@ -66,13 +90,14 @@ async def entrypoint(ctx: agents.JobContext) -> None:
             api_key=settings.butler_api_key,
             user_id=user_id,
             session_id=session_id,
+            room=ctx.room,
         ),
         # TTS: Kokoro via OpenAI-compatible endpoint
         tts=openai.TTS(
             base_url=f"{settings.kokoro_url}/v1",
             api_key="not-needed",
             model="kokoro",
-            voice="bf_emma",
+            voice=voice,
         ),
         # VAD: Silero (runs locally on CPU)
         vad=silero.VAD.load(),

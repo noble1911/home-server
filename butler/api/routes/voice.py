@@ -16,6 +16,7 @@ from fastapi import APIRouter, Depends
 from starlette.responses import StreamingResponse
 
 from tools import DatabasePool, Tool
+from tools.display_in_chat import DisplayInChatTool
 
 from ..context import load_user_context
 from ..deps import get_db_pool, get_embedding_service, get_internal_or_user, get_tools, get_user_tools
@@ -54,8 +55,10 @@ async def process_voice(
         pool, user_id,
         current_message=req.transcript,
         embedding_service=get_embedding_service(),
+        channel="voice",
     )
     all_tools = await get_user_tools(user_id, tools, pool)
+    all_tools["display_in_chat"] = DisplayInChatTool()
 
     response_text = await chat_with_tools(
         system_prompt=ctx.system_prompt,
@@ -118,9 +121,12 @@ async def stream_voice(
         pool, user_id,
         current_message=req.transcript,
         embedding_service=get_embedding_service(),
+        channel="voice",
     )
     all_tools = await get_user_tools(user_id, tools, pool)
+    all_tools["display_in_chat"] = DisplayInChatTool()
     full_response_parts: list[str] = []
+    visual_parts: list[str] = []
 
     async def generate():
         try:
@@ -133,14 +139,21 @@ async def stream_voice(
                 user_id=user_id,
                 channel="voice",
             ):
-                full_response_parts.append(chunk)
-                yield f"data: {json.dumps({'delta': chunk})}\n\n"
+                if isinstance(chunk, dict) and chunk.get("type") == "visual_content":
+                    visual_parts.append(chunk.get("content", ""))
+                    yield f"data: {json.dumps(chunk)}\n\n"
+                else:
+                    full_response_parts.append(chunk)
+                    yield f"data: {json.dumps({'delta': chunk})}\n\n"
 
             yield "data: [DONE]\n\n"
         finally:
             # Save conversation history even if the client disconnects mid-stream.
             # The finally block runs on both normal completion and generator aclose().
             full_text = "".join(full_response_parts)
+            # Append visual content so future turns have context
+            if visual_parts:
+                full_text += "\n\n[Displayed in chat:\n" + "\n".join(visual_parts) + "]"
             if full_text:
                 try:
                     metadata = {"session_id": req.session_id}
@@ -172,6 +185,29 @@ async def stream_voice(
                     )
 
     return StreamingResponse(generate(), media_type="text/event-stream")
+
+
+@router.get("/user-voice/{user_id}")
+async def get_user_voice(
+    user_id: str,
+    _caller: str | None = Depends(get_internal_or_user),
+    pool: DatabasePool = Depends(get_db_pool),
+):
+    """Return the user's preferred TTS voice for the LiveKit agent.
+
+    Lightweight endpoint: the agent calls this once at session start to
+    determine which Kokoro voice to use. Falls back to bf_emma (British
+    female) when no preference is stored.
+    """
+    db = pool.pool
+    soul = await db.fetchval(
+        "SELECT soul FROM butler.users WHERE id = $1", user_id
+    )
+    voice = "bf_emma"
+    if soul:
+        data = json.loads(soul) if isinstance(soul, str) else soul
+        voice = data.get("voice") or "bf_emma"
+    return {"voice": voice}
 
 
 def _should_end_turn(response: str) -> bool:

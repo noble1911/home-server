@@ -3,11 +3,11 @@ import { useAuthStore } from '../stores/authStore'
 import { useUserStore } from '../stores/userStore'
 import { api } from '../services/api'
 import type { SoulConfig } from '../types/user'
-import { SERVICE_DISPLAY_NAMES } from '../types/user'
+import { DEFAULT_VOICE, SERVICE_DISPLAY_NAMES, VOICE_OPTIONS } from '../types/user'
 
-type Step = 'welcome' | 'name' | 'butler-name' | 'personality' | 'credentials' | 'done'
+type Step = 'welcome' | 'name' | 'butler-name' | 'personality' | 'voice' | 'credentials' | 'done'
 
-const STEPS: Step[] = ['welcome', 'name', 'butler-name', 'personality', 'credentials', 'done']
+const STEPS: Step[] = ['welcome', 'name', 'butler-name', 'personality', 'voice', 'credentials', 'done']
 
 interface OnboardingData {
   name: string
@@ -29,6 +29,7 @@ export default function Onboarding() {
   const [userName, setUserName] = useState('')
   const [butlerNameInput, setButlerNameInput] = useState('Jarvis')
   const [personality, setPersonality] = useState<SoulConfig['personality']>('balanced')
+  const [selectedVoice, setSelectedVoice] = useState(DEFAULT_VOICE)
   const [serviceUsername, setServiceUsername] = useState('')
   const [servicePassword, setServicePassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -68,6 +69,7 @@ export default function Onboarding() {
           personality,
           verbosity: 'moderate',
           humor: 'subtle',
+          voice: selectedVoice,
         },
       }
 
@@ -226,6 +228,37 @@ export default function Onboarding() {
               <button onClick={() => setStep('butler-name')} className="btn btn-secondary flex-1">
                 Back
               </button>
+              <button onClick={() => setStep('voice')} className="btn btn-primary flex-1">
+                Continue
+              </button>
+            </div>
+          </div>
+        )}
+
+        {step === 'voice' && (
+          <div>
+            <h2 className="text-xl font-bold text-butler-100 mb-2">Choose a voice</h2>
+            <p className="text-butler-400 mb-6">How should {butlerNameInput} sound during voice conversations?</p>
+            <div className="space-y-3 mb-6">
+              {VOICE_OPTIONS.map((v) => (
+                <button
+                  key={v.id}
+                  onClick={() => setSelectedVoice(v.id)}
+                  className={`w-full p-4 rounded-lg border text-left transition-colors ${
+                    selectedVoice === v.id
+                      ? 'border-accent bg-accent/10'
+                      : 'border-butler-700 bg-butler-800 hover:border-butler-600'
+                  }`}
+                >
+                  <div className="font-medium text-butler-100">{v.name}</div>
+                  <div className="text-sm text-butler-400">{v.accent} {v.gender}</div>
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => setStep('personality')} className="btn btn-secondary flex-1">
+                Back
+              </button>
               <button onClick={() => setStep('credentials')} className="btn btn-primary flex-1">
                 Continue
               </button>
@@ -298,7 +331,7 @@ export default function Onboarding() {
             </div>
 
             <div className="flex gap-3">
-              <button onClick={() => setStep('personality')} className="btn btn-secondary flex-1">
+              <button onClick={() => setStep('voice')} className="btn btn-secondary flex-1">
                 Back
               </button>
               <button

@@ -34,7 +34,13 @@ export interface AgentStateMessage {
   state: 'thinking' | 'speaking' | 'idle'
 }
 
-export type LiveKitDataMessage = TranscriptMessage | AgentStateMessage
+export interface VisualContentMessage {
+  type: 'visual_content'
+  content: string
+  title?: string
+}
+
+export type LiveKitDataMessage = TranscriptMessage | AgentStateMessage | VisualContentMessage
 
 /** SSE events from POST /api/chat/stream */
 export type ChatStreamEvent =

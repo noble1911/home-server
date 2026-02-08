@@ -101,6 +101,7 @@ async def _get_profile(user_id: str, pool: DatabasePool) -> UserProfile:
             verbosity=soul.get("verbosity", "moderate"),
             humor=soul.get("humor", "subtle"),
             customInstructions=soul.get("customInstructions"),
+            voice=soul.get("voice"),
         ),
         facts=[
             UserFact(

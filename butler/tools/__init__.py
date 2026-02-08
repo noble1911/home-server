@@ -44,6 +44,7 @@ from .storage_monitor import StorageMonitorTool
 from .schedule_task import ScheduleTaskTool
 from .whatsapp import WhatsAppTool
 from .self_update import SelfUpdateTool
+from .display_in_chat import DisplayInChatTool
 
 __all__ = [
     # Base
@@ -94,4 +95,6 @@ __all__ = [
     "WhatsAppTool",
     # Self-update
     "SelfUpdateTool",
+    # Display in chat (voice-only)
+    "DisplayInChatTool",
 ]

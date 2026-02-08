@@ -25,7 +25,26 @@ export interface SoulConfig {
   verbosity: 'concise' | 'moderate' | 'detailed'
   humor: 'none' | 'subtle' | 'playful'
   customInstructions?: string
+  voice?: string
 }
+
+export interface VoiceOption {
+  id: string
+  name: string
+  accent: string
+  gender: string
+}
+
+export const VOICE_OPTIONS: VoiceOption[] = [
+  { id: 'af_bella', name: 'Bella', accent: 'American', gender: 'Female' },
+  { id: 'af_sarah', name: 'Sarah', accent: 'American', gender: 'Female' },
+  { id: 'am_adam', name: 'Adam', accent: 'American', gender: 'Male' },
+  { id: 'am_michael', name: 'Michael', accent: 'American', gender: 'Male' },
+  { id: 'bf_emma', name: 'Emma', accent: 'British', gender: 'Female' },
+  { id: 'bm_george', name: 'George', accent: 'British', gender: 'Male' },
+]
+
+export const DEFAULT_VOICE = 'bf_emma'
 
 export type NotificationCategory =
   | 'download'

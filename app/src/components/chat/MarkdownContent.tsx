@@ -55,6 +55,15 @@ function MarkdownContent({ content }: MarkdownContentProps) {
         ),
         li: ({ children }) => <li>{children}</li>,
 
+        img: ({ src, alt }) => (
+          <img
+            src={src}
+            alt={alt || ''}
+            className="max-w-full rounded-lg my-2"
+            loading="lazy"
+          />
+        ),
+
         a: ({ href, children }) => (
           <a
             href={href}

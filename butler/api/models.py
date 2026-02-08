@@ -94,6 +94,7 @@ class SoulConfig(BaseModel):
     verbosity: str = "moderate"
     humor: str = "subtle"
     customInstructions: str | None = None
+    voice: str | None = None
 
 
 class NotificationPrefs(BaseModel):

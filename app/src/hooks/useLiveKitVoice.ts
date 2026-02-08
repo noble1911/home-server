@@ -122,6 +122,15 @@ export function useLiveKitVoice(): UseLiveKitVoiceReturn {
           })
         }
         break
+      case 'visual_content':
+        addMessage({
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: (message.title ? `**${message.title}**\n\n` : '') + message.content,
+          type: 'voice',
+          timestamp: new Date().toISOString(),
+        })
+        break
       case 'agent_state':
         if (message.state === 'thinking') setVoiceStatus('processing')
         else if (message.state === 'speaking') setVoiceStatus('speaking')

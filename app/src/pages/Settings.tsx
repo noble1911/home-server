@@ -7,7 +7,7 @@ import { usePushNotifications } from '../hooks/usePushNotifications'
 import { api, clearUserFacts, deleteUserAccount } from '../services/api'
 import ConfirmDialog from '../components/ConfirmDialog'
 import type { AdminUser, InviteCode, OAuthConnection, ServiceCredential, ToolPermission } from '../types/user'
-import { PERMISSION_INFO, SERVICE_DISPLAY_NAMES } from '../types/user'
+import { DEFAULT_VOICE, PERMISSION_INFO, SERVICE_DISPLAY_NAMES, VOICE_OPTIONS } from '../types/user'
 
 interface ConnectionsResponse {
   connections: OAuthConnection[]
@@ -456,6 +456,29 @@ export default function Settings() {
                 </button>
               ))}
             </div>
+          </div>
+
+          <div>
+            <label className="block text-sm text-butler-300 mb-2">Voice</label>
+            <div className="space-y-2">
+              {VOICE_OPTIONS.map(v => (
+                <button
+                  key={v.id}
+                  onClick={() => updateSoul({ voice: v.id })}
+                  className={`w-full p-3 rounded-lg border text-left transition-colors ${
+                    (profile.soul.voice || DEFAULT_VOICE) === v.id
+                      ? 'border-accent bg-accent/10'
+                      : 'border-butler-700 bg-butler-800 hover:border-butler-600'
+                  }`}
+                >
+                  <div className="text-sm text-butler-100">{v.name}</div>
+                  <div className="text-xs text-butler-400">{v.accent} {v.gender}</div>
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-butler-500 mt-2">
+              Voice changes take effect on your next voice session.
+            </p>
           </div>
         </div>
       </section>

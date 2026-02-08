@@ -86,7 +86,7 @@ async def load_user_context(
     )
 
     return UserContext(
-        system_prompt=_build_system_prompt(user_name, soul, facts),
+        system_prompt=_build_system_prompt(user_name, soul, facts, channel=channel),
         user_name=user_name,
         butler_name=butler_name,
         history=history,
@@ -247,6 +247,8 @@ def _build_system_prompt(
     user_name: str,
     soul: dict,
     facts: list,
+    *,
+    channel: str | None = None,
 ) -> str:
     """Compose system prompt from personality and known facts.
 
@@ -286,5 +288,12 @@ def _build_system_prompt(
     parts.append("- Be concise in voice responses (1-2 sentences unless asked for detail)")
     parts.append("- Use remember_fact to store important information about the user")
     parts.append("- For home automation, confirm before executing destructive actions")
+
+    if channel == "voice":
+        parts.append(
+            "- When a response benefits from visual formatting (tables, images, "
+            "lists, links), use display_in_chat to show rich content in the chat "
+            "while providing a brief spoken summary"
+        )
 
     return "\n".join(parts)

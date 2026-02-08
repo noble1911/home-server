@@ -251,7 +251,7 @@ async def stream_chat_with_tools(
     db_pool: DatabasePool | None = None,
     user_id: str | None = None,
     channel: str | None = None,
-) -> AsyncGenerator[str, None]:
+) -> AsyncGenerator[str | dict, None]:
     """Stream Claude's response text, executing any tool calls between rounds.
 
     Like chat_with_tools() but yields text chunks as they arrive from
@@ -319,6 +319,14 @@ async def stream_chat_with_tools(
 
         tool_results = []
         for block in tool_use_blocks:
+            # Intercept display_in_chat: yield visual event before executing
+            if block.name == "display_in_chat":
+                yield {
+                    "type": "visual_content",
+                    "content": block.input.get("content", ""),
+                    "title": block.input.get("title", ""),
+                }
+
             result = await execute_and_log_tool(
                 block.name, block.input, tools,
                 db_pool=db_pool, user_id=user_id, channel=channel,
