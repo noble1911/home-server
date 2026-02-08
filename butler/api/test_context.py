@@ -1,4 +1,4 @@
-"""Tests for cross-channel context loading.
+"""Tests for context loading and multi-turn conversation history.
 
 Run with: pytest butler/api/test_context.py -v
 
@@ -7,9 +7,17 @@ These tests use mocked database responses - no real PostgreSQL required.
 
 import pytest
 from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from .context import UserContext, _build_system_prompt, _channel_label, load_user_context
+from .context import (
+    UserContext,
+    _build_system_prompt,
+    _load_facts,
+    _hybrid_fact_search,
+    load_user_context,
+    load_conversation_messages,
+)
+from .llm import _build_messages
 
 
 @pytest.fixture
@@ -20,140 +28,127 @@ def mock_pool():
     return pool
 
 
-def _make_history_row(role, content, channel, minutes_ago=0):
+def _make_history_row(role, content, minutes_ago=0):
     """Helper to create a conversation history row dict."""
-    ts = datetime(2026, 2, 5, 12, 0, 0, tzinfo=timezone.utc) - timedelta(minutes=minutes_ago)
-    return {"role": role, "content": content, "channel": channel, "created_at": ts}
-
-
-class TestChannelLabel:
-    """Tests for _channel_label helper."""
-
-    def test_voice_channel(self):
-        assert _channel_label("voice") == "[via voice]"
-
-    def test_pwa_channel(self):
-        assert _channel_label("pwa") == "[via text]"
-
-    def test_whatsapp_channel(self):
-        assert _channel_label("whatsapp") == "[via whatsapp]"
-
-    def test_telegram_channel(self):
-        assert _channel_label("telegram") == "[via telegram]"
-
-    def test_unknown_channel_fallback(self):
-        assert _channel_label("sms") == "[via sms]"
+    return {"role": role, "content": content}
 
 
 class TestBuildSystemPrompt:
-    """Tests for _build_system_prompt with channel indicators."""
+    """Tests for _build_system_prompt (personality + facts only, no history)."""
 
-    def test_cross_channel_history_includes_labels(self):
-        """Messages from different channels get correct labels."""
-        history = [
-            _make_history_row("user", "What's the weather?", "voice", minutes_ago=10),
-            _make_history_row("assistant", "It's sunny and 20C.", "voice", minutes_ago=9),
-            _make_history_row("user", "Tell me more", "pwa", minutes_ago=5),
-            _make_history_row("assistant", "UV index is high today.", "pwa", minutes_ago=4),
-        ]
-        prompt = _build_system_prompt("Ron", {}, [], history)
+    def test_basic_prompt_structure(self):
+        """System prompt contains role and user name."""
+        prompt = _build_system_prompt("Ron", {}, [])
 
-        assert "[via voice]" in prompt
-        assert "[via text]" in prompt
-        assert "What's the weather?" in prompt
-        assert "Tell me more" in prompt
+        assert "Butler" in prompt
+        assert "Ron" in prompt
 
-    def test_history_shown_chronologically(self):
-        """Messages should appear oldest-first in the prompt (DB returns newest-first)."""
-        history = [
-            # DB returns DESC (newest first)
-            _make_history_row("user", "Second message", "pwa", minutes_ago=0),
-            _make_history_row("user", "First message", "voice", minutes_ago=10),
-        ]
-        prompt = _build_system_prompt("Ron", {}, [], history)
-
-        first_pos = prompt.index("First message")
-        second_pos = prompt.index("Second message")
-        assert first_pos < second_pos
-
-    def test_whatsapp_channel_in_history(self):
-        """WhatsApp messages get proper labels."""
-        history = [
-            _make_history_row("user", "Hi from WhatsApp", "whatsapp"),
-        ]
-        prompt = _build_system_prompt("Ron", {}, [], history)
-
-        assert "[via whatsapp]" in prompt
-        assert "Hi from WhatsApp" in prompt
-
-    def test_empty_history_no_context_section(self):
-        """No RECENT CONTEXT section when history is empty."""
-        prompt = _build_system_prompt("Ron", {}, [], [])
+    def test_no_history_in_prompt(self):
+        """System prompt no longer contains conversation history."""
+        prompt = _build_system_prompt("Ron", {}, [])
 
         assert "RECENT CONTEXT" not in prompt
 
-    def test_content_truncated_at_100_chars(self):
-        """Long messages should be truncated in the prompt."""
-        long_msg = "A" * 200
-        history = [_make_history_row("user", long_msg, "pwa")]
-        prompt = _build_system_prompt("Ron", {}, [], history)
+    def test_personality_included(self):
+        """Soul config personality fields appear in prompt."""
+        soul = {"personality": "friendly", "humor": "dry wit"}
+        prompt = _build_system_prompt("Ron", soul, [])
 
-        # The full 200-char message should not appear
-        assert long_msg not in prompt
-        # But the first 100 chars should
-        assert "A" * 100 in prompt
+        assert "friendly" in prompt
+        assert "dry wit" in prompt
 
-    def test_header_mentions_all_channels(self):
-        """The context section header should indicate cross-channel scope."""
-        history = [_make_history_row("user", "Hello", "voice")]
-        prompt = _build_system_prompt("Ron", {}, [], history)
+    def test_facts_included(self):
+        """Known facts appear in prompt."""
+        facts = [
+            {"fact": "Loves Italian food", "category": "preference"},
+            {"fact": "Has a cat named Luna", "category": "other"},
+        ]
+        prompt = _build_system_prompt("Ron", {}, facts)
 
-        assert "across all channels" in prompt
+        assert "Loves Italian food" in prompt
+        assert "Has a cat named Luna" in prompt
+        assert "[preference]" in prompt
 
-    def test_missing_channel_defaults_to_pwa(self):
-        """Rows with no channel key default to [via text]."""
-        row = {"role": "user", "content": "Old message", "created_at": datetime.now(timezone.utc)}
-        prompt = _build_system_prompt("Ron", {}, [], [row])
+    def test_rules_included(self):
+        """Behavioral rules appear in prompt."""
+        prompt = _build_system_prompt("Ron", {}, [])
 
-        assert "[via text]" in prompt
+        assert "RULES:" in prompt
+        assert "remember_fact" in prompt
+
+    def test_custom_butler_name(self):
+        """Soul config can override butler name."""
+        soul = {"butler_name": "Jarvis"}
+        prompt = _build_system_prompt("Ron", soul, [])
+
+        assert "Jarvis" in prompt
+
+
+class TestLoadConversationMessages:
+    """Tests for load_conversation_messages."""
+
+    @pytest.mark.asyncio
+    async def test_returns_chronological_messages(self, mock_pool):
+        """Messages returned in chronological order (oldest first)."""
+        # DB returns DESC (newest first)
+        mock_pool.pool.fetch = AsyncMock(return_value=[
+            {"role": "assistant", "content": "It's sunny!"},
+            {"role": "user", "content": "What's the weather?"},
+        ])
+
+        with patch("api.context.settings") as mock_settings:
+            mock_settings.max_history_messages = 20
+            messages = await load_conversation_messages(mock_pool, "user1")
+
+        assert len(messages) == 2
+        assert messages[0]["role"] == "user"
+        assert messages[0]["content"] == "What's the weather?"
+        assert messages[1]["role"] == "assistant"
+        assert messages[1]["content"] == "It's sunny!"
+
+    @pytest.mark.asyncio
+    async def test_merges_consecutive_same_role(self, mock_pool):
+        """Consecutive same-role messages are merged."""
+        mock_pool.pool.fetch = AsyncMock(return_value=[
+            {"role": "user", "content": "Second part"},
+            {"role": "user", "content": "First part"},
+        ])
+
+        with patch("api.context.settings") as mock_settings:
+            mock_settings.max_history_messages = 20
+            messages = await load_conversation_messages(mock_pool, "user1")
+
+        assert len(messages) == 1
+        assert "First part" in messages[0]["content"]
+        assert "Second part" in messages[0]["content"]
+
+    @pytest.mark.asyncio
+    async def test_empty_history(self, mock_pool):
+        """No messages returns empty list."""
+        mock_pool.pool.fetch = AsyncMock(return_value=[])
+
+        with patch("api.context.settings") as mock_settings:
+            mock_settings.max_history_messages = 20
+            messages = await load_conversation_messages(mock_pool, "user1")
+
+        assert messages == []
+
+    @pytest.mark.asyncio
+    async def test_uses_configured_limit(self, mock_pool):
+        """Respects max_history_messages setting."""
+        mock_pool.pool.fetch = AsyncMock(return_value=[])
+
+        with patch("api.context.settings") as mock_settings:
+            mock_settings.max_history_messages = 10
+            await load_conversation_messages(mock_pool, "user1")
+
+        call_args = mock_pool.pool.fetch.call_args
+        # The limit parameter should be 10
+        assert call_args[0][2] == 10
 
 
 class TestLoadUserContext:
     """Tests for load_user_context database interactions."""
-
-    @pytest.mark.asyncio
-    async def test_loads_history_across_channels(self, mock_pool):
-        """Verify the SQL does NOT filter by channel."""
-        mock_pool.pool.fetchrow = AsyncMock(return_value={
-            "id": "user1", "name": "Ron", "soul": {},
-        })
-        mock_pool.pool.fetch = AsyncMock(return_value=[])
-
-        await load_user_context(mock_pool, "user1")
-
-        # The conversation history query is the second db.fetch call
-        history_call = mock_pool.pool.fetch.call_args_list[1]
-        sql = history_call[0][0]
-
-        # Must NOT contain channel filter
-        assert "channel =" not in sql.lower()
-        # Must SELECT channel column
-        assert "channel" in sql.lower()
-
-    @pytest.mark.asyncio
-    async def test_history_limit_is_20(self, mock_pool):
-        """Verify the query fetches up to 20 messages."""
-        mock_pool.pool.fetchrow = AsyncMock(return_value={
-            "id": "user1", "name": "Ron", "soul": {},
-        })
-        mock_pool.pool.fetch = AsyncMock(return_value=[])
-
-        await load_user_context(mock_pool, "user1")
-
-        history_call = mock_pool.pool.fetch.call_args_list[1]
-        sql = history_call[0][0]
-
-        assert "LIMIT 20" in sql
 
     @pytest.mark.asyncio
     async def test_unknown_user_returns_defaults(self, mock_pool):
@@ -166,27 +161,221 @@ class TestLoadUserContext:
         assert ctx.user_name == "User"
         assert ctx.butler_name == "Butler"
         assert "Butler" in ctx.system_prompt
+        assert ctx.history == []
 
     @pytest.mark.asyncio
-    async def test_cross_channel_messages_in_prompt(self, mock_pool):
-        """End-to-end: voice + text messages both appear in system prompt."""
+    async def test_context_includes_history(self, mock_pool):
+        """UserContext.history is populated with conversation messages."""
         mock_pool.pool.fetchrow = AsyncMock(return_value={
             "id": "user1", "name": "Ron", "soul": {},
         })
 
         history_rows = [
-            _make_history_row("user", "Check the lights", "pwa", minutes_ago=0),
-            _make_history_row("assistant", "Lights are on", "pwa", minutes_ago=1),
-            _make_history_row("user", "What's the temp?", "voice", minutes_ago=5),
-            _make_history_row("assistant", "It's 22 degrees", "voice", minutes_ago=4),
+            {"role": "assistant", "content": "It's 22 degrees"},
+            {"role": "user", "content": "What's the temp?"},
         ]
 
         # First fetch = facts, second fetch = history
         mock_pool.pool.fetch = AsyncMock(side_effect=[[], history_rows])
 
-        ctx = await load_user_context(mock_pool, "user1")
+        with patch("api.context.settings") as mock_settings:
+            mock_settings.max_history_messages = 20
+            ctx = await load_user_context(mock_pool, "user1")
 
-        assert "[via voice]" in ctx.system_prompt
-        assert "[via text]" in ctx.system_prompt
-        assert "What's the temp?" in ctx.system_prompt
-        assert "Check the lights" in ctx.system_prompt
+        assert len(ctx.history) == 2
+        assert ctx.history[0]["role"] == "user"
+        assert ctx.history[1]["role"] == "assistant"
+
+    @pytest.mark.asyncio
+    async def test_history_not_in_system_prompt(self, mock_pool):
+        """Conversation history should NOT appear in system prompt."""
+        mock_pool.pool.fetchrow = AsyncMock(return_value={
+            "id": "user1", "name": "Ron", "soul": {},
+        })
+
+        history_rows = [
+            {"role": "user", "content": "What's the temp?"},
+        ]
+
+        mock_pool.pool.fetch = AsyncMock(side_effect=[[], history_rows])
+
+        with patch("api.context.settings") as mock_settings:
+            mock_settings.max_history_messages = 20
+            ctx = await load_user_context(mock_pool, "user1")
+
+        # History content should NOT be in system prompt (it's in messages now)
+        assert "What's the temp?" not in ctx.system_prompt
+
+
+class TestLoadFacts:
+    """Tests for _load_facts with semantic and confidence fallback."""
+
+    @pytest.mark.asyncio
+    async def test_fallback_without_embedding_service(self):
+        """Without embedding_service, falls back to confidence-based query."""
+        db = AsyncMock()
+        db.fetch = AsyncMock(return_value=[
+            {"fact": "Likes coffee", "category": "preference"},
+        ])
+
+        facts = await _load_facts(db, "user1", current_message="hello")
+        assert len(facts) == 1
+        assert facts[0]["fact"] == "Likes coffee"
+
+    @pytest.mark.asyncio
+    async def test_fallback_without_message(self):
+        """Without current_message, falls back to confidence-based query."""
+        db = AsyncMock()
+        db.fetch = AsyncMock(return_value=[])
+        embedding_svc = AsyncMock()
+
+        facts = await _load_facts(db, "user1", embedding_service=embedding_svc)
+        assert facts == []
+        # embed() should NOT have been called
+        embedding_svc.embed.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_semantic_path_when_both_provided(self):
+        """With message + embedding_service, uses hybrid search."""
+        db = AsyncMock()
+        embedding_svc = AsyncMock()
+        embedding_svc.embed = AsyncMock(return_value=[0.1] * 768)
+
+        # _hybrid_fact_search will be called, mock the two db.fetch calls
+        db.fetch = AsyncMock(side_effect=[
+            [{"id": 1, "fact": "Semantic fact", "category": "general"}],
+            [{"id": 2, "fact": "Confidence fact", "category": "general"}],
+        ])
+
+        facts = await _load_facts(
+            db, "user1",
+            current_message="dinner plans",
+            embedding_service=embedding_svc,
+        )
+        embedding_svc.embed.assert_called_once_with("dinner plans")
+        assert len(facts) == 2
+
+    @pytest.mark.asyncio
+    async def test_semantic_fallback_on_embed_failure(self):
+        """If embed() returns None, falls back to confidence-based query."""
+        db = AsyncMock()
+        embedding_svc = AsyncMock()
+        embedding_svc.embed = AsyncMock(return_value=None)
+
+        db.fetch = AsyncMock(return_value=[
+            {"fact": "Fallback fact", "category": "general"},
+        ])
+
+        facts = await _load_facts(
+            db, "user1",
+            current_message="hello",
+            embedding_service=embedding_svc,
+        )
+        # Should fall back to single confidence query
+        assert len(facts) == 1
+        assert facts[0]["fact"] == "Fallback fact"
+
+
+class TestHybridFactSearch:
+    """Tests for _hybrid_fact_search deduplication logic."""
+
+    @pytest.mark.asyncio
+    async def test_deduplication(self):
+        """Facts appearing in both semantic and confidence results are deduplicated."""
+        db = AsyncMock()
+        db.fetch = AsyncMock(side_effect=[
+            # Semantic results
+            [
+                {"id": 1, "fact": "Likes Italian", "category": "food"},
+                {"id": 2, "fact": "Has a cat", "category": "pets"},
+            ],
+            # Confidence results (id=1 overlaps)
+            [
+                {"id": 1, "fact": "Likes Italian", "category": "food"},
+                {"id": 3, "fact": "Works remotely", "category": "work"},
+            ],
+        ])
+
+        facts = await _hybrid_fact_search(db, "user1", [0.1] * 768)
+        assert len(facts) == 3
+        fact_ids = [f["id"] for f in facts]
+        assert fact_ids == [1, 2, 3]  # Semantic first, then unique confidence
+
+    @pytest.mark.asyncio
+    async def test_semantic_priority(self):
+        """Semantic results come before confidence-only results."""
+        db = AsyncMock()
+        db.fetch = AsyncMock(side_effect=[
+            [{"id": 10, "fact": "Relevant to query", "category": "general"}],
+            [{"id": 20, "fact": "High confidence", "category": "general"}],
+        ])
+
+        facts = await _hybrid_fact_search(db, "user1", [0.5] * 768)
+        assert facts[0]["id"] == 10
+        assert facts[1]["id"] == 20
+
+
+class TestBuildMessages:
+    """Tests for _build_messages in llm.py."""
+
+    def test_no_history(self):
+        """Without history, returns a single user message."""
+        messages = _build_messages("Hello")
+        assert messages == [{"role": "user", "content": "Hello"}]
+
+    def test_with_normal_history(self):
+        """History + current message produces correct messages array."""
+        history = [
+            {"role": "user", "content": "Hi"},
+            {"role": "assistant", "content": "Hello!"},
+        ]
+        messages = _build_messages("How are you?", history)
+        assert len(messages) == 3
+        assert messages[0] == {"role": "user", "content": "Hi"}
+        assert messages[1] == {"role": "assistant", "content": "Hello!"}
+        assert messages[2] == {"role": "user", "content": "How are you?"}
+
+    def test_strips_leading_assistant_messages(self):
+        """Leading assistant messages are dropped (Claude API requires user first)."""
+        history = [
+            {"role": "assistant", "content": "Orphaned reply"},
+            {"role": "user", "content": "Real question"},
+            {"role": "assistant", "content": "Real answer"},
+        ]
+        messages = _build_messages("Follow-up", history)
+        assert messages[0]["role"] == "user"
+        assert messages[0]["content"] == "Real question"
+        assert len(messages) == 3
+
+    def test_strips_multiple_leading_assistant_messages(self):
+        """Multiple leading assistant messages are all dropped."""
+        history = [
+            {"role": "assistant", "content": "First orphan"},
+            {"role": "assistant", "content": "Second orphan"},
+            {"role": "user", "content": "Hello"},
+            {"role": "assistant", "content": "Hi there"},
+        ]
+        messages = _build_messages("World", history)
+        assert messages[0]["role"] == "user"
+        assert messages[0]["content"] == "Hello"
+        assert len(messages) == 3
+
+    def test_all_assistant_history_stripped(self):
+        """If history is all assistant messages, only current message remains."""
+        history = [
+            {"role": "assistant", "content": "Orphan 1"},
+            {"role": "assistant", "content": "Orphan 2"},
+        ]
+        messages = _build_messages("Hello")
+        assert messages == [{"role": "user", "content": "Hello"}]
+
+    def test_merges_trailing_user_in_history(self):
+        """If history ends with user, current message is merged to avoid consecutive user roles."""
+        history = [
+            {"role": "user", "content": "Previous unanswered question"},
+        ]
+        messages = _build_messages("New question", history)
+        assert len(messages) == 1
+        assert messages[0]["role"] == "user"
+        assert "Previous unanswered question" in messages[0]["content"]
+        assert "New question" in messages[0]["content"]

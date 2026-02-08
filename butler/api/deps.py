@@ -70,19 +70,20 @@ DEFAULT_PERMISSIONS: list[str] = ["media", "home"]
 _db_pool: DatabasePool | None = None
 _tools: dict[str, Tool] | None = None
 _scheduler: TaskScheduler | None = None
+_embedding_service: EmbeddingService | None = None
 
 
 async def init_resources() -> None:
     """Initialize database pool and tool instances. Called once at startup."""
-    global _db_pool, _tools, _scheduler
+    global _db_pool, _tools, _scheduler, _embedding_service
     _db_pool = await DatabasePool.create(settings.database_url)
 
     # Embedding service for semantic memory search (optional)
-    embedding_service = EmbeddingService(settings.ollama_url) if settings.ollama_url else None
+    _embedding_service = EmbeddingService(settings.ollama_url) if settings.ollama_url else None
 
     _tools = {
-        "remember_fact": RememberFactTool(_db_pool, embedding_service),
-        "recall_facts": RecallFactsTool(_db_pool, embedding_service),
+        "remember_fact": RememberFactTool(_db_pool, _embedding_service),
+        "recall_facts": RecallFactsTool(_db_pool, _embedding_service),
         "get_user": GetUserTool(_db_pool),
     }
 
@@ -223,6 +224,11 @@ def get_tools() -> dict[str, Tool]:
     if _tools is None:
         raise HTTPException(503, "Tools not initialized")
     return _tools
+
+
+def get_embedding_service() -> EmbeddingService | None:
+    """Return the embedding service, or None if not configured."""
+    return _embedding_service
 
 
 async def get_current_user(

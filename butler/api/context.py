@@ -4,17 +4,29 @@ Before each Claude API call, we load the user's personality config, learned
 facts, and recent conversation history from PostgreSQL, then compose a system
 prompt that personalizes Butler's responses.
 
+Conversation history is now passed as actual message objects in the Claude API
+messages array (multi-turn), rather than truncated summaries in the system prompt.
+
+Facts use a hybrid approach: semantic search via pgvector (for relevance to the
+current message) combined with top-confidence facts (for general context).
+
 Database tables used:
 - butler.users (soul JSONB column)
-- butler.user_facts (learned facts with confidence scores)
+- butler.user_facts (learned facts with confidence scores + embeddings)
 - butler.conversation_history (recent messages across channels)
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import logging
+from dataclasses import dataclass, field
 
 from tools import DatabasePool
+from tools.embeddings import EmbeddingService
+
+from .config import settings
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -22,10 +34,26 @@ class UserContext:
     system_prompt: str
     user_name: str
     butler_name: str
+    history: list[dict] = field(default_factory=list)
 
 
-async def load_user_context(pool: DatabasePool, user_id: str) -> UserContext:
-    """Load all context needed for a personalized LLM call."""
+async def load_user_context(
+    pool: DatabasePool,
+    user_id: str,
+    *,
+    current_message: str | None = None,
+    embedding_service: EmbeddingService | None = None,
+) -> UserContext:
+    """Load all context needed for a personalized LLM call.
+
+    Args:
+        pool: Database connection pool.
+        user_id: The user making the request.
+        current_message: The user's current message, used for semantic fact
+            search. If provided with an embedding_service, facts are loaded
+            by relevance to this message instead of just by confidence.
+        embedding_service: Optional embedding service for semantic search.
+    """
     db = pool.pool
 
     user = await db.fetchrow(
@@ -33,7 +61,7 @@ async def load_user_context(pool: DatabasePool, user_id: str) -> UserContext:
     )
     if not user:
         return UserContext(
-            system_prompt=_build_system_prompt("User", {}, [], []),
+            system_prompt=_build_system_prompt("User", {}, []),
             user_name="User",
             butler_name="Butler",
         )
@@ -42,7 +70,46 @@ async def load_user_context(pool: DatabasePool, user_id: str) -> UserContext:
     user_name = user["name"] or "User"
     butler_name = soul.get("butler_name", "Butler")
 
-    facts = await db.fetch(
+    facts = await _load_facts(
+        db, user_id,
+        current_message=current_message,
+        embedding_service=embedding_service,
+    )
+
+    history = await load_conversation_messages(pool, user_id)
+
+    return UserContext(
+        system_prompt=_build_system_prompt(user_name, soul, facts),
+        user_name=user_name,
+        butler_name=butler_name,
+        history=history,
+    )
+
+
+async def _load_facts(
+    db,
+    user_id: str,
+    *,
+    current_message: str | None = None,
+    embedding_service: EmbeddingService | None = None,
+) -> list:
+    """Load user facts using hybrid semantic + confidence approach.
+
+    When embedding_service and current_message are available:
+    - 10 facts by semantic similarity to the current message (pgvector)
+    - 10 facts by highest confidence (for general context)
+    - Deduplicated by fact ID
+
+    Falls back to top-20 by confidence when semantic search is unavailable.
+    """
+    # Try semantic search if we have both an embedding service and a message
+    if current_message and embedding_service:
+        query_vector = await embedding_service.embed(current_message)
+        if query_vector:
+            return await _hybrid_fact_search(db, user_id, query_vector)
+
+    # Fallback: top 20 by confidence (original behaviour)
+    return await db.fetch(
         """
         SELECT fact, category FROM butler.user_facts
         WHERE user_id = $1
@@ -53,47 +120,114 @@ async def load_user_context(pool: DatabasePool, user_id: str) -> UserContext:
         user_id,
     )
 
-    history = await db.fetch(
+
+async def _hybrid_fact_search(db, user_id: str, query_vector: list[float]) -> list:
+    """Combine semantic similarity + confidence for fact loading.
+
+    Runs two queries:
+    1. Top 10 by vector similarity to the current message
+    2. Top 10 by confidence score
+
+    Results are deduplicated by fact ID, preserving semantic results first.
+    """
+    # Semantic search: find facts most relevant to current conversation
+    semantic_rows = await db.fetch(
         """
-        SELECT role, content, channel, created_at
-        FROM butler.conversation_history
-        WHERE user_id = $1 AND created_at > NOW() - INTERVAL '7 days'
-        ORDER BY created_at DESC
-        LIMIT 20
+        SELECT id, fact, category
+        FROM butler.user_facts
+        WHERE user_id = $1
+          AND embedding IS NOT NULL
+          AND (expires_at IS NULL OR expires_at > NOW())
+        ORDER BY embedding <=> $2::vector
+        LIMIT 10
+        """,
+        user_id,
+        "[" + ",".join(str(x) for x in query_vector) + "]",
+    )
+
+    # Confidence search: top general-purpose facts
+    confidence_rows = await db.fetch(
+        """
+        SELECT id, fact, category
+        FROM butler.user_facts
+        WHERE user_id = $1
+          AND (expires_at IS NULL OR expires_at > NOW())
+        ORDER BY confidence DESC, created_at DESC
+        LIMIT 10
         """,
         user_id,
     )
 
-    return UserContext(
-        system_prompt=_build_system_prompt(user_name, soul, facts, history),
-        user_name=user_name,
-        butler_name=butler_name,
+    # Deduplicate: semantic results take priority
+    seen_ids = set()
+    combined = []
+    for row in list(semantic_rows) + list(confidence_rows):
+        fact_id = row["id"]
+        if fact_id not in seen_ids:
+            seen_ids.add(fact_id)
+            combined.append(row)
+
+    logger.debug(
+        "Loaded %d facts for user %s (%d semantic, %d confidence, %d after dedup)",
+        len(combined), user_id, len(semantic_rows), len(confidence_rows), len(combined),
     )
 
-
-_CHANNEL_LABELS = {
-    "voice": "[via voice]",
-    "pwa": "[via text]",
-    "whatsapp": "[via whatsapp]",
-    "telegram": "[via telegram]",
-}
+    return combined
 
 
-def _channel_label(channel: str) -> str:
-    """Return a human-readable label for a conversation channel."""
-    return _CHANNEL_LABELS.get(channel, f"[via {channel}]")
+async def load_conversation_messages(
+    pool: DatabasePool,
+    user_id: str,
+    limit: int | None = None,
+) -> list[dict]:
+    """Load recent conversation history as message objects for the Claude API.
+
+    Returns a list of {"role": "user"|"assistant", "content": "..."} dicts
+    in chronological order, ready to prepend to the messages array.
+    """
+    max_msgs = limit if limit is not None else settings.max_history_messages
+    db = pool.pool
+
+    rows = await db.fetch(
+        """
+        SELECT role, content
+        FROM butler.conversation_history
+        WHERE user_id = $1 AND created_at > NOW() - INTERVAL '7 days'
+        ORDER BY created_at DESC
+        LIMIT $2
+        """,
+        user_id,
+        max_msgs,
+    )
+
+    # Reverse to chronological order and build message dicts.
+    # Ensure messages alternate user/assistant — Claude requires this.
+    # Consecutive same-role messages are merged.
+    messages: list[dict] = []
+    for row in reversed(rows):
+        role = row["role"]
+        content = row["content"]
+        if messages and messages[-1]["role"] == role:
+            # Merge consecutive same-role messages
+            messages[-1]["content"] += "\n" + content
+        else:
+            messages.append({"role": role, "content": content})
+    return messages
 
 
 def _build_system_prompt(
     user_name: str,
     soul: dict,
     facts: list,
-    history: list,
 ) -> str:
-    """Compose system prompt from context layers."""
+    """Compose system prompt from personality and known facts.
+
+    Conversation history is no longer included here — it's passed as actual
+    messages in the Claude API messages array for proper multi-turn context.
+    """
     butler_name = soul.get("butler_name", "Butler")
     parts = [
-        f"You are {butler_name}, a helpful AI home assistant. "
+        f"You are {butler_name}, a helpful AI assistant. "
         f"You are speaking with {user_name}."
     ]
 
@@ -118,16 +252,6 @@ def _build_system_prompt(
         for row in facts:
             category = row["category"] or "general"
             parts.append(f"- [{category}] {row['fact']}")
-
-    # Recent conversation context (shown chronologically, across all channels)
-    if history:
-        parts.append("\nRECENT CONTEXT (last 7 days, across all channels):")
-        for row in reversed(history):
-            role = "You" if row["role"] == "assistant" else user_name
-            day = row["created_at"].strftime("%b %d")
-            channel_label = _channel_label(row.get("channel", "pwa"))
-            content = row["content"][:100]
-            parts.append(f"- {day} {channel_label} ({role}): {content}")
 
     # Behavioral rules
     parts.append("\nRULES:")

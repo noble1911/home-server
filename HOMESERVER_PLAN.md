@@ -518,7 +518,7 @@ CREATE TABLE butler.conversation_history (
     user_id TEXT NOT NULL REFERENCES butler.users(id),
     role TEXT NOT NULL,  -- 'user' or 'assistant'
     content TEXT NOT NULL,
-    summary TEXT,        -- AI-generated summary for context injection
+    summary TEXT,        -- AI-generated summary (historical; context now uses full messages)
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -549,39 +549,50 @@ CREATE INDEX idx_history_user_date ON butler.conversation_history(user_id, creat
 
 1. **On conversation start:**
    - Load user's soul config into system prompt
-   - Retrieve recent conversation summaries (last 7 days)
-   - Fetch relevant long-term facts based on conversation context
+   - Load recent conversation messages as multi-turn history (last 20 messages, 7-day window) — passed as actual message objects in the Claude API messages array, not as text in the system prompt
+   - Fetch relevant long-term facts via hybrid search: semantic similarity (pgvector embedding of current message) + highest-confidence facts, deduplicated
 
 2. **During conversation:**
    - Store each exchange in conversation_history
    - Extract and store new facts ("I love sci-fi" → user_facts)
 
 3. **After conversation:**
-   - Generate summary of conversation
    - Update fact confidence scores based on usage
 
-#### Example System Prompt Injection
+#### Example System Prompt & Messages
 
+The system prompt contains personality and facts only. Conversation history is passed as actual messages in the Claude API messages array for proper multi-turn context:
+
+**System Prompt:**
 ```
-You are a helpful home assistant. You're speaking with Ron.
+You are Butler, a helpful AI assistant. You are speaking with Ron.
 
 PERSONALITY:
 - Style: friendly and efficient
-- Formality: casual
 - Verbosity: concise
 - Humor: yes
 
 WHAT YOU KNOW ABOUT RON:
-- Prefers audiobooks at 1.2x speed
-- Favorite author: Brandon Sanderson
-- Listens to audiobooks during commute (8am, 6pm)
-- Recently asked about the Dune series
+- [preference] Prefers audiobooks at 1.2x speed
+- [media] Favorite author: Brandon Sanderson
+- [routine] Listens to audiobooks during commute (8am, 6pm)
+- [media] Recently asked about the Dune series
 
-RECENT CONTEXT (last 7 days, across all channels):
-- Feb 04 [via voice] (Ron): What's the weather tomorrow?
-- Feb 04 [via voice] (You): Tomorrow looks sunny, around 18°C.
-- Feb 05 [via text] (Ron): Download "The Way of Kings" audiobook
-- Feb 05 [via text] (You): Done! Added to your library.
+RULES:
+- Be concise in voice responses (1-2 sentences unless asked for detail)
+- Use remember_fact to store important information about the user
+- For home automation, confirm before executing destructive actions
+```
+
+**Messages Array (multi-turn history + current message):**
+```json
+[
+  {"role": "user", "content": "What's the weather tomorrow?"},
+  {"role": "assistant", "content": "Tomorrow looks sunny, around 18°C."},
+  {"role": "user", "content": "Download 'The Way of Kings' audiobook"},
+  {"role": "assistant", "content": "Done! Added to your library."},
+  {"role": "user", "content": "Will I need an umbrella this weekend?"}
+]
 ```
 
 #### Memory Tools
@@ -592,7 +603,7 @@ Custom Python tools interface directly with PostgreSQL (not Butler API's built-i
 |------|---------|
 | `remember_fact` | Store a new fact about the user |
 | `recall_facts` | Retrieve relevant facts for context |
-| `get_recent_conversations` | Get conversation summaries |
+| `get_recent_conversations` | Get recent conversation messages |
 | `update_soul` | Modify user's personality settings |
 
 #### Adding New Users
@@ -1306,17 +1317,17 @@ This does NOT protect against: Mac Mini theft/fire (use cloud for that).
 
 | Item | Cost (£) | Notes |
 |------|----------|-------|
-| [Claude API](https://www.anthropic.com/api) | ~£3.50 | Butler brain (~500 requests/month) |
+| [Claude API](https://www.anthropic.com/api) | ~£7.00 | Butler brain (~500 requests/month with multi-turn history) |
 | Electricity | ~£3.70 | Mac Mini 24/7 (~15W avg × 730hrs × 34p/kWh) |
 | [AWS Lambda](https://aws.amazon.com/lambda/) (haaska) | £0 | Free tier (1M requests/month) |
 | [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/) | £0 | Free tier — primary remote access |
 | Voice (Groq Whisper + Kokoro TTS) | £0 | STT via Groq free tier, TTS runs locally |
 | All software | £0 | Open source |
-| **Total Monthly (no backup)** | **~£7.21** | |
+| **Total Monthly (no backup)** | **~£10.70** | |
 | | | |
 | **Optional Add-ons:** | | |
 | [iCloud 2TB](https://www.apple.com/uk/icloud/) | +£6.99 | Photo & document backup (user choice) |
-| **Total Monthly (with iCloud)** | **~£14.20** | If user enables cloud backup |
+| **Total Monthly (with iCloud)** | **~£17.69** | If user enables cloud backup |
 
 ### Subscription Savings (Estimated UK Prices)
 
@@ -1330,30 +1341,30 @@ This does NOT protect against: Mac Mini theft/fire (use cloud for that).
 | Audible | £7.99 | Replaced by Audiobookshelf |
 | Smart Home (various) | ~£5.00 | Replaced by haaska (free) |
 | **Gross Savings** | **~£51.44/month** | All services replaced |
-| Minus server costs | -£7.21 | |
-| **Net Savings** | **~£44.23/month** | |
+| Minus server costs | -£10.70 | |
+| **Net Savings** | **~£40.74/month** | |
 
 ### Break-Even Analysis
 
 | Item | Value |
 |------|-------|
 | Hardware cost (estimated) | ~£1,000 |
-| Monthly net savings | £44.23 |
-| **Break-even point** | **~23 months (~1.9 years)** |
+| Monthly net savings | £40.74 |
+| **Break-even point** | **~25 months (~2.0 years)** |
 
 > **Note:** Actual savings depend on which subscriptions you currently have. If you only had Netflix + Audible, savings would be lower. The non-financial benefits (privacy, ownership, no ads, no content removal, Alexa voice control) are immediate.
 >
-> **If you add iCloud backup (£6.99/mo):** Net savings = £37.24/month, break-even = ~27 months
+> **If you add iCloud backup (£6.99/mo):** Net savings = £33.75/month, break-even = ~30 months
 
 ### Total Cost of Ownership (5 Years)
 
 | Scenario | Calculation | Total |
 |----------|-------------|-------|
-| **Self-hosted (no backup)** | £1,000 + (£7.21 × 60 months) | **£1,433** |
-| **Self-hosted (with iCloud)** | £1,000 + (£14.20 × 60 months) | **£1,852** |
+| **Self-hosted (no backup)** | £1,000 + (£10.70 × 60 months) | **£1,642** |
+| **Self-hosted (with iCloud)** | £1,000 + (£17.69 × 60 months) | **£2,061** |
 | **Subscriptions only** | £51.44 × 60 months | **£3,086** |
-| **Savings (no backup)** | | **£1,653 saved** |
-| **Savings (with iCloud)** | | **£1,234 saved** |
+| **Savings (no backup)** | | **£1,444 saved** |
+| **Savings (with iCloud)** | | **£1,025 saved** |
 
 ---
 

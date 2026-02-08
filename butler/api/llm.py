@@ -4,9 +4,14 @@ This module calls the Anthropic API directly using the existing Tool classes
 from tools/. The key adapter is tool_to_anthropic_schema() which
 converts our OpenAI-format tool schemas to Anthropic's format.
 
-Two main functions:
+Three main functions:
 - chat_with_tools(): Batch mode — waits for full response (used by text chat)
 - stream_chat_with_tools(): Streaming mode — yields text chunks via SSE (used by voice)
+- stream_chat_with_events(): Event streaming — yields structured events (used by PWA)
+
+All three accept an optional `history` parameter for multi-turn conversation
+context. History messages are prepended to the messages array so Claude sees
+the full conversation.
 """
 
 from __future__ import annotations
@@ -49,12 +54,48 @@ def tool_to_anthropic_schema(tool: Tool) -> dict:
     }
 
 
+def _build_messages(
+    user_message: str,
+    history: list[dict] | None = None,
+) -> list[dict]:
+    """Build the messages array with optional conversation history.
+
+    Prepends history messages, then appends the current user message.
+    Ensures the first message is always from the user role (Claude API requirement)
+    by stripping any leading assistant messages from history.
+    """
+    messages: list[dict] = []
+
+    if history:
+        # Skip leading assistant messages — Claude requires the first message
+        # to have role "user". This can happen when the user's oldest message
+        # aged out of the history window.
+        started = False
+        for msg in history:
+            if not started:
+                if msg["role"] != "user":
+                    continue
+                started = True
+            messages.append({"role": msg["role"], "content": msg["content"]})
+
+    # Claude requires strict user/assistant alternation. If history ends
+    # with a user message (e.g. the previous assistant reply wasn't stored),
+    # merge into it to avoid consecutive user messages.
+    if messages and messages[-1]["role"] == "user":
+        messages[-1]["content"] += "\n\n" + user_message
+    else:
+        messages.append({"role": "user", "content": user_message})
+
+    return messages
+
+
 async def chat_with_tools(
     system_prompt: str,
     user_message: str,
     tools: dict[str, Tool],
     max_tool_rounds: int = 5,
     *,
+    history: list[dict] | None = None,
     db_pool: DatabasePool | None = None,
     user_id: str | None = None,
     channel: str | None = None,
@@ -62,7 +103,7 @@ async def chat_with_tools(
     """Send a message to Claude, execute any tool calls, and return the response.
 
     Implements the multi-turn tool use loop:
-    1. Send user message + tool definitions to Claude
+    1. Send conversation history + user message + tool definitions to Claude
     2. If response has tool_use blocks, execute each tool
     3. Send tool results back and repeat
     4. Return final text when Claude responds without tool use
@@ -72,18 +113,19 @@ async def chat_with_tools(
         user_message: User's text message or voice transcript
         tools: Dict of tool_name -> Tool instance
         max_tool_rounds: Safety limit on tool use iterations
+        history: Previous conversation messages for multi-turn context
 
     Returns:
         Claude's final text response
     """
     client = _get_client()
     tool_definitions = [tool_to_anthropic_schema(t) for t in tools.values()]
-    messages: list[dict] = [{"role": "user", "content": user_message}]
+    messages = _build_messages(user_message, history)
 
     for round_num in range(max_tool_rounds):
         response = await client.messages.create(
             model=settings.anthropic_model,
-            max_tokens=1024,
+            max_tokens=settings.max_tokens,
             system=system_prompt,
             tools=tool_definitions if tools else [],
             messages=messages,
@@ -135,6 +177,7 @@ async def stream_chat_with_tools(
     tools: dict[str, Tool],
     max_tool_rounds: int = 5,
     *,
+    history: list[dict] | None = None,
     db_pool: DatabasePool | None = None,
     user_id: str | None = None,
     channel: str | None = None,
@@ -154,18 +197,19 @@ async def stream_chat_with_tools(
         user_message: User's text message or voice transcript
         tools: Dict of tool_name -> Tool instance
         max_tool_rounds: Safety limit on tool use iterations
+        history: Previous conversation messages for multi-turn context
 
     Yields:
         Text chunks as they arrive from Claude's streaming API
     """
     client = _get_client()
     tool_definitions = [tool_to_anthropic_schema(t) for t in tools.values()]
-    messages: list[dict] = [{"role": "user", "content": user_message}]
+    messages = _build_messages(user_message, history)
 
     for round_num in range(max_tool_rounds):
         async with client.messages.stream(
             model=settings.anthropic_model,
-            max_tokens=1024,
+            max_tokens=settings.max_tokens,
             system=system_prompt,
             tools=tool_definitions if tools else [],
             messages=messages,
@@ -217,6 +261,7 @@ async def stream_chat_with_events(
     tools: dict[str, Tool],
     max_tool_rounds: int = 5,
     *,
+    history: list[dict] | None = None,
     db_pool: DatabasePool | None = None,
     user_id: str | None = None,
     channel: str | None = None,
@@ -234,12 +279,12 @@ async def stream_chat_with_events(
     """
     client = _get_client()
     tool_definitions = [tool_to_anthropic_schema(t) for t in tools.values()]
-    messages: list[dict] = [{"role": "user", "content": user_message}]
+    messages = _build_messages(user_message, history)
 
     for round_num in range(max_tool_rounds):
         async with client.messages.stream(
             model=settings.anthropic_model,
-            max_tokens=1024,
+            max_tokens=settings.max_tokens,
             system=system_prompt,
             tools=tool_definitions if tools else [],
             messages=messages,
