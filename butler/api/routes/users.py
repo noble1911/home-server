@@ -188,28 +188,27 @@ async def update_notifications(
     pool: DatabasePool = Depends(get_db_pool),
 ):
     """Update phone number and/or notification preferences."""
-    db = pool.pool
+    async with pool.pool.acquire() as conn:
+        async with conn.transaction():
+            if req.phone is not None:
+                await conn.execute(
+                    "UPDATE butler.users SET phone = $2 WHERE id = $1",
+                    user_id,
+                    req.phone if req.phone else None,
+                )
 
-    async with db.transaction():
-        if req.phone is not None:
-            await db.execute(
-                "UPDATE butler.users SET phone = $2 WHERE id = $1",
-                user_id,
-                req.phone if req.phone else None,
-            )
-
-        if req.notificationPrefs is not None:
-            prefs_dict = {
-                "enabled": req.notificationPrefs.enabled,
-                "categories": req.notificationPrefs.categories,
-                "quiet_hours_start": req.notificationPrefs.quietHoursStart,
-                "quiet_hours_end": req.notificationPrefs.quietHoursEnd,
-            }
-            await db.execute(
-                "UPDATE butler.users SET notification_prefs = $2::jsonb WHERE id = $1",
-                user_id,
-                json.dumps(prefs_dict),
-            )
+            if req.notificationPrefs is not None:
+                prefs_dict = {
+                    "enabled": req.notificationPrefs.enabled,
+                    "categories": req.notificationPrefs.categories,
+                    "quiet_hours_start": req.notificationPrefs.quietHoursStart,
+                    "quiet_hours_end": req.notificationPrefs.quietHoursEnd,
+                }
+                await conn.execute(
+                    "UPDATE butler.users SET notification_prefs = $2::jsonb WHERE id = $1",
+                    user_id,
+                    json.dumps(prefs_dict),
+                )
 
     return await _get_profile(user_id, pool)
 

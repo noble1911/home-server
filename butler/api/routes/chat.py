@@ -75,26 +75,26 @@ async def text_chat(
 
     message_id = str(uuid.uuid4())
 
-    db = pool.pool
-    async with db.transaction():
-        await db.execute(
-            """
-            INSERT INTO butler.conversation_history (user_id, channel, role, content, metadata)
-            VALUES ($1, 'pwa', 'user', $2, $3::jsonb)
-            """,
-            user_id,
-            user_content,
-            json.dumps(user_metadata),
-        )
-        await db.execute(
-            """
-            INSERT INTO butler.conversation_history (user_id, channel, role, content, metadata)
-            VALUES ($1, 'pwa', 'assistant', $2, $3::jsonb)
-            """,
-            user_id,
-            response_text,
-            json.dumps({"message_id": message_id}),
-        )
+    async with pool.pool.acquire() as conn:
+        async with conn.transaction():
+            await conn.execute(
+                """
+                INSERT INTO butler.conversation_history (user_id, channel, role, content, metadata)
+                VALUES ($1, 'pwa', 'user', $2, $3::jsonb)
+                """,
+                user_id,
+                user_content,
+                json.dumps(user_metadata),
+            )
+            await conn.execute(
+                """
+                INSERT INTO butler.conversation_history (user_id, channel, role, content, metadata)
+                VALUES ($1, 'pwa', 'assistant', $2, $3::jsonb)
+                """,
+                user_id,
+                response_text,
+                json.dumps({"message_id": message_id}),
+            )
 
     # Auto-learn: extract facts in the background (fire-and-forget)
     asyncio.create_task(
@@ -205,28 +205,28 @@ async def stream_text_chat(
             full_text = "".join(full_response_parts)
             if full_text:
                 try:
-                    db = pool.pool
-                    async with db.transaction():
-                        await db.execute(
-                            """
-                            INSERT INTO butler.conversation_history
-                                (user_id, channel, role, content, metadata)
-                            VALUES ($1, 'pwa', 'user', $2, $3::jsonb)
-                            """,
-                            user_id,
-                            user_content,
-                            json.dumps(user_metadata),
-                        )
-                        await db.execute(
-                            """
-                            INSERT INTO butler.conversation_history
-                                (user_id, channel, role, content, metadata)
-                            VALUES ($1, 'pwa', 'assistant', $2, $3::jsonb)
-                            """,
-                            user_id,
-                            full_text,
-                            json.dumps({"message_id": message_id}),
-                        )
+                    async with pool.pool.acquire() as conn:
+                        async with conn.transaction():
+                            await conn.execute(
+                                """
+                                INSERT INTO butler.conversation_history
+                                    (user_id, channel, role, content, metadata)
+                                VALUES ($1, 'pwa', 'user', $2, $3::jsonb)
+                                """,
+                                user_id,
+                                user_content,
+                                json.dumps(user_metadata),
+                            )
+                            await conn.execute(
+                                """
+                                INSERT INTO butler.conversation_history
+                                    (user_id, channel, role, content, metadata)
+                                VALUES ($1, 'pwa', 'assistant', $2, $3::jsonb)
+                                """,
+                                user_id,
+                                full_text,
+                                json.dumps({"message_id": message_id}),
+                            )
                     # Auto-learn: extract facts in the background
                     asyncio.create_task(
                         extract_and_store_facts(
