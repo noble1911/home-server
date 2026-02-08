@@ -142,7 +142,7 @@ async def _hybrid_fact_search(db, user_id: str, query_vector: list[float]) -> li
         LIMIT 10
         """,
         user_id,
-        str(query_vector),
+        "[" + ",".join(str(x) for x in query_vector) + "]",
     )
 
     # Confidence search: top general-purpose facts
@@ -185,7 +185,7 @@ async def load_conversation_messages(
     Returns a list of {"role": "user"|"assistant", "content": "..."} dicts
     in chronological order, ready to prepend to the messages array.
     """
-    max_msgs = limit or settings.max_history_messages
+    max_msgs = limit if limit is not None else settings.max_history_messages
     db = pool.pool
 
     rows = await db.fetch(

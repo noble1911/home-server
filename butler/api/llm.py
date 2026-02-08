@@ -61,18 +61,28 @@ def _build_messages(
     """Build the messages array with optional conversation history.
 
     Prepends history messages, then appends the current user message.
-    Ensures the first message is always from the user role (Claude API requirement).
+    Ensures the first message is always from the user role (Claude API requirement)
+    by stripping any leading assistant messages from history.
     """
     messages: list[dict] = []
 
     if history:
+        # Skip leading assistant messages — Claude requires the first message
+        # to have role "user". This can happen when the user's oldest message
+        # aged out of the history window.
+        started = False
         for msg in history:
+            if not started:
+                if msg["role"] != "user":
+                    continue
+                started = True
             messages.append({"role": msg["role"], "content": msg["content"]})
 
-    # If history ends with a user message, merge the current message into it
-    # to avoid consecutive user messages (Claude API requirement).
+    # Claude requires strict user/assistant alternation. If history ends
+    # with a user message (e.g. the previous assistant reply wasn't stored),
+    # merge into it to avoid consecutive user messages.
     if messages and messages[-1]["role"] == "user":
-        messages[-1]["content"] += "\n" + user_message
+        messages[-1]["content"] += "\n\n" + user_message
     else:
         messages.append({"role": "user", "content": user_message})
 

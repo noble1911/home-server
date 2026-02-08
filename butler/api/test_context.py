@@ -17,6 +17,7 @@ from .context import (
     load_user_context,
     load_conversation_messages,
 )
+from .llm import _build_messages
 
 
 @pytest.fixture
@@ -312,3 +313,69 @@ class TestHybridFactSearch:
         facts = await _hybrid_fact_search(db, "user1", [0.5] * 768)
         assert facts[0]["id"] == 10
         assert facts[1]["id"] == 20
+
+
+class TestBuildMessages:
+    """Tests for _build_messages in llm.py."""
+
+    def test_no_history(self):
+        """Without history, returns a single user message."""
+        messages = _build_messages("Hello")
+        assert messages == [{"role": "user", "content": "Hello"}]
+
+    def test_with_normal_history(self):
+        """History + current message produces correct messages array."""
+        history = [
+            {"role": "user", "content": "Hi"},
+            {"role": "assistant", "content": "Hello!"},
+        ]
+        messages = _build_messages("How are you?", history)
+        assert len(messages) == 3
+        assert messages[0] == {"role": "user", "content": "Hi"}
+        assert messages[1] == {"role": "assistant", "content": "Hello!"}
+        assert messages[2] == {"role": "user", "content": "How are you?"}
+
+    def test_strips_leading_assistant_messages(self):
+        """Leading assistant messages are dropped (Claude API requires user first)."""
+        history = [
+            {"role": "assistant", "content": "Orphaned reply"},
+            {"role": "user", "content": "Real question"},
+            {"role": "assistant", "content": "Real answer"},
+        ]
+        messages = _build_messages("Follow-up", history)
+        assert messages[0]["role"] == "user"
+        assert messages[0]["content"] == "Real question"
+        assert len(messages) == 3
+
+    def test_strips_multiple_leading_assistant_messages(self):
+        """Multiple leading assistant messages are all dropped."""
+        history = [
+            {"role": "assistant", "content": "First orphan"},
+            {"role": "assistant", "content": "Second orphan"},
+            {"role": "user", "content": "Hello"},
+            {"role": "assistant", "content": "Hi there"},
+        ]
+        messages = _build_messages("World", history)
+        assert messages[0]["role"] == "user"
+        assert messages[0]["content"] == "Hello"
+        assert len(messages) == 3
+
+    def test_all_assistant_history_stripped(self):
+        """If history is all assistant messages, only current message remains."""
+        history = [
+            {"role": "assistant", "content": "Orphan 1"},
+            {"role": "assistant", "content": "Orphan 2"},
+        ]
+        messages = _build_messages("Hello")
+        assert messages == [{"role": "user", "content": "Hello"}]
+
+    def test_merges_trailing_user_in_history(self):
+        """If history ends with user, current message is merged to avoid consecutive user roles."""
+        history = [
+            {"role": "user", "content": "Previous unanswered question"},
+        ]
+        messages = _build_messages("New question", history)
+        assert len(messages) == 1
+        assert messages[0]["role"] == "user"
+        assert "Previous unanswered question" in messages[0]["content"]
+        assert "New question" in messages[0]["content"]

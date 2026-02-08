@@ -80,11 +80,10 @@ async def init_resources() -> None:
 
     # Embedding service for semantic memory search (optional)
     _embedding_service = EmbeddingService(settings.ollama_url) if settings.ollama_url else None
-    embedding_service = _embedding_service
 
     _tools = {
-        "remember_fact": RememberFactTool(_db_pool, embedding_service),
-        "recall_facts": RecallFactsTool(_db_pool, embedding_service),
+        "remember_fact": RememberFactTool(_db_pool, _embedding_service),
+        "recall_facts": RecallFactsTool(_db_pool, _embedding_service),
         "get_user": GetUserTool(_db_pool),
     }
 
