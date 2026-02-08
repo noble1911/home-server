@@ -18,7 +18,7 @@ from starlette.responses import StreamingResponse
 from tools import DatabasePool, Tool
 
 from ..context import load_user_context
-from ..deps import get_current_user, get_db_pool, get_tools, get_user_tools
+from ..deps import get_current_user, get_db_pool, get_embedding_service, get_tools, get_user_tools
 from ..llm import chat_with_tools, stream_chat_with_events
 from ..models import ChatHistoryResponse, ChatRequest, ChatResponse, HistoryMessage
 
@@ -40,13 +40,18 @@ async def text_chat(
     conversation history, and returns a message_id for the PWA to
     track the response.
     """
-    ctx = await load_user_context(pool, user_id)
+    ctx = await load_user_context(
+        pool, user_id,
+        current_message=req.message,
+        embedding_service=get_embedding_service(),
+    )
     all_tools = await get_user_tools(user_id, tools, pool)
 
     response_text = await chat_with_tools(
         system_prompt=ctx.system_prompt,
         user_message=req.message,
         tools=all_tools,
+        history=ctx.history,
         db_pool=pool,
         user_id=user_id,
         channel="pwa",
@@ -143,7 +148,11 @@ async def stream_text_chat(
         data: {"type":"done","message_id":"<uuid>"}
         data: [DONE]
     """
-    ctx = await load_user_context(pool, user_id)
+    ctx = await load_user_context(
+        pool, user_id,
+        current_message=req.message,
+        embedding_service=get_embedding_service(),
+    )
     all_tools = await get_user_tools(user_id, tools, pool)
     message_id = str(uuid.uuid4())
     full_response_parts: list[str] = []
@@ -154,6 +163,7 @@ async def stream_text_chat(
                 system_prompt=ctx.system_prompt,
                 user_message=req.message,
                 tools=all_tools,
+                history=ctx.history,
                 db_pool=pool,
                 user_id=user_id,
                 channel="pwa",

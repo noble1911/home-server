@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     # Claude API
     anthropic_api_key: str = ""
     anthropic_model: str = "claude-sonnet-4-20250514"
+    max_tokens: int = 4096
+    max_history_messages: int = 20
 
     # LiveKit (must match voice-stack/livekit.yaml)
     livekit_url: str = "ws://livekit:7880"

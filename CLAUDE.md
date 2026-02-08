@@ -184,8 +184,8 @@ home-server/
 
 | Config | Cost |
 |--------|------|
-| No backup | ~£7.21 (Claude API + electricity) |
-| With iCloud 2TB | ~£14.20 |
+| No backup | ~£10.70 (Claude API + electricity) |
+| With iCloud 2TB | ~£17.69 |
 
 ## Design Decisions Made (2026-02-05)
 
