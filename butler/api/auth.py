@@ -97,11 +97,11 @@ def create_livekit_token(user_id: str, room_name: str) -> str:
     token = AccessToken(settings.livekit_api_key, settings.livekit_api_secret)
     token.identity = user_id
     token.name = user_id
-    token.video_grants = VideoGrants(
+    token.with_grants(VideoGrants(
         room_join=True,
         room=room_name,
         can_publish=True,
         can_subscribe=True,
-    )
+    ))
     token.ttl = timedelta(hours=1)
     return token.to_jwt()
