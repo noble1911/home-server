@@ -21,7 +21,7 @@ This guide walks through everything needed to set up your home server from scrat
 
 ### 1.1 External Drive
 
-> **No external drive?** Pass `--skip-drive` to `setup.sh` and data will be stored at `~/HomeServer` on the internal SSD instead. Skip to [1.2 Network](#12-network).
+> **No external drive?** Pass `--skip-drive` to `setup.sh` and data will be stored at `~/HomeServer` on the internal SSD instead. You can migrate to an external drive later with `scripts/change-drive.sh`. Skip to [1.2 Network](#12-network).
 
 Plug in your external USB drive and format it:
 
@@ -232,6 +232,9 @@ curl -fsSL https://raw.githubusercontent.com/noble1911/home-server/main/setup.sh
 
 # No external drive — store everything on internal SSD
 curl -fsSL https://raw.githubusercontent.com/noble1911/home-server/main/setup.sh | bash -s -- --skip-drive
+
+# Later, migrate from internal SSD to an external drive:
+cd ~/home-server && ./scripts/change-drive.sh
 ```
 
 ### What Gets Deployed
