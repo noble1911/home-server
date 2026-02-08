@@ -199,16 +199,6 @@ class RememberFactTool(DatabaseTool):
 
         pool = await self._get_pool()
 
-        # Ensure user exists
-        await pool.execute(
-            """
-            INSERT INTO butler.users (id, name)
-            VALUES ($1, $1)
-            ON CONFLICT (id) DO NOTHING
-            """,
-            user_id
-        )
-
         # Generate embedding if service available
         embedding = None
         if self._embedding_service:

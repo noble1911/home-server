@@ -45,6 +45,11 @@ async def execute_and_log_tool(
         )
         return result
 
+    # Override user_id in tool input with the authenticated user so the LLM
+    # can't accidentally create phantom users by guessing names.
+    if user_id and "user_id" in tool_input:
+        tool_input = {**tool_input, "user_id": user_id}
+
     start = time.monotonic()
     error_msg: str | None = None
     try:

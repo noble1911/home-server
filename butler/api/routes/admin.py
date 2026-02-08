@@ -131,7 +131,8 @@ async def list_users(
     """List all users with their roles and permissions. Admin only."""
     db = pool.pool
     rows = await db.fetch(
-        "SELECT id, name, role, permissions FROM butler.users ORDER BY created_at"
+        "SELECT id, name, role, permissions FROM butler.users "
+        "WHERE id NOT IN ('default', 'system') ORDER BY created_at"
     )
     users = []
     for r in rows:
