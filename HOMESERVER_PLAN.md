@@ -3,9 +3,9 @@
 > **Hardware:** Mac Mini M4 (24GB Unified Memory, 512GB SSD) + External USB Drive
 > **Goal:** Self-hosted, privacy-focused media server with AI voice assistant + Alexa
 > **Monthly Cost:** ~£7.21 (API + electricity) — backup optional, Alexa via free haaska
-> **Butler Engine:** [Nanobot](https://github.com/HKUDS/nanobot) (~4k lines, skill-based)
+> **Butler Engine:** Butler API (~4k lines, FastAPI + custom Python tools)
 >
-> ⚠️ **Note (2026-02-05):** Nanobot uses a "skills" system (markdown instruction files) and custom Python tools. Skills teach the agent how to use tools; the agent then calls built-in executors (shell, filesystem, web). Custom Python tools are registered in `nanobot/tools/`.
+> ⚠️ **Note (2026-02-05):** Butler API uses a "skills" system (markdown instruction files) and custom Python tools. Skills teach the agent how to use tools; the agent then calls built-in executors (shell, filesystem, web). Custom Python tools are registered in `butler/tools/`.
 
 ---
 
@@ -130,9 +130,7 @@
 
 | Service | Homepage | Purpose | Run Method | RAM (Idle) | RAM (Peak) | Port |
 |---------|----------|---------|------------|------------|------------|------|
-| [**Nanobot**](https://github.com/HKUDS/nanobot) | [GitHub](https://github.com/HKUDS/nanobot) | Ultra-lightweight AI agent (~4k lines) | Docker container | 100MB | 300MB | 8100 |
-| **Butler API** | Self-built | FastAPI gateway for PWA, voice, and chat (uses Claude API + tools) | Docker container | 50MB | 200MB | 8000 |
-| Custom Skills/Tools | Self-built | Skills (markdown) + Tools (Python) for service integrations | Part of Nanobot | Included | Included | - |
+| **Butler API** | Self-built | FastAPI backend for PWA, voice, and chat (Claude API + custom Python tools) | Docker container | 100MB | 300MB | 8000 |
 | [**APScheduler**](https://apscheduler.readthedocs.io/) | [Docs](https://apscheduler.readthedocs.io/) | Cron-style task scheduling | Part of Agent | Included | Included | - |
 
 > **Note:** The LLM (Claude) and STT (Groq Whisper) run in the cloud to preserve local RAM. TTS (Kokoro) runs locally for low latency.
@@ -197,7 +195,7 @@
 | Category | Services | Idle Total | Peak Total |
 |----------|----------|------------|------------|
 | **macOS + OrbStack** | System overhead | 3.5GB | 5GB |
-| **Voice Assistant** | LiveKit, Kokoro, Nanobot | 1.0GB | 2.1GB |
+| **Voice Assistant** | LiveKit, Kokoro, Butler API | 1.0GB | 2.1GB |
 | **Media** | Jellyfin, *arrs, qBit | 1.5GB | 5.9GB |
 | **Photos/Files** | Immich, Nextcloud | 1.4GB | 5GB |
 | **Books** | Calibre, Audiobookshelf, Readarr | 0.7GB | 1.2GB |
@@ -215,7 +213,7 @@
 | LiveKit Agent | 300MB | 500MB | Python orchestrator |
 | Groq Whisper STT | 0MB | 0MB | Cloud API (free tier) |
 | Kokoro TTS | 400MB | 800MB | Local TTS model |
-| Nanobot | 100MB | 300MB | Agent + Python tools |
+| Butler API | 100MB | 300MB | Agent + Python tools |
 | **Total Voice** | **1.0GB** | **2.1GB** | |
 
 ### Peak Scenario Analysis
@@ -234,31 +232,29 @@
 
 ## AI Butler Architecture
 
-### Technology Choice: Nanobot
+### Technology Choice: Butler API
 
-After evaluating options, **[Nanobot](https://github.com/HKUDS/nanobot)** is the chosen foundation:
+We built our own lightweight FastAPI backend rather than adopting an existing framework:
 
-| Factor | Nanobot | OpenClaw | Winner |
-|--------|---------|----------|--------|
-| Codebase | ~4,000 lines | 430,000+ lines | ✅ Nanobot |
-| Auditability | Easy to read entire codebase | Requires significant time | ✅ Nanobot |
-| Tool Support | Native | Native | Tie |
-| WhatsApp | WebSocket (no public IP) | Yes | ✅ Nanobot |
-| Voice | Groq Whisper (free tier) | Various | ✅ Nanobot |
-| Scheduling | Cron + intervals | Yes | Tie |
-| Customization | Research-friendly, designed for forking | Feature-complete but complex | ✅ Nanobot |
-| Security surface | Minimal | Large | ✅ Nanobot |
-
-> *"Nanobot does not aim to replace full-featured frameworks for production, but it is perfect for prototyping, learning, and quickly starting your own experiments with autonomous AI agents."* - [HKUDS](https://github.com/HKUDS/nanobot)
+| Factor | Butler API (self-built) | OpenClaw | Why we built our own |
+|--------|------------------------|----------|----------------------|
+| Codebase | ~4,000 lines | 430,000+ lines | Easy to audit and maintain |
+| Auditability | Read in an afternoon | Requires significant time | Security-critical for home use |
+| Tool Support | Custom Python tools | Native | Full control over integrations |
+| WhatsApp | WebSocket (no public IP) | Yes | No port forwarding needed |
+| Voice | Groq Whisper (free tier) | Various | Cost-effective STT |
+| Scheduling | Cron + intervals | Yes | Simple and sufficient |
+| Customization | Designed for our use case | Feature-complete but complex | No unnecessary abstractions |
+| Security surface | Minimal | Large | Smaller attack surface |
 
 ### Design Philosophy
 
-The Butler is built on **Nanobot with custom Python tools**, keeping the codebase minimal and auditable:
+The Butler is built on **custom Python tools**, keeping the codebase minimal and auditable:
 
 | Principle | Implementation |
 |-----------|----------------|
-| **No external skills** | Skill download capability removed from codebase |
-| **Custom tools only** | All integrations built and audited by us |
+| **No external dependencies for AI tools** | Skill download capability removed from codebase |
+| **Custom Python tools only** | All integrations built and audited by us |
 | **Network isolation** | Cloudflare Tunnel for remote access, admin services LAN-only |
 | **Read-only where possible** | Calendar, email, location = read-only access |
 | **Multi-user** | Supports both household members |
@@ -320,7 +316,7 @@ The Butler is built on **Nanobot with custom Python tools**, keeping the codebas
 │  │  │  └───────────┘ └───────────┘ └───────────┘ └───────────┘       │ │ │
 │  │  │                                                                 │ │ │
 │  │  │  ┌───────────────────────────────────────────────────────────┐ │ │ │
-│  │  │  │           NANOBOT + CUSTOM PYTHON TOOLS                   │ │ │ │
+│  │  │  │           BUTLER API + CUSTOM TOOLS                       │ │ │ │
 │  │  │  │                                                           │ │ │ │
 │  │  │  │  ╔═══════════════════════════════════════════════════╗   │ │ │ │
 │  │  │  │  ║  READ-ONLY TOOLS                                   ║   │ │ │ │
@@ -590,7 +586,7 @@ RECENT CONTEXT (last 7 days, across all channels):
 
 #### Memory Tools
 
-Custom Python tools interface directly with PostgreSQL (not Nanobot's built-in `memory.py`):
+Custom Python tools interface directly with PostgreSQL (not Butler API's built-in `memory.py`):
 
 | Tool | Purpose |
 |------|---------|
@@ -690,7 +686,7 @@ Custom Python tools interface directly with PostgreSQL (not Nanobot's built-in `
 
 ### Integrations (Custom Skills & Tools)
 
-> **Note:** These are implemented as Nanobot skills (markdown instructions) or custom Python tools in the `nanobot/tools/` directory.
+> **Note:** These are implemented as custom Python tools in the `butler/tools/` directory.
 
 #### Read-Only Integrations
 
@@ -747,7 +743,7 @@ Instead of the paid Home Assistant Cloud (£5/month), we use the community-maint
                       └───────────────┘     └───────────────┘             │
                                                                           ▼
                                                                   ┌───────────────┐
-                                                                  │   Nanobot     │
+                                                                  │   Butler API     │
                                                                   │   Butler      │
                                                                   └───────────────┘
 ```
@@ -777,13 +773,13 @@ Instead of the paid Home Assistant Cloud (£5/month), we use the community-maint
 **Alexa Invocation Options:**
 - `"Alexa, ask Home to..."` - triggers Home Assistant skill
 - `"Alexa, tell Butler to..."` - can create custom invocation name
-- Simple commands go direct to HA; complex ones routed to Nanobot
+- Simple commands go direct to HA; complex ones routed to Butler API
 
-### Security Approach (Nanobot)
+### Security Approach
 
-Nanobot is already minimal (~4k lines), but we further harden it:
+Butler API is already minimal (~4k lines), but we further harden it:
 
-| Nanobot Feature | Our Configuration |
+| Butler API Feature | Our Configuration |
 |-----------------|-------------------|
 | External skill loading | ❌ Disabled in config |
 | Tool directory | ⚠️ Locked to our custom Python tools only |
@@ -792,11 +788,10 @@ Nanobot is already minimal (~4k lines), but we further harden it:
 | Network access | ⚠️ Cloudflare Tunnel (no public ports) |
 | LLM providers | ✅ Claude API only |
 | WhatsApp | ✅ WebSocket mode (no public IP) |
-| Telegram | ✅ Voice + text enabled |
 | Scheduler | ✅ Cron for automations |
 | User allowlist | ✅ Only specified phone numbers |
 
-**Why Nanobot is more secure than OpenClaw:**
+**Why Butler API security approach:**
 - 99% smaller attack surface (4k vs 430k lines)
 - Entire codebase readable in an afternoon
 - Research-focused = clean, auditable code
@@ -1383,7 +1378,7 @@ All software used in this project with links to official sources.
 | [Groq Whisper](https://console.groq.com/) | [groq.com](https://console.groq.com/) | Cloud speech-to-text (Whisper large-v3-turbo, free tier) | Commercial |
 | [Kokoro TTS](https://github.com/remsky/Kokoro-FastAPI) | [GitHub](https://github.com/remsky/Kokoro-FastAPI) | High-quality local text-to-speech | Apache 2.0 |
 | [Claude API](https://www.anthropic.com/api) | [anthropic.com](https://www.anthropic.com/api) | LLM for understanding, reasoning, function calling | Commercial |
-| [Nanobot](https://github.com/HKUDS/nanobot) | [GitHub](https://github.com/HKUDS/nanobot) | Ultra-lightweight AI agent framework (~4k lines) | MIT |
+| Butler API | Self-built | FastAPI backend with custom Python tools (~4k lines) | - |
 
 ### Media & Entertainment
 

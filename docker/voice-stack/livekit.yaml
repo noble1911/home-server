@@ -21,8 +21,8 @@ logging:
 turn:
   enabled: false
 
-# Webhook configuration (optional, for Nanobot integration)
+# Webhook configuration (optional, for Butler API integration)
 # webhook:
 #   urls:
-#     - http://nanobot:8100/livekit/webhook
+#     - http://butler-api:8000/api/livekit/webhook
 #   api_key: devkey

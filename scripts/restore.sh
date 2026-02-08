@@ -31,7 +31,6 @@ declare -A VOLUME_CONTAINER=(
     [prowlarr-config]=prowlarr
     [qbittorrent-config]=qbittorrent
     [homeassistant-config]=homeassistant
-    [nanobot-data]=nanobot
     [nextcloud-data]=nextcloud
 )
 

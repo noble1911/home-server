@@ -35,7 +35,6 @@ git checkout -b ron875/issue-<number>-short-description
 gh pr create --title "Build Home Assistant Tool" --body "Closes #4"
 ```
 
-> **Example:** We discovered Nanobot uses "skills" not MCP — we updated the plan.
 > **Example:** We decided to use PostgreSQL directly instead of memory.py — we updated the issue.
 
 ### When You Discover Undocumented Work
@@ -84,7 +83,7 @@ gh issue edit <number> --add-assignee @me  # Claim an issue
 - Media streaming (Jellyfin, *arr stack)
 - Photo management (Immich)
 - File sync (Nextcloud)
-- AI voice assistant (Nanobot + Claude API)
+- AI voice assistant (Butler API + Claude API)
 - Smart home (Home Assistant + Alexa via haaska)
 
 **Owner:** Ron (GitHub: noble1911)
@@ -98,66 +97,13 @@ gh issue edit <number> --add-assignee @me  # Claim an issue
 ### Development Approach
 We're building the software FIRST, then deploying to Mac Mini later:
 1. Build PWA (React app) - can develop/test locally
-2. Build Nanobot skills & tools (Python) - can develop/test locally
+2. Build Butler tools (Python) - can develop/test locally
 3. Create Docker Compose files - define the infrastructure
 4. Build custom Docker images - package our code
 5. Create setup scripts - automate deployment
 
 ### Blockers
 - Mac Mini hardware not yet arrived (but we can build software now!)
-
----
-
-## Critical: Nanobot Architecture
-
-> ⚠️ **The plan originally said "MCP-native" - this is incorrect.**
-
-**HKUDS/nanobot** (the one we're using) uses a **skills system**, not MCP:
-
-```
-Skills (SKILL.md)     →  Markdown files that TEACH the agent how to do things
-Tools (Python class)  →  Code that EXECUTES actions (shell, filesystem, web, etc.)
-```
-
-### Two Nanobot Projects Exist - We Use HKUDS
-
-| Project | What It Is | Our Choice |
-|---------|------------|------------|
-| **[HKUDS/nanobot](https://github.com/HKUDS/nanobot)** | Python, ~4k lines, WhatsApp/Telegram built-in | ✅ **Using this** |
-| [nanobot-ai/nanobot](https://github.com/nanobot-ai/nanobot) | Go-based MCP host, different project | ❌ Not using |
-
-### What's Built Into HKUDS/nanobot
-- ✅ WhatsApp integration (just configure, don't rebuild)
-- ✅ Telegram with voice transcription (Groq Whisper)
-- ✅ Cron scheduling
-- ✅ Basic memory system (`memory.py`)
-- ✅ Weather skill (already exists)
-- ❌ LiveKit/real-time voice (we need to add this)
-- ✅ Groq Whisper STT (cloud API, free tier)
-
-### How to Extend Nanobot
-
-**For simple integrations** → Write a Skill (SKILL.md):
-```markdown
----
-name: my_skill
-description: "What it does"
-metadata: {"nanobot":{"requires":{"bins":["curl"]}}}
----
-# Instructions for the agent
-Use `curl` to call the API...
-```
-
-**For critical integrations** → Write a Tool (Python):
-```python
-class MyTool(Tool):
-    name = "my_tool"
-    description = "What it does"
-    parameters = { ... }  # JSON Schema
-
-    async def execute(self, **kwargs) -> str:
-        # Actual implementation
-```
 
 ---
 
@@ -170,13 +116,12 @@ home-server/
 ├── HOMESERVER_PLAN.md     # Complete architecture & plan
 ├── setup.sh               # All-in-one setup (calls scripts/)
 ├── app/                   # Butler PWA (React + Vite + LiveKit)
-├── butler/                # LiveKit agent (voice bridge to Butler API)
-│   └── livekit-agent/     # Custom LLM plugin for LiveKit
-├── nanobot/               # Nanobot gateway + Butler API (FastAPI)
-│   ├── api/               # Butler API (auth, chat, voice, tools)
+├── butler/                # Butler API (FastAPI) + LiveKit agent
+│   ├── api/               # Auth, chat, voice, tools routes
 │   ├── tools/             # Custom Python tools (15+)
 │   ├── migrations/        # PostgreSQL schema migrations
-│   └── docker-compose.yml # Nanobot + Butler API containers
+│   ├── livekit-agent/     # LiveKit Agents worker (STT → LLM → TTS)
+│   └── docker-compose.yml # Butler API container
 ├── docker/                # Docker Compose stacks
 │   ├── books-stack/       # Calibre-Web, Audiobookshelf, Readarr
 │   ├── download-stack/    # qBittorrent, Prowlarr
@@ -229,8 +174,7 @@ home-server/
 | Alexa integration | haaska + AWS Lambda | Free vs £5/mo HA Cloud |
 | Cloud backup | Optional (user choice) | Cost reduction, user accepts risk |
 | Docker runtime | OrbStack | Optimized for Apple Silicon |
-| AI agent | HKUDS/nanobot | Minimal codebase (~4k lines), WhatsApp built-in |
-| Agent extensions | Skills + Python Tools | Skills for simple, Tools for critical |
+| AI backend | Butler API (FastAPI) | Custom Python tools, Claude API direct |
 | Memory storage | PostgreSQL (Immich's DB) | Already in stack, has vector extensions |
 | Task tracking | GitHub Issues | Avoids merge conflicts with parallel agents |
 | Remote access | Cloudflare Tunnel | No port forwarding, works on any device with a browser |
@@ -249,15 +193,13 @@ home-server/
 
 | Question | Answer |
 |----------|--------|
-| Does Nanobot have built-in memory? | Yes, basic `memory.py` - we extend it |
+| Does Butler have built-in memory? | Yes, custom `memory.py` with vector search |
 | Memory storage? | PostgreSQL (Immich's DB, `butler` schema) |
 | How to inject user context? | Load soul config + facts into system prompt |
 | Where does soul config live? | PostgreSQL `butler.users` table |
 
 ### Remaining Questions
 
-- [ ] How does Nanobot handle multi-user conversations?
-- [ ] Can we run multiple Nanobot instances (one per channel)?
 - [ ] Best way to share tools between voice agent and text agent?
 - [ ] Voice identification vs app-based user identification?
 

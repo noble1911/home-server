@@ -125,7 +125,7 @@ All stacks join the `homeserver` network, allowing containers to communicate usi
 ```
 radarr → qbittorrent:8081      (download client)
 prowlarr → radarr:7878         (indexer sync)
-nanobot → immich-postgres:5432 (memory storage)
+butler-api → immich-postgres:5432 (memory storage)
 ```
 
 If you need to manually create the network:

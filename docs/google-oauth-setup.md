@@ -50,7 +50,7 @@ This guide walks you through creating Google OAuth credentials so Butler can acc
 
 ## 5. Configure Butler
 
-Add the credentials to your `nanobot/.env` file:
+Add the credentials to your `butler/.env` file:
 
 ```bash
 GOOGLE_CLIENT_ID=123456789-abcdef.apps.googleusercontent.com
@@ -87,5 +87,5 @@ The same OAuth credentials work for additional Google APIs. To add a new service
 
 1. Enable the API in Google Cloud Console (APIs & Services > Library)
 2. Add the required scope to the consent screen (APIs & Services > OAuth consent screen > Scopes)
-3. Add the scope to `GOOGLE_SCOPES` in `nanobot/api/oauth.py`
+3. Add the scope to `GOOGLE_SCOPES` in `butler/api/oauth.py`
 4. Existing users will need to disconnect and reconnect to grant the new scope

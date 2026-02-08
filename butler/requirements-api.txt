@@ -1,0 +1,26 @@
+# Butler API dependencies
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+pydantic-settings>=2.0.0
+
+# Database (shared with butler tools)
+asyncpg>=0.29.0
+
+# HTTP client (used by HomeAssistantTool)
+aiohttp>=3.9.0
+
+# Claude API
+anthropic>=0.40.0
+
+# Auth
+PyJWT>=2.8.0
+livekit-api>=0.7.0
+
+# Push notifications (Web Push API)
+pywebpush>=2.0.0
+
+# Encryption (Fernet for service credential storage)
+cryptography>=42.0.0
+
+# Scheduling (used by ScheduleTaskTool for cron expressions)
+croniter>=1.4.0

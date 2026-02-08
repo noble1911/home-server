@@ -104,7 +104,7 @@ livekit-cli join-room \
 
 ### LiveKit Keys & .env File
 
-The voice stack uses a `.env` file at `docker/voice-stack/.env` for API keys. This file is **auto-generated** by `13-nanobot.sh` to stay in sync with the Nanobot `.env`:
+The voice stack uses a `.env` file at `docker/voice-stack/.env` for API keys. This file is **auto-generated** by `13-butler.sh` to stay in sync with the Butler `.env`:
 
 ```
 LIVEKIT_API_KEY=<generated>
@@ -113,7 +113,7 @@ INTERNAL_API_KEY=<generated>
 GROQ_API_KEY=<your-groq-key>
 ```
 
-The `13-nanobot.sh` script also updates `docker/voice-stack/livekit.yaml` to replace the default dev keys with production keys.
+The `13-butler.sh` script also updates `docker/voice-stack/livekit.yaml` to replace the default dev keys with production keys.
 
 **If you need to regenerate keys manually:**
 
@@ -121,7 +121,7 @@ The `13-nanobot.sh` script also updates `docker/voice-stack/livekit.yaml` to rep
 docker run --rm livekit/generate
 ```
 
-Then update both `nanobot/.env` and `docker/voice-stack/.env` with the new values.
+Then update both `butler/.env` and `docker/voice-stack/.env` with the new values.
 
 ### Kokoro Voices
 
@@ -208,7 +208,7 @@ Voice stack needs ~2GB RAM at peak. If running with other stacks:
 
 With voice infrastructure ready:
 
-1. **Deploy Nanobot** (issue #11) - the AI agent
+1. **Deploy Butler API** (issue #11) - the AI agent
 2. **Build Butler tools** (issues #2-#9) - service integrations
 3. **Create PWA** - the client interface
 4. **Connect to LiveKit Agents** - orchestrate the flow

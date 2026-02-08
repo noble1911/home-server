@@ -1,0 +1,75 @@
+# Butler API
+# Connects to: PostgreSQL (memory), voice-stack, smart-home-stack
+# All services share the 'homeserver' network for seamless communication
+
+services:
+  butler-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: butler-api
+    environment:
+      # Database (same Immich PostgreSQL)
+      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@immich-postgres:5432/immich
+      # Claude API
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-sonnet-4-20250514}
+      # LiveKit (must match voice-stack config)
+      - LIVEKIT_URL=ws://livekit:7880
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY:-devkey}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET:-secret}
+      # Auth
+      - JWT_SECRET=${JWT_SECRET}
+      - INVITE_CODES=${INVITE_CODES:-BUTLER-001}
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY:-}
+      # Home Assistant
+      - HOME_ASSISTANT_URL=http://homeassistant:8123
+      - HOME_ASSISTANT_TOKEN=${HA_TOKEN:-}
+      # Weather
+      - OPENWEATHERMAP_API_KEY=${OPENWEATHERMAP_API_KEY:-}
+      # Ollama (for local embeddings / semantic memory search)
+      - OLLAMA_URL=${OLLAMA_URL:-http://ollama:11434}
+      # Radarr
+      - RADARR_URL=http://radarr:7878
+      - RADARR_API_KEY=${RADARR_API_KEY:-}
+      # Sonarr
+      - SONARR_URL=http://sonarr:8989
+      - SONARR_API_KEY=${SONARR_API_KEY:-}
+      # Readarr
+      - READARR_URL=http://readarr:8787
+      - READARR_API_KEY=${READARR_API_KEY:-}
+      # Jellyfin
+      - JELLYFIN_URL=http://jellyfin:8096
+      - JELLYFIN_API_KEY=${JELLYFIN_API_KEY:-}
+      # Prowlarr
+      - PROWLARR_API_KEY=${PROWLARR_API_KEY:-}
+      # Health & storage monitoring
+      - EXTERNAL_DRIVE_PATH=${EXTERNAL_DRIVE_PATH:-/mnt/external}
+      - STORAGE_THRESHOLDS=${STORAGE_THRESHOLDS:-70,80,90}
+      - HEALTH_CHECK_TIMEOUT=${HEALTH_CHECK_TIMEOUT:-5}
+      # Google OAuth (for Calendar, Gmail, etc.)
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI:-http://localhost:8000/api/oauth/google/callback}
+      - OAUTH_FRONTEND_URL=${OAUTH_FRONTEND_URL:-http://localhost:5173}
+      # WhatsApp Gateway (outbound notifications)
+      - WHATSAPP_GATEWAY_URL=${WHATSAPP_GATEWAY_URL:-}
+    volumes:
+      - ./api:/app/api:ro
+      - ./tools:/app/tools:ro
+      - ${DRIVE_PATH:-/Volumes/HomeServer}:/mnt/external:ro
+    ports:
+      - "8000:8000"
+    networks:
+      - homeserver
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+
+networks:
+  homeserver:
+    external: true

@@ -50,7 +50,7 @@ else
     echo -e "  ${YELLOW}⚠${NC} PostgreSQL may still be starting..."
 fi
 
-# Initialize Butler schema for Nanobot memory
+# Initialize Butler schema
 echo ""
 echo -e "${BLUE}==>${NC} Setting up Butler schema for AI memory..."
 "$SCRIPT_DIR/init-butler-schema.sh"
