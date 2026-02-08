@@ -84,7 +84,7 @@ async def text_chat(
                 """,
                 user_id,
                 user_content,
-                json.dumps(user_metadata),
+                user_metadata,
             )
             await conn.execute(
                 """
@@ -93,7 +93,7 @@ async def text_chat(
                 """,
                 user_id,
                 response_text,
-                json.dumps({"message_id": message_id}),
+                {"message_id": message_id},
             )
 
     # Auto-learn: extract facts in the background (fire-and-forget)
@@ -215,7 +215,7 @@ async def stream_text_chat(
                                 """,
                                 user_id,
                                 user_content,
-                                json.dumps(user_metadata),
+                                user_metadata,
                             )
                             await conn.execute(
                                 """
@@ -225,7 +225,7 @@ async def stream_text_chat(
                                 """,
                                 user_id,
                                 full_text,
-                                json.dumps({"message_id": message_id}),
+                                {"message_id": message_id},
                             )
                     # Auto-learn: extract facts in the background
                     asyncio.create_task(

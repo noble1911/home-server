@@ -69,7 +69,7 @@ async def create_task(
         user_id,
         req.name,
         req.cronExpression,
-        json.dumps(req.action.model_dump(exclude_none=True)),
+        req.action.model_dump(exclude_none=True),
         req.enabled,
         next_run,
     )
@@ -160,7 +160,7 @@ async def update_task(
 
     if req.action is not None:
         updates.append(f"action = ${idx}::jsonb")
-        values.append(json.dumps(req.action.model_dump(exclude_none=True)))
+        values.append(req.action.model_dump(exclude_none=True))
         idx += 1
 
     if req.cronExpression is not None:

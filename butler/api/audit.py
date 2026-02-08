@@ -6,7 +6,6 @@ Logging failures are silent — they must never break the user's conversation.
 
 from __future__ import annotations
 
-import json
 import logging
 import time
 from typing import Any
@@ -96,7 +95,7 @@ async def _log_usage(
             """,
             user_id,
             tool_name,
-            json.dumps(parameters),
+            parameters,
             result_summary,
             error,
             duration_ms,

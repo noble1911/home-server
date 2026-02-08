@@ -77,7 +77,7 @@ async def process_voice(
         """,
         user_id,
         req.transcript,
-        _json_str(metadata),
+        metadata,
     )
     await db.execute(
         """
@@ -86,7 +86,7 @@ async def process_voice(
         """,
         user_id,
         response_text,
-        _json_str(metadata),
+        metadata,
     )
 
     return VoiceProcessResponse(
@@ -153,7 +153,7 @@ async def stream_voice(
                         """,
                         user_id,
                         req.transcript,
-                        _json_str(metadata),
+                        metadata,
                     )
                     await db.execute(
                         """
@@ -163,7 +163,7 @@ async def stream_voice(
                         """,
                         user_id,
                         full_text,
-                        _json_str(metadata),
+                        metadata,
                     )
                 except Exception:
                     logger.exception(
@@ -180,6 +180,4 @@ def _should_end_turn(response: str) -> bool:
     return any(phrase in lower for phrase in _FAREWELL_PHRASES)
 
 
-def _json_str(data: dict) -> str:
-    """Convert dict to JSON string for asyncpg JSONB parameter."""
-    return json.dumps(data)
+

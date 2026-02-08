@@ -167,7 +167,7 @@ async def update_user_permissions(
     result = await db.execute(
         "UPDATE butler.users SET permissions = $2::jsonb WHERE id = $1",
         user_id,
-        json.dumps(req.permissions),
+        req.permissions,
     )
     if result == "UPDATE 0":
         raise HTTPException(404, "User not found")

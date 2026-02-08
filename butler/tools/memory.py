@@ -657,7 +657,7 @@ class UpdateSoulTool(DatabaseTool):
             WHERE id = $1
             RETURNING soul
             """,
-            user_id, json.dumps(updates)
+            user_id, updates
         )
 
         if not row:

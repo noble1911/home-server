@@ -41,7 +41,7 @@ HA Automation Example (configuration.yaml):
 
 from __future__ import annotations
 
-import json
+
 import logging
 from typing import Annotated
 
@@ -98,7 +98,7 @@ async def _store_event(
         event.entity_id,
         event.old_state,
         event.new_state,
-        json.dumps(event.attributes),
+        event.attributes,
     )
     return row["id"]
 

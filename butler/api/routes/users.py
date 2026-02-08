@@ -176,7 +176,7 @@ async def update_soul(
         WHERE id = $1
         """,
         user_id,
-        json.dumps(soul_dict),
+        soul_dict,
     )
     return {"status": "ok"}
 
@@ -207,7 +207,7 @@ async def update_notifications(
                 await conn.execute(
                     "UPDATE butler.users SET notification_prefs = $2::jsonb WHERE id = $1",
                     user_id,
-                    json.dumps(prefs_dict),
+                    prefs_dict,
                 )
 
     return await _get_profile(user_id, pool)
@@ -249,7 +249,7 @@ async def complete_onboarding(
         """,
         user_id,
         req.name,
-        json.dumps(soul_dict),
+        soul_dict,
     )
 
     # Auto-provision service accounts if credentials were provided
