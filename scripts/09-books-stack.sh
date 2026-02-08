@@ -75,7 +75,7 @@ fi
 echo ""
 echo -e "${BLUE}==>${NC} Configuring Audiobookshelf..."
 
-ABS_STATUS=$(curl -sf http://localhost:13378/api/status 2>/dev/null)
+ABS_STATUS=$(curl -sf http://localhost:13378/status 2>/dev/null)
 
 if echo "$ABS_STATUS" | grep -q '"isInit":true'; then
     echo -e "  ${GREEN}✓${NC} Audiobookshelf already initialized"
@@ -84,7 +84,7 @@ elif [[ -n "$ABS_ADMIN_USER" ]] && [[ -n "$ABS_ADMIN_PASS" ]]; then
     curl -sf -X POST http://localhost:13378/init \
         -H "Content-Type: application/json" \
         -d "$(jq -n --arg u "$ABS_ADMIN_USER" --arg p "$ABS_ADMIN_PASS" \
-            '{newRoot: {username: $u, password: $p}}')" > /dev/null 2>&1
+            '{newRoot: {username: $u, password: $p}}')" > /dev/null 2>&1 || true
 
     # Login to get token for library creation
     ABS_LOGIN=$(curl -sf -X POST http://localhost:13378/login \
@@ -146,7 +146,7 @@ if [[ -n "$READARR_API_KEY" ]]; then
         echo -e "  ${GREEN}✓${NC} Readarr download client already set"
     else
         arr_api_post "http://localhost:8787/api/v1/downloadclient" "$READARR_API_KEY" \
-            '{"name":"qBittorrent","implementation":"QBittorrent","configContract":"QBittorrentSettings","protocol":"torrent","enable":true,"fields":[{"name":"host","value":"qbittorrent"},{"name":"port","value":8081},{"name":"username","value":"admin"},{"name":"password","value":"adminadmin"},{"name":"bookCategory","value":"books"}]}' > /dev/null 2>&1 || true
+            '{"name":"qBittorrent","implementation":"QBittorrent","configContract":"QBittorrentSettings","protocol":"torrent","priority":1,"enable":true,"fields":[{"name":"host","value":"qbittorrent"},{"name":"port","value":8081},{"name":"username","value":"admin"},{"name":"password","value":"adminadmin"},{"name":"bookCategory","value":"books"}]}' > /dev/null 2>&1 || true
         echo -e "  ${GREEN}✓${NC} Readarr download client: qBittorrent"
     fi
 else
@@ -227,7 +227,7 @@ if [[ -n "$PROWLARR_API_KEY" ]] && [[ -n "$READARR_API_KEY" ]]; then
         echo -e "  ${GREEN}✓${NC} Prowlarr → Readarr already connected"
     else
         arr_api_post "http://localhost:9696/api/v1/applications" "$PROWLARR_API_KEY" \
-            "{\"name\":\"Readarr\",\"syncLevel\":\"fullSync\",\"implementation\":\"Readarr\",\"configContract\":\"ReadarrSettings\",\"fields\":[{\"name\":\"prowlarrUrl\",\"value\":\"http://prowlarr:9696\"},{\"name\":\"baseUrl\",\"value\":\"http://readarr:8787\"},{\"name\":\"apiKey\",\"value\":\"${READARR_API_KEY}\"}]}" > /dev/null
+            "{\"name\":\"Readarr\",\"syncLevel\":\"fullSync\",\"implementation\":\"Readarr\",\"configContract\":\"ReadarrSettings\",\"fields\":[{\"name\":\"prowlarrUrl\",\"value\":\"http://prowlarr:9696\"},{\"name\":\"baseUrl\",\"value\":\"http://readarr:8787\"},{\"name\":\"apiKey\",\"value\":\"${READARR_API_KEY}\"}]}" > /dev/null 2>&1 || true
         echo -e "  ${GREEN}✓${NC} Prowlarr → Readarr connected"
     fi
 else
