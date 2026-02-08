@@ -3,6 +3,8 @@ services:
     image: livekit/livekit-server:v1.9.11
     container_name: livekit
     command: --config /etc/livekit.yaml
+    environment:
+      - "LIVEKIT_KEYS=${LIVEKIT_API_KEY:-devkey}: ${LIVEKIT_API_SECRET:-secret}"
     volumes:
       - ./livekit.yaml:/etc/livekit.yaml:ro
     ports:
