@@ -36,7 +36,11 @@ from tools import (
     WhatsAppTool,
 )
 
-from .scheduler import TaskScheduler
+from tools.alerting import NotificationDispatcher
+
+from .alert_dispatch import start_alert_dispatch, stop_alert_dispatch
+from .push import create_push_channel, create_whatsapp_channel
+from .scheduler import TaskScheduler, seed_default_schedules
 
 from .auth import decode_user_jwt
 from .cleanup import start_cleanup, stop_cleanup
@@ -186,9 +190,23 @@ async def init_resources() -> None:
     # Schedule task tool (always registered — uses DB only)
     _tools["schedule_task"] = ScheduleTaskTool(_db_pool)
 
+    # ── Alert dispatch ──────────────────────────────────────────────
+    # Wire NotificationDispatcher with Push + WhatsApp channels so that
+    # alerts recorded by health/storage tools actually get sent out.
+    dispatcher = NotificationDispatcher(alert_manager)
+    dispatcher.register_channel(create_push_channel(_db_pool))
+    if settings.whatsapp_gateway_url:
+        dispatcher.register_channel(
+            create_whatsapp_channel(_db_pool, settings.whatsapp_gateway_url)
+        )
+    start_alert_dispatch(dispatcher)
+
     # Start background scheduler
     _scheduler = TaskScheduler(db_pool=_db_pool, tools=_tools)
     await _scheduler.start()
+
+    # Seed default health + storage check schedules on first startup
+    await seed_default_schedules(_db_pool)
 
     # Background cleanup for old conversations and expired facts
     start_cleanup(_db_pool, settings.cleanup_retention_days)
@@ -204,6 +222,7 @@ async def cleanup_resources() -> None:
     global _db_pool, _tools, _scheduler
     if _scheduler:
         await _scheduler.stop()
+    await stop_alert_dispatch()
     await stop_ratelimit_cleanup()
     await stop_cleanup()
     if _tools:

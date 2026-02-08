@@ -180,6 +180,7 @@ class RememberFactTool(DatabaseTool):
         fact = kwargs["fact"]
         category = kwargs.get("category", "other")
         confidence = kwargs.get("confidence", 1.0)
+        source = kwargs.get("source", "conversation")
 
         pool = await self._get_pool()
 
@@ -207,18 +208,18 @@ class RememberFactTool(DatabaseTool):
                 """
                 INSERT INTO butler.user_facts
                     (user_id, fact, category, confidence, source, embedding)
-                VALUES ($1, $2, $3, $4, 'conversation', $5::vector)
+                VALUES ($1, $2, $3, $4, $5, $6::vector)
                 """,
-                user_id, fact, category, confidence, vector_str
+                user_id, fact, category, confidence, source, vector_str
             )
         else:
             await pool.execute(
                 """
                 INSERT INTO butler.user_facts
                     (user_id, fact, category, confidence, source)
-                VALUES ($1, $2, $3, $4, 'conversation')
+                VALUES ($1, $2, $3, $4, $5)
                 """,
-                user_id, fact, category, confidence
+                user_id, fact, category, confidence, source
             )
 
         return f"Remembered: {fact}"
