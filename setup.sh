@@ -190,6 +190,14 @@ else
     echo -e "  Using ${DRIVE_PATH} on internal SSD instead"
 fi
 
+# Persist DRIVE_PATH so individual scripts can be re-run without the export
+if ! grep -q "^DRIVE_PATH=" "$CREDENTIALS_FILE" 2>/dev/null; then
+    echo "" >> "$CREDENTIALS_FILE"
+    echo "# Data directory" >> "$CREDENTIALS_FILE"
+    printf 'DRIVE_PATH=%s\n' "$DRIVE_PATH" >> "$CREDENTIALS_FILE"
+    echo -e "  ${GREEN}✓${NC} DRIVE_PATH saved to credentials file"
+fi
+
 # Clone repo — scripts 07+ need sibling files (docker-compose, configs, lib/)
 REPO_DIR="$HOME/home-server"
 echo -e "\n${BLUE}==>${NC} Cloning repo for local scripts..."
