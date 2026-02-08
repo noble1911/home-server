@@ -21,3 +21,6 @@ pywebpush>=2.0.0
 
 # Encryption (Fernet for service credential storage)
 cryptography>=42.0.0
+
+# Scheduling (used by ScheduleTaskTool for cron expressions)
+croniter>=1.4.0
