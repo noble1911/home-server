@@ -117,8 +117,13 @@ ssh -L 8096:localhost:8096 -L 8123:localhost:8123 macmini
 
 ## Troubleshooting
 
+**"Turning Remote Login on or off requires Full Disk Access privileges"**
+- The `systemsetup` command needs Full Disk Access on macOS Ventura+
+- **Easiest fix:** Enable via System Settings → General → Sharing → Remote Login
+- **Alternative:** Grant Terminal Full Disk Access in System Settings → Privacy & Security → Full Disk Access
+
 **"Connection refused"**
-- SSH not enabled: `sudo systemsetup -setremotelogin on`
+- SSH not enabled: enable via System Settings → General → Sharing → Remote Login
 - Firewall blocking port 22
 
 **"Host key verification failed"**
