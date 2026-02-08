@@ -8,9 +8,10 @@ import type { LiveKitDataMessage } from '../types/conversation'
 
 function getLiveKitUrl(): string {
   if (import.meta.env.VITE_LIVEKIT_URL) return import.meta.env.VITE_LIVEKIT_URL
-  // Auto-detect: use the same hostname the page was loaded from
+  // Route through the same origin via nginx /livekit/ proxy
   const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-  return `${proto}//${window.location.hostname}:7880`
+  const port = window.location.port ? `:${window.location.port}` : ''
+  return `${proto}//${window.location.hostname}${port}/livekit/`
 }
 const LIVEKIT_URL = getLiveKitUrl()
 const BARS = 20
