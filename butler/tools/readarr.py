@@ -61,6 +61,8 @@ class ReadarrTool(Tool):
         self._quality_profiles: list[dict] | None = None
         self._metadata_profiles: list[dict] | None = None
         self._root_folders: list[dict] | None = None
+        # Cache last search results so add_book can skip the slow edition lookup
+        self._last_search_results: dict[str, dict] = {}
 
     async def _get_session(self) -> aiohttp.ClientSession:
         """Get or create the HTTP session."""
@@ -208,6 +210,13 @@ class ReadarrTool(Tool):
             if not results or not isinstance(results, list):
                 return f"No books found for '{title}'"
 
+            # Cache results so add_book can skip the slow edition lookup
+            self._last_search_results = {
+                b.get("foreignBookId", ""): b
+                for b in results[:5]
+                if b.get("foreignBookId")
+            }
+
             return self._format_search_results(results[:5], title)
 
     async def _add_book(
@@ -221,19 +230,21 @@ class ReadarrTool(Tool):
 
         session = await self._get_session()
 
-        # Fetch full book data via lookup
-        lookup_url = f"{self.base_url}/api/v1/book/lookup"
-        async with session.get(
-            lookup_url, params={"term": f"edition:{book_foreign_id}"}
-        ) as resp:
-            if resp.status != 200:
-                return f"Error fetching book details: HTTP {resp.status}"
-            results = await resp.json()
+        # Use cached search result if available (avoids slow edition lookup)
+        book_data = self._last_search_results.get(book_foreign_id)
+        if not book_data:
+            lookup_url = f"{self.base_url}/api/v1/book/lookup"
+            async with session.get(
+                lookup_url, params={"term": f"edition:{book_foreign_id}"}
+            ) as resp:
+                if resp.status != 200:
+                    return f"Error fetching book details: HTTP {resp.status}"
+                results = await resp.json()
 
-        if not results or not isinstance(results, list) or len(results) == 0:
-            return f"Error: Could not find book data for ID {book_foreign_id}."
+            if not results or not isinstance(results, list) or len(results) == 0:
+                return f"Error: Could not find book data for ID {book_foreign_id}."
 
-        book_data = results[0]
+            book_data = results[0]
 
         # Auto-detect quality profile, metadata profile, and root folder
         quality_profile_id = await self._get_default_quality_profile_id()
