@@ -185,6 +185,59 @@ class TaskScheduler:
                 logger.warning("Check triggered notification but WhatsApp not configured")
 
 
+async def seed_default_schedules(db_pool: DatabasePool) -> None:
+    """Create default health and storage check tasks on first startup.
+
+    Inserts a 'system' user (if needed) and two recurring checks:
+    - Health check every 6 hours
+    - Storage check daily at 9am
+
+    Uses WHERE NOT EXISTS to avoid duplicates on server restart.
+    """
+    pool = db_pool.pool
+
+    # Ensure 'system' user exists (FK requirement for scheduled_tasks)
+    await pool.execute(
+        """
+        INSERT INTO butler.users (id, name, role)
+        VALUES ('system', 'System', 'admin')
+        ON CONFLICT (id) DO NOTHING
+        """,
+    )
+
+    # Health check every 6 hours
+    await pool.execute(
+        """
+        INSERT INTO butler.scheduled_tasks
+            (user_id, name, cron_expression, action, enabled, next_run)
+        SELECT 'system', 'Health check (auto)', '0 */6 * * *',
+            '{"type":"check","tool":"server_health","params":{},"notifyOn":"warning"}'::jsonb,
+            TRUE, NOW() + INTERVAL '6 hours'
+        WHERE NOT EXISTS (
+            SELECT 1 FROM butler.scheduled_tasks
+            WHERE user_id = 'system' AND name = 'Health check (auto)'
+        )
+        """,
+    )
+
+    # Storage check daily at 9am
+    await pool.execute(
+        """
+        INSERT INTO butler.scheduled_tasks
+            (user_id, name, cron_expression, action, enabled, next_run)
+        SELECT 'system', 'Storage check (auto)', '0 9 * * *',
+            '{"type":"check","tool":"storage_monitor","params":{},"notifyOn":"warning"}'::jsonb,
+            TRUE, NOW() + INTERVAL '1 day'
+        WHERE NOT EXISTS (
+            SELECT 1 FROM butler.scheduled_tasks
+            WHERE user_id = 'system' AND name = 'Storage check (auto)'
+        )
+        """,
+    )
+
+    logger.info("Default schedules seeded")
+
+
 def _compute_next_run(cron_expression: str | None, after: datetime) -> datetime | None:
     """Compute the next run time from a cron expression.
 
