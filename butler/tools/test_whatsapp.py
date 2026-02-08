@@ -7,12 +7,28 @@ These tests use mocked responses — no real WhatsApp gateway or database requir
 
 import json
 import time
+from datetime import datetime, timezone
 
 import pytest
 import aiohttp
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from .whatsapp import WhatsAppTool, MAX_MESSAGES_PER_HOUR, VALID_CATEGORIES
+
+
+@pytest.fixture(autouse=True)
+def _pin_clock_to_midday():
+    """Pin datetime.now() to 14:00 UTC so quiet-hours checks are deterministic.
+
+    Individual tests (e.g. TestQuietHours) can still override with their own
+    patch context manager — the innermost patch wins.
+    """
+    midday = datetime(2026, 1, 15, 14, 0, 0, tzinfo=timezone.utc)
+    with patch("tools.whatsapp.datetime") as mock_dt:
+        mock_dt.now.return_value = midday
+        # Keep real datetime constructor accessible for non-now() usage
+        mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
+        yield mock_dt
 
 
 # ---------------------------------------------------------------------------
