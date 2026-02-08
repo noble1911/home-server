@@ -55,12 +55,12 @@ DEFAULT_SERVICES: dict[str, dict[str, Any]] = {
         "headers": {"X-Api-Key": "{sonarr_api_key}"},
     },
     "bazarr": {
-        "url": "http://bazarr:6767/api/system/health",
+        "url": "http://bazarr:6767/",
         "stack": "media",
     },
     # Download stack
     "qbittorrent": {
-        "url": "http://qbittorrent:8081/api/v2/app/version",
+        "url": "http://qbittorrent:8081/",
         "stack": "download",
     },
     "prowlarr": {
@@ -97,9 +97,8 @@ DEFAULT_SERVICES: dict[str, dict[str, Any]] = {
     },
     # Smart home stack
     "homeassistant": {
-        "url": "http://homeassistant:8123/api/",
+        "url": "http://homeassistant:8123/manifest.json",
         "stack": "smart-home",
-        "headers": {"Authorization": "Bearer {ha_token}"},
     },
     "cloudflared": {
         "url": "http://cloudflared:2000/ready",
