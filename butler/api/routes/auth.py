@@ -58,9 +58,9 @@ async def redeem_invite(
     db = pool.pool
     code_upper = req.code.strip().upper()
 
-    # Check if any real users exist (exclude the seed 'default' user)
+    # Check if any real users exist (exclude seed users)
     user_count = await db.fetchval(
-        "SELECT COUNT(*) FROM butler.users WHERE id != 'default'"
+        "SELECT COUNT(*) FROM butler.users WHERE id NOT IN ('default', 'system')"
     )
 
     if user_count == 0:
