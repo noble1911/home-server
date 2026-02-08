@@ -12,6 +12,13 @@ NC='\033[0m'
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUTLER_DIR="${SCRIPT_DIR}/../butler"
 
+# Source shared helpers and load DRIVE_PATH + credentials
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib/configure-helpers.sh"
+load_credentials || true
+DRIVE_PATH="${DRIVE_PATH:-/Volumes/HomeServer}"
+export DRIVE_PATH
+
 # ──────────────────────────────────────────────────
 # Helper functions (idempotent key=value operations)
 # ──────────────────────────────────────────────────

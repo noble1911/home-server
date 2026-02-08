@@ -56,10 +56,18 @@ echo -e "${BLUE}==>${NC} Setting up Butler schema for AI memory..."
 "$SCRIPT_DIR/init-butler-schema.sh"
 
 # ─────────────────────────────────────────────
-# Nextcloud: Auto-install via occ CLI
+# Nextcloud: Create database + auto-install via occ CLI
 # ─────────────────────────────────────────────
 echo ""
 echo -e "${BLUE}==>${NC} Configuring Nextcloud..."
+
+# Create Nextcloud database if it doesn't exist (PostgreSQL only auto-creates the 'immich' DB)
+if ! docker exec immich-postgres psql -U postgres -lqt | cut -d \| -f 1 | grep -qw nextcloud; then
+    docker exec immich-postgres psql -U postgres -c "CREATE DATABASE nextcloud;" &>/dev/null
+    echo -e "  ${GREEN}✓${NC} Created nextcloud database"
+else
+    echo -e "  ${GREEN}✓${NC} Nextcloud database exists"
+fi
 
 NC_STATUS=$(docker exec -u www-data nextcloud php occ status --output=json 2>/dev/null || echo '{}')
 
