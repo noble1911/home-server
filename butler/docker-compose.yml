@@ -57,7 +57,7 @@ services:
     volumes:
       - ./api:/app/api:ro
       - ./tools:/app/tools:ro
-      - ${DRIVE_PATH:-/Volumes/HomeServer}:/mnt/external:ro
+      - ${DRIVE_PATH:-/Volumes/HomeServer}:/mnt/external
     ports:
       - "8000:8000"
     networks:

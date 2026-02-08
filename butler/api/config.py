@@ -86,6 +86,9 @@ class Settings(BaseSettings):
     calibreweb_admin_user: str = ""
     calibreweb_admin_password: str = ""
 
+    # Media files management (direct filesystem access to media directories)
+    media_files_enabled: bool = True
+
     # Health & storage monitoring
     external_drive_path: str = "/mnt/external"
     storage_thresholds: str = "70,80,90"

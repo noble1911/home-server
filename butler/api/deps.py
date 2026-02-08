@@ -21,6 +21,7 @@ from tools import (
     ImmichTool,
     JellyfinTool,
     ListEntitiesByDomainTool,
+    MediaFilesTool,
     PhoneLocationTool,
     RadarrTool,
     ReadarrTool,
@@ -58,7 +59,7 @@ ALWAYS_ALLOWED_TOOLS: set[str] = {
 }
 
 PERMISSION_TOOL_MAP: dict[str, list[str]] = {
-    "media": ["radarr", "readarr", "sonarr", "immich", "jellyfin"],
+    "media": ["radarr", "readarr", "sonarr", "immich", "jellyfin", "media_files"],
     "home": ["home_assistant", "list_ha_entities"],
     "location": ["phone_location"],
     "calendar": ["google_calendar"],
@@ -154,6 +155,12 @@ async def init_resources() -> None:
         _tools["whatsapp"] = WhatsAppTool(
             gateway_url=settings.whatsapp_gateway_url,
             db_pool=_db_pool,
+        )
+
+    # Media file browser (direct filesystem access to media directories)
+    if settings.media_files_enabled:
+        _tools["media_files"] = MediaFilesTool(
+            root_path=settings.external_drive_path,
         )
 
     # Health & storage monitoring (always registered — degrade gracefully)

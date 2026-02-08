@@ -44,6 +44,7 @@ from .storage_monitor import StorageMonitorTool
 from .schedule_task import ScheduleTaskTool
 from .whatsapp import WhatsAppTool
 from .self_update import SelfUpdateTool
+from .media_files import MediaFilesTool
 from .display_in_chat import DisplayInChatTool
 
 __all__ = [
@@ -95,6 +96,8 @@ __all__ = [
     "WhatsAppTool",
     # Self-update
     "SelfUpdateTool",
+    # Media files (filesystem browser)
+    "MediaFilesTool",
     # Display in chat (voice-only)
     "DisplayInChatTool",
 ]
