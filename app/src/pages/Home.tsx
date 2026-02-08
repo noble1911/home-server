@@ -6,7 +6,6 @@ import { useInstallPrompt } from '../hooks/useInstallPrompt'
 import { getChatHistory, clearChatHistory } from '../services/api'
 import ConfirmDialog from '../components/ConfirmDialog'
 import type { Message } from '../types/conversation'
-import VoiceButton from '../components/voice/VoiceButton'
 import Waveform from '../components/voice/Waveform'
 import TranscriptBubble from '../components/voice/TranscriptBubble'
 import ChatInput from '../components/chat/ChatInput'
@@ -137,17 +136,17 @@ export default function Home() {
   }, [disconnect])
 
   return (
-    <div className="flex flex-col h-full min-h-[calc(100vh-8rem)]">
+    <div className="flex flex-col h-full">
       {/* Connection error banner */}
       {connectionError && (
-        <div className="mx-4 mt-2 px-3 py-2 bg-red-900/30 text-red-300 text-xs rounded-lg">
+        <div className="shrink-0 mx-4 mt-2 px-3 py-2 bg-red-900/30 text-red-300 text-xs rounded-lg">
           Voice server unavailable — using demo mode
         </div>
       )}
 
       {/* Install prompt banner */}
       {canInstall && (
-        <div className="mx-4 mt-2 px-3 py-2 bg-accent/10 border border-accent/30 rounded-lg">
+        <div className="shrink-0 mx-4 mt-2 px-3 py-2 bg-accent/10 border border-accent/30 rounded-lg">
           {isIOS ? (
             <div className="flex items-start justify-between gap-2">
               <p className="text-xs text-butler-200">
@@ -187,7 +186,7 @@ export default function Home() {
 
       {/* Clear history button */}
       {messages.length > 0 && (
-        <div className="flex items-center justify-end px-4 pt-2">
+        <div className="shrink-0 flex items-center justify-end px-4 pt-2">
           <button
             onClick={() => setShowClearConfirm(true)}
             disabled={isClearing}
@@ -202,8 +201,8 @@ export default function Home() {
         </div>
       )}
 
-      {/* Conversation Transcript */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4">
+      {/* Conversation Transcript — scrolls independently */}
+      <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0 p-4 space-y-4">
         {/* Load more button */}
         {hasMoreHistory && messages.length > 0 && (
           <div className="flex justify-center">
@@ -237,11 +236,10 @@ export default function Home() {
               Hi, I'm {butlerName}
             </h2>
             <p className="text-butler-400 max-w-sm">
-              Press and hold the microphone button to speak, or type a message below.
+              Tap the microphone to speak, or type a message below.
             </p>
           </div>
         )}
-
 
         {/* Messages with date separators */}
         {messages.map((message, index) => {
@@ -260,23 +258,21 @@ export default function Home() {
         })}
       </div>
 
-      {/* Voice Interface */}
-      <div className="p-4 space-y-4">
-        <div className={`flex justify-center transition-opacity duration-200 ${showWaveform ? 'opacity-100' : 'opacity-0'}`}>
-          <Waveform isActive={showWaveform} levels={audioLevels} />
-        </div>
+      {/* Input area — pinned at bottom */}
+      <div className="shrink-0 border-t border-butler-800/50 px-4 pt-2 pb-3">
+        {/* Waveform — visible only during voice activity */}
+        {showWaveform && (
+          <div className="flex justify-center pb-2">
+            <Waveform isActive={showWaveform} levels={audioLevels} />
+          </div>
+        )}
 
-        <div className="flex justify-center">
-          <VoiceButton
-            status={voiceStatus}
-            isRecording={isRecording}
-            onStartListening={startListening}
-            onStopListening={stopListening}
-            connectionError={connectionError}
-          />
-        </div>
-
-        <ChatInput />
+        <ChatInput
+          voiceStatus={voiceStatus}
+          isRecording={isRecording}
+          onStartListening={startListening}
+          onStopListening={stopListening}
+        />
       </div>
 
       <ConfirmDialog

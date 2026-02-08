@@ -1,6 +1,8 @@
 import { useState, useCallback, useRef } from 'react'
+import { useSettingsStore } from '../../stores/settingsStore'
 import { useChatStream } from '../../hooks/useChatStream'
 import type { ImagePayload } from '../../hooks/useChatStream'
+import type { VoiceStatus } from '../../types/conversation'
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
 const MAX_SIZE_BYTES = 5 * 1024 * 1024 // 5 MB
@@ -9,12 +11,52 @@ interface PendingImage extends ImagePayload {
   dataUrl: string // data URI for preview
 }
 
-export default function ChatInput() {
+interface ChatInputProps {
+  voiceStatus?: VoiceStatus
+  isRecording?: boolean
+  onStartListening?: () => void
+  onStopListening?: () => void
+}
+
+export default function ChatInput({
+  voiceStatus = 'idle',
+  isRecording = false,
+  onStartListening,
+  onStopListening,
+}: ChatInputProps) {
+  const { voiceMode } = useSettingsStore()
   const [message, setMessage] = useState('')
   const [pendingImage, setPendingImage] = useState<PendingImage | null>(null)
   const [imageError, setImageError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { sendMessage, isStreaming, error } = useChatStream()
+
+  // Voice button handlers
+  const handleVoicePress = useCallback(() => {
+    if (!onStartListening) return
+    if (voiceMode === 'push-to-talk') {
+      onStartListening()
+    } else {
+      if (isRecording) {
+        onStopListening?.()
+      } else {
+        onStartListening()
+      }
+    }
+  }, [voiceMode, isRecording, onStartListening, onStopListening])
+
+  const handleVoiceRelease = useCallback(() => {
+    if (voiceMode === 'push-to-talk') {
+      onStopListening?.()
+    }
+  }, [voiceMode, onStopListening])
+
+  const micStatusColors: Record<VoiceStatus, string> = {
+    idle: 'bg-butler-700 hover:bg-butler-600',
+    listening: 'bg-red-500 hover:bg-red-600 animate-pulse',
+    processing: 'bg-yellow-500 hover:bg-yellow-600',
+    speaking: 'bg-green-500 hover:bg-green-600',
+  }
 
   const processFile = useCallback((file: File) => {
     setImageError(null)
@@ -97,7 +139,7 @@ export default function ChatInput() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="flex gap-2">
+      <form onSubmit={handleSubmit} className="flex items-center gap-2">
         {/* Hidden file input */}
         <input
           ref={fileInputRef}
@@ -106,6 +148,26 @@ export default function ChatInput() {
           onChange={handleFileSelect}
           className="hidden"
         />
+
+        {/* Voice button */}
+        {onStartListening && (
+          <button
+            type="button"
+            onMouseDown={handleVoicePress}
+            onMouseUp={handleVoiceRelease}
+            onMouseLeave={voiceMode === 'push-to-talk' ? handleVoiceRelease : undefined}
+            onTouchStart={handleVoicePress}
+            onTouchEnd={handleVoiceRelease}
+            className={`
+              shrink-0 w-10 h-10 rounded-full flex items-center justify-center
+              transition-all duration-200 active:scale-95
+              ${micStatusColors[voiceStatus]}
+            `}
+            aria-label={isRecording ? 'Stop listening' : 'Start voice'}
+          >
+            <MicIcon className="w-5 h-5 text-white" />
+          </button>
+        )}
 
         {/* Image attach button */}
         <button
@@ -169,6 +231,14 @@ function CloseIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+    </svg>
+  )
+}
+
+function MicIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
     </svg>
   )
 }
