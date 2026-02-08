@@ -18,7 +18,7 @@ services:
       - homeserver
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8081/"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8081/"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -39,7 +39,7 @@ services:
       - homeserver
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9696/ping"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:9696/ping"]
       interval: 30s
       timeout: 10s
       retries: 3

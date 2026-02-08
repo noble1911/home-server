@@ -1,21 +1,26 @@
-# Local development with Docker
-# Usage: docker compose up
+# Butler PWA (React + Vite + Nginx)
+# Production: docker compose up butler-app
+# Development: docker compose --profile dev up butler-app-dev
 
 services:
   butler-app:
     build:
       context: .
       dockerfile: Dockerfile
+    container_name: butler-app
     ports:
       - "3000:80"
     environment:
       - VITE_API_URL=http://localhost:8000/api
+    networks:
+      - homeserver
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/health"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:80/health"]
       interval: 30s
       timeout: 3s
       retries: 3
       start_period: 5s
+    restart: unless-stopped
 
   # Development mode with hot reload
   butler-app-dev:
@@ -31,3 +36,7 @@ services:
       - VITE_API_URL=http://localhost:8000/api
     profiles:
       - dev
+
+networks:
+  homeserver:
+    external: true

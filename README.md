@@ -281,14 +281,16 @@ Now that services are running, go back to the Cloudflare dashboard and add route
 
 | Subdomain | Service (Type: HTTP) | URL |
 |-----------|---------------------|-----|
-| `butler` | `http://localhost:3000` | Butler PWA |
-| `butler-api` | `http://localhost:8000` | Butler API |
-| `jellyfin` | `http://localhost:8096` | Jellyfin |
-| `photos` | `http://localhost:2283` | Immich |
-| `books` | `http://localhost:13378` | Audiobookshelf |
-| `files` | `http://localhost:8080` | Nextcloud |
-| `ha` | `http://localhost:8123` | Home Assistant |
-| `ebooks` | `http://localhost:8083` | Calibre-Web |
+| `butler` | `http://butler-app:80` | Butler PWA |
+| `butler-api` | `http://butler-api:8000` | Butler API |
+| `jellyfin` | `http://jellyfin:8096` | Jellyfin |
+| `photos` | `http://immich-server:2283` | Immich |
+| `books` | `http://audiobookshelf:80` | Audiobookshelf |
+| `files` | `http://nextcloud:80` | Nextcloud |
+| `ha` | `http://homeassistant:8123` | Home Assistant |
+| `ebooks` | `http://calibre-web:8083` | Calibre-Web |
+
+> **Important:** Use Docker container names (not `localhost`) because `cloudflared` runs inside Docker where `localhost` refers to the container itself, not the host machine.
 
 3. After adding routes, verify each service loads via its `https://subdomain.yourdomain.com` URL
 
