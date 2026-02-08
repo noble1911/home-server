@@ -33,6 +33,7 @@ from tools import (
     StorageMonitorTool,
     Tool,
     WeatherTool,
+    SelfUpdateTool,
     WhatsAppTool,
 )
 
@@ -64,6 +65,7 @@ PERMISSION_TOOL_MAP: dict[str, list[str]] = {
     "email": ["gmail"],
     "automation": ["schedule_task"],
     "communication": ["whatsapp"],
+    "admin": ["self_update"],
 }
 
 ALL_PERMISSION_GROUPS: list[str] = sorted(PERMISSION_TOOL_MAP.keys())
@@ -189,6 +191,9 @@ async def init_resources() -> None:
 
     # Schedule task tool (always registered — uses DB only)
     _tools["schedule_task"] = ScheduleTaskTool(_db_pool)
+
+    # Self-update tool (always registered — admin permission required)
+    _tools["self_update"] = SelfUpdateTool()
 
     # ── Alert dispatch ──────────────────────────────────────────────
     # Wire NotificationDispatcher with Push + WhatsApp channels so that
