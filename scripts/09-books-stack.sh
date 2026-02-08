@@ -53,8 +53,8 @@ CALIBRE_LIB="${DRIVE_PATH}/Books/eBooks/Calibre Library"
 if [[ ! -f "${CALIBRE_LIB}/metadata.db" ]]; then
     mkdir -p "${CALIBRE_LIB}"
     # Create a minimal valid Calibre metadata.db using SQLite via Docker
-    docker run --rm -v "${CALIBRE_LIB}:/lib" alpine sh -c \
-        'apk add --no-cache sqlite >/dev/null 2>&1 && sqlite3 /lib/metadata.db "CREATE TABLE IF NOT EXISTS books(id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL DEFAULT \"Unknown\"); CREATE TABLE IF NOT EXISTS data(id INTEGER PRIMARY KEY, book INTEGER, format TEXT, uncompressed_size INTEGER, name TEXT);"' 2>/dev/null
+    docker run --rm -v "${CALIBRE_LIB}:/data" alpine sh -c \
+        'apk add --no-cache sqlite >/dev/null 2>&1 && sqlite3 /data/metadata.db "CREATE TABLE IF NOT EXISTS books(id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL DEFAULT \"Unknown\"); CREATE TABLE IF NOT EXISTS data(id INTEGER PRIMARY KEY, book INTEGER, format TEXT, uncompressed_size INTEGER, name TEXT);"' 2>/dev/null
     echo -e "  ${GREEN}✓${NC} Empty Calibre metadata.db created"
 else
     echo -e "  ${GREEN}✓${NC} Calibre metadata.db already exists"
