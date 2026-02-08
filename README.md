@@ -476,6 +476,31 @@ For photos and documents, cloud backup is **optional** — see [HOMESERVER_PLAN.
 
 ---
 
+## Updating
+
+Pull the latest code and rebuild only the stacks that changed:
+
+```bash
+bash ~/home-server/scripts/update.sh
+```
+
+| Flag | Description |
+|------|-------------|
+| `--check` | Show available updates without applying them |
+| `--force` | Rebuild all stacks, even if unchanged |
+
+The script compares local and remote commits, identifies which Docker Compose stacks were affected, pulls the changes, and rebuilds only those stacks. It's safe to run at any time — if nothing changed, it exits immediately.
+
+To migrate data to a different drive (e.g. from internal SSD to an external drive):
+
+```bash
+cd ~/home-server && ./scripts/change-drive.sh
+```
+
+This interactively stops running stacks, copies data with `rsync`, and restarts everything on the new path.
+
+---
+
 ## Monthly Costs
 
 | Configuration | Cost |
