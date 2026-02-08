@@ -45,6 +45,11 @@
   .card {
     @apply bg-butler-800 rounded-xl border border-butler-700;
   }
+
+  /* Highlight.js: remove default background so <pre> wrapper controls it */
+  .hljs {
+    background: transparent !important;
+  }
 }
 
 @layer utilities {
