@@ -152,7 +152,9 @@
 |---------|----------|---------|------------|------------|------------|------|
 | [**Calibre-Web**](https://github.com/janeczku/calibre-web) | [GitHub](https://github.com/janeczku/calibre-web) | E-book library, OPDS feed, Kindle email delivery | Docker container | 150MB | 300MB | 8083 |
 | [**Audiobookshelf**](https://www.audiobookshelf.org/) | [audiobookshelf.org](https://www.audiobookshelf.org/) | Audiobook streaming & progress sync (native mobile apps) | Docker container | 200MB | 400MB | 13378 |
-| [**Readarr**](https://readarr.com/) | [readarr.com](https://readarr.com/) | Book & audiobook automation | Docker container | 300MB | 500MB | 8787 |
+| ~~Readarr~~ | ~~readarr.com~~ | ~~Book automation~~ (replaced by Butler BookTool) | ~~Docker~~ | — | — | — |
+
+> **Note (2026-02-08):** Readarr/Bookshelf has been replaced by Butler's BookTool which searches Open Library for metadata and uses Prowlarr + qBittorrent directly for downloads. The upstream Bookshelf metadata provider (api.bookinfo.pro) is unreliable — search and edition lookups hang indefinitely. See `butler/tools/books.py`.
 
 > **Ebook Access Methods:** Calibre-Web serves ebooks via browser (built-in EPUB/PDF reader), OPDS catalog feed (for mobile apps like KOReader, Moon+ Reader, FBReader), Kindle email delivery (Send-to-Kindle), and direct download. See [Ebook Reading Guide](docs/ebook-reading-guide.md) for setup. Audiobookshelf has native iOS/Android apps with offline downloads.
 
@@ -715,7 +717,8 @@ Custom Python tools interface directly with PostgreSQL (not Butler API's built-i
 | Integration | Purpose | Access Level |
 |-------------|---------|--------------|
 | **Home Assistant** | Control heating, lights, devices | Read-write |
-| **Radarr/Sonarr/Readarr** | Add media to library | Read-write |
+| **Radarr/Sonarr** | Add movies & TV to library | Read-write |
+| **BookTool** | Search & download books (Open Library + Prowlarr + qBit) | Read-write |
 | **Jellyfin** | Playback control | Read-write |
 | **Immich** | Photo search | Read-only |
 | **WhatsApp** | Send notifications to users | Write-only (outbound) |
@@ -725,7 +728,7 @@ Custom Python tools interface directly with PostgreSQL (not Butler API's built-i
 | Command | What Happens |
 |---------|--------------|
 | *"Turn the heating on 2 days before I get back from Japan"* | Reads calendar → finds return date → schedules HA automation |
-| *"Find the new Dune audiobook"* | Readarr search → Prowlarr → qBittorrent → WhatsApp notification when done |
+| *"Find the new Dune audiobook"* | BookTool search (Open Library) → Prowlarr → qBittorrent → WhatsApp notification when done |
 | *"Is anyone home?"* | Checks both phone locations → responds accordingly |
 | *"What's the weather like for my trip?"* | Reads calendar for trip dates → fetches weather forecast |
 | *"Dim the living room lights"* | Calls Home Assistant → adjusts lights |
