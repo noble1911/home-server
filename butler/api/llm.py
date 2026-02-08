@@ -76,12 +76,18 @@ def _build_tool_definitions(tools: dict[str, Tool]) -> list[dict]:
 def _build_messages(
     user_message: str,
     history: list[dict] | None = None,
+    *,
+    image: dict | None = None,
 ) -> list[dict]:
     """Build the messages array with optional conversation history.
 
     Prepends history messages, then appends the current user message.
     Ensures the first message is always from the user role (Claude API requirement)
     by stripping any leading assistant messages from history.
+
+    When *image* is provided (``{"data": ..., "media_type": ...}``), the
+    current user message is formatted as a list of content blocks so Claude
+    receives both the image and text together.
     """
     messages: list[dict] = []
 
@@ -97,13 +103,47 @@ def _build_messages(
                 started = True
             messages.append({"role": msg["role"], "content": msg["content"]})
 
+    # Build the content for the current user message.
+    if image:
+        content: str | list[dict] = [
+            {
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": image["media_type"],
+                    "data": image["data"],
+                },
+            },
+            {"type": "text", "text": user_message},
+        ]
+    else:
+        content = user_message
+
     # Claude requires strict user/assistant alternation. If history ends
     # with a user message (e.g. the previous assistant reply wasn't stored),
     # merge into it to avoid consecutive user messages.
     if messages and messages[-1]["role"] == "user":
-        messages[-1]["content"] += "\n\n" + user_message
+        prev = messages[-1]["content"]
+        if image or isinstance(prev, list):
+            # Either the new message has an image, or the previous message
+            # already uses content-block format (e.g. from a prior image
+            # turn). Normalise both sides into block lists and merge.
+            # Note: content values are always str or list[dict] here.
+            if isinstance(prev, str):
+                prev_blocks = [{"type": "text", "text": prev}]
+            else:
+                prev_blocks = list(prev)
+
+            if isinstance(content, str):
+                new_blocks: list[dict] = [{"type": "text", "text": content}]
+            else:
+                new_blocks = list(content)
+
+            messages[-1]["content"] = prev_blocks + new_blocks
+        else:
+            messages[-1]["content"] += "\n\n" + user_message
     else:
-        messages.append({"role": "user", "content": user_message})
+        messages.append({"role": "user", "content": content})
 
     return messages
 
@@ -115,6 +155,7 @@ async def chat_with_tools(
     max_tool_rounds: int = 5,
     *,
     history: list[dict] | None = None,
+    image: dict | None = None,
     db_pool: DatabasePool | None = None,
     user_id: str | None = None,
     channel: str | None = None,
@@ -139,7 +180,7 @@ async def chat_with_tools(
     """
     client = _get_client()
     tool_definitions = _build_tool_definitions(tools)
-    messages = _build_messages(user_message, history)
+    messages = _build_messages(user_message, history, image=image)
 
     for round_num in range(max_tool_rounds):
         response = await client.messages.create(
@@ -206,6 +247,7 @@ async def stream_chat_with_tools(
     max_tool_rounds: int = 5,
     *,
     history: list[dict] | None = None,
+    image: dict | None = None,
     db_pool: DatabasePool | None = None,
     user_id: str | None = None,
     channel: str | None = None,
@@ -232,7 +274,7 @@ async def stream_chat_with_tools(
     """
     client = _get_client()
     tool_definitions = _build_tool_definitions(tools)
-    messages = _build_messages(user_message, history)
+    messages = _build_messages(user_message, history, image=image)
 
     for round_num in range(max_tool_rounds):
         async with client.messages.stream(
@@ -303,6 +345,7 @@ async def stream_chat_with_events(
     max_tool_rounds: int = 5,
     *,
     history: list[dict] | None = None,
+    image: dict | None = None,
     db_pool: DatabasePool | None = None,
     user_id: str | None = None,
     channel: str | None = None,
@@ -320,7 +363,7 @@ async def stream_chat_with_events(
     """
     client = _get_client()
     tool_definitions = _build_tool_definitions(tools)
-    messages = _build_messages(user_message, history)
+    messages = _build_messages(user_message, history, image=image)
 
     for round_num in range(max_tool_rounds):
         web_search_active = False

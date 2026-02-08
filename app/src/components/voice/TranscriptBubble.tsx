@@ -22,6 +22,13 @@ export default function TranscriptBubble({ message, butlerName }: TranscriptBubb
         {!isUser && (
           <div className="text-xs text-butler-400 mb-1">{butlerName}</div>
         )}
+        {message.imageDataUrl && (
+          <img
+            src={message.imageDataUrl}
+            alt="Attached image"
+            className="max-w-full max-h-48 rounded-lg mb-2"
+          />
+        )}
         {message.role === 'assistant' && !message.content && !message.toolStatus ? (
           <p className="text-sm text-butler-400 animate-pulse">...</p>
         ) : (

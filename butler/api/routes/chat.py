@@ -24,6 +24,18 @@ from ..deps import get_current_user, get_db_pool, get_embedding_service, get_too
 from ..llm import chat_with_tools, stream_chat_with_events
 from ..models import ChatHistoryResponse, ChatRequest, ChatResponse, HistoryMessage
 
+
+def _prepare_image_context(req: ChatRequest) -> tuple[dict | None, str, dict]:
+    """Extract image payload and DB-ready content/metadata from a chat request."""
+    image_payload = None
+    user_content = req.message
+    user_metadata: dict = {}
+    if req.image:
+        image_payload = {"data": req.image.data, "media_type": req.image.mediaType}
+        user_content = f"[Image attached: {req.image.mediaType}]\n{req.message}"
+        user_metadata = {"has_image": True, "image_media_type": req.image.mediaType}
+    return image_payload, user_content, user_metadata
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
@@ -48,12 +60,14 @@ async def text_chat(
         embedding_service=get_embedding_service(),
     )
     all_tools = await get_user_tools(user_id, tools, pool)
+    image_payload, user_content, user_metadata = _prepare_image_context(req)
 
     response_text = await chat_with_tools(
         system_prompt=ctx.system_prompt,
         user_message=req.message,
         tools=all_tools,
         history=ctx.history,
+        image=image_payload,
         db_pool=pool,
         user_id=user_id,
         channel="pwa",
@@ -61,25 +75,26 @@ async def text_chat(
 
     message_id = str(uuid.uuid4())
 
-    # Save both sides of the conversation
     db = pool.pool
-    await db.execute(
-        """
-        INSERT INTO butler.conversation_history (user_id, channel, role, content)
-        VALUES ($1, 'pwa', 'user', $2)
-        """,
-        user_id,
-        req.message,
-    )
-    await db.execute(
-        """
-        INSERT INTO butler.conversation_history (user_id, channel, role, content, metadata)
-        VALUES ($1, 'pwa', 'assistant', $2, $3::jsonb)
-        """,
-        user_id,
-        response_text,
-        json.dumps({"message_id": message_id}),
-    )
+    async with db.transaction():
+        await db.execute(
+            """
+            INSERT INTO butler.conversation_history (user_id, channel, role, content, metadata)
+            VALUES ($1, 'pwa', 'user', $2, $3::jsonb)
+            """,
+            user_id,
+            user_content,
+            json.dumps(user_metadata),
+        )
+        await db.execute(
+            """
+            INSERT INTO butler.conversation_history (user_id, channel, role, content, metadata)
+            VALUES ($1, 'pwa', 'assistant', $2, $3::jsonb)
+            """,
+            user_id,
+            response_text,
+            json.dumps({"message_id": message_id}),
+        )
 
     # Auto-learn: extract facts in the background (fire-and-forget)
     asyncio.create_task(
@@ -163,6 +178,8 @@ async def stream_text_chat(
         embedding_service=get_embedding_service(),
     )
     all_tools = await get_user_tools(user_id, tools, pool)
+    image_payload, user_content, user_metadata = _prepare_image_context(req)
+
     message_id = str(uuid.uuid4())
     full_response_parts: list[str] = []
 
@@ -173,6 +190,7 @@ async def stream_text_chat(
                 user_message=req.message,
                 tools=all_tools,
                 history=ctx.history,
+                image=image_payload,
                 db_pool=pool,
                 user_id=user_id,
                 channel="pwa",
@@ -188,25 +206,27 @@ async def stream_text_chat(
             if full_text:
                 try:
                     db = pool.pool
-                    await db.execute(
-                        """
-                        INSERT INTO butler.conversation_history
-                            (user_id, channel, role, content)
-                        VALUES ($1, 'pwa', 'user', $2)
-                        """,
-                        user_id,
-                        req.message,
-                    )
-                    await db.execute(
-                        """
-                        INSERT INTO butler.conversation_history
-                            (user_id, channel, role, content, metadata)
-                        VALUES ($1, 'pwa', 'assistant', $2, $3::jsonb)
-                        """,
-                        user_id,
-                        full_text,
-                        json.dumps({"message_id": message_id}),
-                    )
+                    async with db.transaction():
+                        await db.execute(
+                            """
+                            INSERT INTO butler.conversation_history
+                                (user_id, channel, role, content, metadata)
+                            VALUES ($1, 'pwa', 'user', $2, $3::jsonb)
+                            """,
+                            user_id,
+                            user_content,
+                            json.dumps(user_metadata),
+                        )
+                        await db.execute(
+                            """
+                            INSERT INTO butler.conversation_history
+                                (user_id, channel, role, content, metadata)
+                            VALUES ($1, 'pwa', 'assistant', $2, $3::jsonb)
+                            """,
+                            user_id,
+                            full_text,
+                            json.dumps({"message_id": message_id}),
+                        )
                     # Auto-learn: extract facts in the background
                     asyncio.create_task(
                         extract_and_store_facts(

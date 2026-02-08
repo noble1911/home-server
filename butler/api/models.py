@@ -180,10 +180,32 @@ class ServiceCredentialsResponse(BaseModel):
 
 # --- Chat ---
 
+ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
+# ~5 MB raw → ~6.8 M base64 chars; round up to 7 M for headroom.
+MAX_IMAGE_BASE64_LEN = 7_000_000
+
+
+class ImageAttachment(BaseModel):
+    """Base64-encoded image for Claude vision. No data-URI prefix."""
+    data: str
+    mediaType: str
+
+    @model_validator(mode="after")
+    def validate_image(self):
+        if self.mediaType not in ALLOWED_IMAGE_TYPES:
+            raise ValueError(
+                f"Unsupported image type '{self.mediaType}'. "
+                f"Allowed: {', '.join(sorted(ALLOWED_IMAGE_TYPES))}"
+            )
+        if len(self.data) > MAX_IMAGE_BASE64_LEN:
+            raise ValueError("Image too large (max ~5 MB)")
+        return self
+
 
 class ChatRequest(BaseModel):
     message: str
     type: str = "text"
+    image: ImageAttachment | None = None
 
 
 class ChatResponse(BaseModel):
