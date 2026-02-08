@@ -21,6 +21,8 @@ This guide walks through everything needed to set up your home server from scrat
 
 ### 1.1 External Drive
 
+> **No external drive?** Pass `--skip-drive` to `setup.sh` and data will be stored at `~/HomeServer` on the internal SSD instead. Skip to [1.2 Network](#12-network).
+
 Plug in your external USB drive and format it:
 
 1. Open **Disk Utility** (Spotlight → search "Disk Utility")
@@ -180,7 +182,7 @@ Confirm you have these ready:
 
 | Item | Status |
 |------|--------|
-| External drive plugged in and formatted | ☐ |
+| External drive plugged in and formatted (or use `--skip-drive`) | ☐ |
 | Mac Mini connected via Ethernet | ☐ |
 | Anthropic API key | ☐ |
 | Groq API key (or skip voice) | ☐ |
@@ -204,7 +206,7 @@ The script will:
 2. **Install Homebrew** and CLI tools
 3. **Configure power settings** — prevent sleep, auto-restart after power failure
 4. **Install OrbStack** — Docker runtime optimized for Apple Silicon
-5. **Set up external drive** — create directory structure on `/Volumes/HomeServer`
+5. **Set up external drive** — create directory structure on `/Volumes/HomeServer` (or `~/HomeServer` with `--skip-drive`)
 6. **Deploy all Docker stacks** — downloads images and starts containers
 7. **Auto-configure services** — connects Radarr/Sonarr to Prowlarr and qBittorrent, creates admin accounts, sets up media libraries
 8. **Prompt for API keys** — enter the keys you collected in Phase 2
@@ -217,6 +219,7 @@ The script will:
 | `--drive-name=NAME` | External drive name (default: `HomeServer`) |
 | `--skip-voice` | Skip voice stack (LiveKit + Kokoro TTS) |
 | `--skip-butler` | Skip Butler API deployment |
+| `--skip-drive` | Use internal SSD instead of external drive (data at `~/HomeServer`) |
 
 Examples:
 
@@ -226,6 +229,9 @@ curl -fsSL https://raw.githubusercontent.com/noble1911/home-server/main/setup.sh
 
 # Minimal install (no voice, no Butler)
 curl -fsSL https://raw.githubusercontent.com/noble1911/home-server/main/setup.sh | bash -s -- --skip-voice --skip-butler
+
+# No external drive — store everything on internal SSD
+curl -fsSL https://raw.githubusercontent.com/noble1911/home-server/main/setup.sh | bash -s -- --skip-drive
 ```
 
 ### What Gets Deployed
