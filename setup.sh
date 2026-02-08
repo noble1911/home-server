@@ -208,6 +208,18 @@ else
     echo -e "\n${YELLOW}==>${NC} Skipping Butler API (--skip-butler flag)"
 fi
 
+# Clone repo locally for future updates
+REPO_DIR="$HOME/home-server"
+echo -e "\n${GREEN}Cloning repo for future updates${NC}"
+if [[ -d "$REPO_DIR/.git" ]]; then
+    echo -e "  ${GREEN}✓${NC} Repo already cloned at ${REPO_DIR}"
+    git -C "$REPO_DIR" pull --ff-only 2>&1 || echo -e "  ${YELLOW}⚠${NC} Could not pull latest — run 'git -C $REPO_DIR pull' manually"
+else
+    git clone https://github.com/noble1911/home-server.git "$REPO_DIR" 2>/dev/null && \
+        echo -e "  ${GREEN}✓${NC} Repo cloned to ${REPO_DIR}" || \
+        echo -e "  ${YELLOW}⚠${NC} Could not clone repo — clone it manually later: git clone https://github.com/noble1911/home-server.git ${REPO_DIR}"
+fi
+
 # Summary
 echo ""
 echo -e "${GREEN}"
@@ -276,4 +288,9 @@ fi
 echo ""
 fi
 echo -e "${YELLOW}Credentials saved to:${NC} ~/.homeserver-credentials"
+echo ""
+echo -e "${GREEN}Updating services:${NC}"
+echo "  cd ~/home-server && git pull"
+echo "  Then rebuild the stack you changed, e.g.:"
+echo "    docker compose -f docker/media-stack/docker-compose.yml up -d --build"
 echo ""

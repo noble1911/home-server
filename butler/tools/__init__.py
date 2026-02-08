@@ -43,6 +43,7 @@ from .server_health import ServerHealthTool
 from .storage_monitor import StorageMonitorTool
 from .schedule_task import ScheduleTaskTool
 from .whatsapp import WhatsAppTool
+from .self_update import SelfUpdateTool
 
 __all__ = [
     # Base
@@ -91,4 +92,6 @@ __all__ = [
     "ScheduleTaskTool",
     # WhatsApp
     "WhatsAppTool",
+    # Self-update
+    "SelfUpdateTool",
 ]
