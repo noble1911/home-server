@@ -13,6 +13,7 @@ from fastapi import Depends, Header, HTTPException
 
 from tools import (
     AlertStateManager,
+    BookTool,
     DatabasePool,
     EmbeddingService,
     GmailTool,
@@ -59,7 +60,7 @@ ALWAYS_ALLOWED_TOOLS: set[str] = {
 }
 
 PERMISSION_TOOL_MAP: dict[str, list[str]] = {
-    "media": ["radarr", "readarr", "sonarr", "immich", "jellyfin", "media_files"],
+    "media": ["radarr", "readarr", "books", "sonarr", "immich", "jellyfin", "media_files"],
     "home": ["home_assistant", "list_ha_entities"],
     "location": ["phone_location"],
     "calendar": ["google_calendar"],
@@ -127,6 +128,16 @@ async def init_resources() -> None:
         _tools["readarr"] = ReadarrTool(
             base_url=settings.readarr_url,
             api_key=settings.readarr_api_key,
+        )
+
+    # Books tool (Open Library + Prowlarr + qBittorrent) — replaces Readarr for search/download
+    if settings.prowlarr_api_key:
+        _tools["books"] = BookTool(
+            prowlarr_url="http://prowlarr:9696",
+            prowlarr_api_key=settings.prowlarr_api_key,
+            qbit_url=settings.qbittorrent_url,
+            qbit_user=settings.qbittorrent_username,
+            qbit_pass=settings.qbittorrent_password,
         )
 
     # Only register Immich tool if configured

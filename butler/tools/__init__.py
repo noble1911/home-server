@@ -34,6 +34,7 @@ from .google_calendar import GoogleCalendarTool
 from .jellyfin import JellyfinTool
 from .radarr import RadarrTool
 from .readarr import ReadarrTool
+from .books import BookTool
 from .sonarr import SonarrTool
 from .immich import ImmichTool
 from .phone_location import PhoneLocationTool
@@ -77,6 +78,8 @@ __all__ = [
     "RadarrTool",
     # Readarr
     "ReadarrTool",
+    # Books (Open Library + Prowlarr + qBittorrent)
+    "BookTool",
     # Sonarr
     "SonarrTool",
     # Immich
