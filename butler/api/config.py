@@ -103,6 +103,12 @@ class Settings(BaseSettings):
     health_check_timeout: int = 5
     prowlarr_api_key: str = ""
 
+    # Host system info (for accurate dashboard stats inside Docker)
+    host_platform: str = ""           # e.g., "macOS"
+    host_architecture: str = ""       # e.g., "Apple M4"
+    host_memory_total_gb: int = 0     # e.g., 24 (0 = fall back to /proc/meminfo)
+    has_external_drive: bool = False   # True when DRIVE_PATH is an external volume
+
     # Cleanup jobs
     cleanup_retention_days: int = 30
 

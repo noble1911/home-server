@@ -66,6 +66,8 @@ class StorageMonitorTool(Tool):
         alert_manager: AlertStateManager,
         external_drive_path: str = "/mnt/external",
         thresholds: tuple[int, ...] = DEFAULT_THRESHOLDS,
+        ssd_path: str = "/mnt/host-ssd",
+        has_external_drive: bool = False,
     ):
         """Initialize the storage monitor tool.
 
@@ -74,11 +76,15 @@ class StorageMonitorTool(Tool):
             alert_manager: AlertStateManager for deduplication.
             external_drive_path: Mount path for the external drive inside the container.
             thresholds: Percentage thresholds that trigger alerts (ascending).
+            ssd_path: Mount path for the host SSD (used when external drive exists).
+            has_external_drive: True when DRIVE_PATH points to an external volume.
         """
         self._db_pool = db_pool
         self._alert_manager = alert_manager
         self._external_path = external_drive_path
         self._thresholds = tuple(sorted(thresholds))
+        self._ssd_path = ssd_path
+        self._has_external_drive = has_external_drive
 
     async def close(self) -> None:
         """No resources to release."""
@@ -224,18 +230,20 @@ class StorageMonitorTool(Tool):
                 await self._alert_manager.resolve_alert(alert_key)
 
     async def _check_external(self) -> str:
-        """Check external drive usage with category breakdown."""
+        """Check external drive / data volume usage with category breakdown."""
         usage = self._check_volume(self._external_path)
         if usage is None:
             return (
-                f"External drive not available at {self._external_path}. "
+                f"Data volume not available at {self._external_path}. "
                 "Is the volume mounted?"
             )
 
-        await self._update_threshold_alerts("external", usage["percent"])
+        label = "External Drive" if self._has_external_drive else "Data (Mac SSD)"
+        alert_key = "external" if self._has_external_drive else "ssd"
+        await self._update_threshold_alerts(alert_key, usage["percent"])
 
         lines = [
-            f"External Drive: {_format_bytes(usage['used'])} / "
+            f"{label}: {_format_bytes(usage['used'])} / "
             f"{_format_bytes(usage['total'])} ({usage['percent']}%) "
             f"— {self._status_label(usage['percent'])}",
         ]
@@ -243,39 +251,54 @@ class StorageMonitorTool(Tool):
         # Category breakdown
         categories = await self._get_category_sizes()
         if categories:
-            parts = [f"{label}: {_format_bytes(size)}"
-                     for label, size in sorted(categories.items(),
-                                               key=lambda x: x[1], reverse=True)]
+            parts = [f"{cat}: {_format_bytes(size)}"
+                     for cat, size in sorted(categories.items(),
+                                             key=lambda x: x[1], reverse=True)]
             lines.append("  " + " | ".join(parts))
 
         return "\n".join(lines)
 
     async def _check_ssd(self) -> str:
-        """Check internal SSD usage."""
-        # Inside Docker, "/" is the container's overlay filesystem.
-        # If /mnt/host is mounted, use that for host SSD stats.
-        # Otherwise fall back to "/" which shows container disk usage.
-        usage = self._check_volume("/")
+        """Check Mac SSD usage.
+
+        When an external drive exists, the SSD stats come from _ssd_path
+        (/mnt/host-ssd). Otherwise, _external_path IS the SSD, so we
+        delegate to _check_external() to avoid duplicating logic.
+        """
+        if not self._has_external_drive:
+            # No separate SSD — _external_path is the Mac SSD
+            return await self._check_external()
+
+        usage = self._check_volume(self._ssd_path)
         if usage is None:
-            return "Could not determine SSD usage."
+            return "Could not determine Mac SSD usage."
 
         await self._update_threshold_alerts("ssd", usage["percent"])
 
         return (
-            f"Internal SSD: {_format_bytes(usage['used'])} / "
+            f"Mac SSD: {_format_bytes(usage['used'])} / "
             f"{_format_bytes(usage['total'])} ({usage['percent']}%) "
             f"— {self._status_label(usage['percent'])}"
         )
 
     async def _check_all(self) -> str:
-        """Check all volumes."""
+        """Check all volumes.
+
+        When no external drive: single "Data (Mac SSD)" entry.
+        When external drive: "External Drive" + "Mac SSD".
+        """
         parts = []
 
-        ext = await self._check_external()
-        parts.append(ext)
+        if self._has_external_drive:
+            ext = await self._check_external()
+            parts.append(ext)
 
-        ssd = await self._check_ssd()
-        parts.append(ssd)
+            ssd = await self._check_ssd()
+            parts.append(ssd)
+        else:
+            # Single volume — _check_external shows "Data (Mac SSD)"
+            ssd = await self._check_external()
+            parts.append(ssd)
 
         # Alert summary
         alerts = await self._alert_manager.get_active_alerts("storage_threshold")

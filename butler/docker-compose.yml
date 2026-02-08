@@ -58,10 +58,16 @@ services:
       - QBITTORRENT_PASSWORD=${QBITTORRENT_PASSWORD:-adminadmin}
       # WhatsApp Gateway (outbound notifications)
       - WHATSAPP_GATEWAY_URL=${WHATSAPP_GATEWAY_URL:-}
+      # Host system info (accurate dashboard stats inside Docker)
+      - HOST_PLATFORM=${HOST_PLATFORM:-}
+      - HOST_ARCHITECTURE=${HOST_ARCHITECTURE:-}
+      - HOST_MEMORY_TOTAL_GB=${HOST_MEMORY_TOTAL_GB:-0}
+      - HAS_EXTERNAL_DRIVE=${HAS_EXTERNAL_DRIVE:-false}
     volumes:
       - ./api:/app/api:ro
       - ./tools:/app/tools:ro
       - ${DRIVE_PATH:-/Volumes/HomeServer}:/mnt/external
+      - /private/var/empty:/mnt/host-ssd:ro
     ports:
       - "8000:8000"
     networks:

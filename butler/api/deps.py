@@ -194,6 +194,8 @@ async def init_resources() -> None:
         alert_manager=alert_manager,
         external_drive_path=settings.external_drive_path,
         thresholds=thresholds,
+        ssd_path="/mnt/host-ssd",
+        has_external_drive=settings.has_external_drive,
     )
 
     # Schedule task tool (always registered — uses DB only)

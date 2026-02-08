@@ -17,6 +17,7 @@ from fastapi import APIRouter, Depends, Query
 
 from tools import DatabasePool, ServerHealthTool, StorageMonitorTool, Tool
 
+from ..config import settings
 from ..deps import get_admin_user, get_current_user, get_db_pool, get_tools
 from ..models import ToolUsageEntry, ToolUsageResponse, ToolUsageSummary
 
@@ -70,42 +71,65 @@ async def system_storage(
     _user_id: str = Depends(get_current_user),
     tools: dict[str, Tool] = Depends(get_tools),
 ) -> dict[str, Any]:
-    """Disk usage for SSD and external drive."""
+    """Disk usage for SSD and external drive.
+
+    When has_external_drive=False: single "Mac SSD" volume from /mnt/external
+    (which IS the Mac SSD via bind mount — statvfs returns host partition stats).
+
+    When has_external_drive=True: "External Drive" from /mnt/external (with
+    category breakdown) + "Mac SSD" from /mnt/host-ssd.
+    """
     storage_tool = tools.get("storage_monitor")
     if not isinstance(storage_tool, StorageMonitorTool):
         return {"volumes": []}
 
     volumes = []
 
-    # External drive
-    ext = storage_tool._check_volume(storage_tool._external_path)
-    if ext:
-        categories = await storage_tool._get_category_sizes()
-        volumes.append({
-            "name": "External Drive",
-            "total": ext["total"],
-            "used": ext["used"],
-            "free": ext["free"],
-            "percent": ext["percent"],
-            "totalFormatted": _format_bytes(ext["total"]),
-            "usedFormatted": _format_bytes(ext["used"]),
-            "freeFormatted": _format_bytes(ext["free"]),
-            "categories": {k: {"bytes": v, "formatted": _format_bytes(v)} for k, v in categories.items()},
-        })
+    if storage_tool._has_external_drive:
+        # Two-volume mode: external drive + Mac SSD
+        ext = storage_tool._check_volume(storage_tool._external_path)
+        if ext:
+            categories = await storage_tool._get_category_sizes()
+            volumes.append({
+                "name": "External Drive",
+                "total": ext["total"],
+                "used": ext["used"],
+                "free": ext["free"],
+                "percent": ext["percent"],
+                "totalFormatted": _format_bytes(ext["total"]),
+                "usedFormatted": _format_bytes(ext["used"]),
+                "freeFormatted": _format_bytes(ext["free"]),
+                "categories": {k: {"bytes": v, "formatted": _format_bytes(v)} for k, v in categories.items()},
+            })
 
-    # Internal SSD
-    ssd = storage_tool._check_volume("/")
-    if ssd:
-        volumes.append({
-            "name": "Internal SSD",
-            "total": ssd["total"],
-            "used": ssd["used"],
-            "free": ssd["free"],
-            "percent": ssd["percent"],
-            "totalFormatted": _format_bytes(ssd["total"]),
-            "usedFormatted": _format_bytes(ssd["used"]),
-            "freeFormatted": _format_bytes(ssd["free"]),
-        })
+        ssd = storage_tool._check_volume(storage_tool._ssd_path)
+        if ssd:
+            volumes.append({
+                "name": "Mac SSD",
+                "total": ssd["total"],
+                "used": ssd["used"],
+                "free": ssd["free"],
+                "percent": ssd["percent"],
+                "totalFormatted": _format_bytes(ssd["total"]),
+                "usedFormatted": _format_bytes(ssd["used"]),
+                "freeFormatted": _format_bytes(ssd["free"]),
+            })
+    else:
+        # Single-volume mode: /mnt/external IS the Mac SSD
+        ssd = storage_tool._check_volume(storage_tool._external_path)
+        if ssd:
+            categories = await storage_tool._get_category_sizes()
+            volumes.append({
+                "name": "Mac SSD",
+                "total": ssd["total"],
+                "used": ssd["used"],
+                "free": ssd["free"],
+                "percent": ssd["percent"],
+                "totalFormatted": _format_bytes(ssd["total"]),
+                "usedFormatted": _format_bytes(ssd["used"]),
+                "freeFormatted": _format_bytes(ssd["free"]),
+                "categories": {k: {"bytes": v, "formatted": _format_bytes(v)} for k, v in categories.items()},
+            })
 
     return {"volumes": volumes}
 
@@ -163,13 +187,30 @@ def _format_uptime(seconds: int) -> str:
 async def system_stats(
     _user_id: str = Depends(get_current_user),
 ) -> dict[str, Any]:
-    """Basic system metrics (uptime, memory, platform)."""
+    """Basic system metrics (uptime, memory, platform).
+
+    Uses host env vars (HOST_PLATFORM, HOST_ARCHITECTURE, HOST_MEMORY_TOTAL_GB)
+    when available, falling back to container-detected values.
+    """
     uptime_seconds = _read_proc_uptime()
     memory = _read_proc_meminfo()
 
+    # Use host-provided memory total if available, keeping /proc/meminfo for used/available
+    if settings.host_memory_total_gb > 0 and memory:
+        host_total = settings.host_memory_total_gb * (1024 ** 3)
+        used = memory["used"]
+        memory = {
+            "total": host_total,
+            "used": used,
+            "available": host_total - used,
+            "percent": round(used / host_total * 100) if host_total > 0 else 0,
+            "totalFormatted": _format_bytes(host_total),
+            "usedFormatted": _format_bytes(used),
+        }
+
     return {
-        "platform": platform.system(),
-        "architecture": platform.machine(),
+        "platform": settings.host_platform or platform.system(),
+        "architecture": settings.host_architecture or platform.machine(),
         "uptimeSeconds": uptime_seconds,
         "uptimeFormatted": _format_uptime(uptime_seconds) if uptime_seconds else None,
         "memory": memory,

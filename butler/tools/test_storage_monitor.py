@@ -33,11 +33,13 @@ def alert_manager(mock_pool):
 
 @pytest.fixture
 def tool(mock_pool, alert_manager):
-    """Create a StorageMonitorTool with default config."""
+    """Create a StorageMonitorTool with external drive config."""
     return StorageMonitorTool(
         db_pool=mock_pool,
         alert_manager=alert_manager,
         external_drive_path="/mnt/external",
+        ssd_path="/mnt/host-ssd",
+        has_external_drive=True,
     )
 
 
@@ -184,7 +186,7 @@ class TestCheckExternal:
 
 
 class TestCheckSSD:
-    """Tests for check_ssd action."""
+    """Tests for check_ssd action (with external drive)."""
 
     @pytest.mark.asyncio
     async def test_ssd_healthy(self, tool, alert_manager):
@@ -196,6 +198,7 @@ class TestCheckSSD:
 
         assert "35%" in result
         assert "OK" in result
+        assert "Mac SSD" in result
 
     @pytest.mark.asyncio
     async def test_ssd_warning(self, tool, alert_manager):
@@ -207,6 +210,7 @@ class TestCheckSSD:
 
         assert "75%" in result
         assert "WARNING" in result
+        assert "Mac SSD" in result
 
 
 class TestCheckAll:
@@ -214,8 +218,7 @@ class TestCheckAll:
 
     @pytest.mark.asyncio
     async def test_combined_report(self, tool, alert_manager):
-        """check_all includes both volumes."""
-        call_count = 0
+        """check_all includes both volumes when external drive exists."""
         def mock_exists(path):
             return True
 
@@ -232,7 +235,7 @@ class TestCheckAll:
 
         assert "Storage Report" in result
         assert "External Drive" in result
-        assert "Internal SSD" in result
+        assert "Mac SSD" in result
         assert "Active Storage Alerts" in result
 
 
@@ -257,6 +260,59 @@ class TestGetAlerts:
         assert "1" in result
         assert "WARNING" in result
         assert "72%" in result
+
+
+class TestNoExternalDrive:
+    """Tests for single-disk mode (no external drive)."""
+
+    @pytest.fixture
+    def no_ext_tool(self, mock_pool, alert_manager):
+        """Create a StorageMonitorTool without external drive."""
+        return StorageMonitorTool(
+            db_pool=mock_pool,
+            alert_manager=alert_manager,
+            external_drive_path="/mnt/external",
+            ssd_path="/mnt/host-ssd",
+            has_external_drive=False,
+        )
+
+    @pytest.mark.asyncio
+    async def test_check_external_shows_mac_ssd(self, no_ext_tool, alert_manager):
+        """check_external labels as 'Data (Mac SSD)' when no external drive."""
+        with patch("os.path.exists", return_value=True), \
+             patch("shutil.disk_usage", return_value=_usage(500, 200)), \
+             patch("os.path.isdir", return_value=False):
+
+            result = await no_ext_tool.execute(action="check_external")
+
+        assert "Data (Mac SSD)" in result
+        assert "External Drive" not in result
+
+    @pytest.mark.asyncio
+    async def test_check_ssd_delegates_to_external(self, no_ext_tool, alert_manager):
+        """check_ssd delegates to check_external in single-disk mode."""
+        with patch("os.path.exists", return_value=True), \
+             patch("shutil.disk_usage", return_value=_usage(500, 200)), \
+             patch("os.path.isdir", return_value=False):
+
+            result = await no_ext_tool.execute(action="check_ssd")
+
+        assert "Data (Mac SSD)" in result
+
+    @pytest.mark.asyncio
+    async def test_check_all_single_volume(self, no_ext_tool, alert_manager):
+        """check_all shows only one volume in single-disk mode."""
+        with patch("os.path.exists", return_value=True), \
+             patch("shutil.disk_usage", return_value=_usage(500, 200)), \
+             patch("os.path.isdir", return_value=False):
+
+            result = await no_ext_tool.execute(action="check_all")
+
+        assert "Storage Report" in result
+        assert "Data (Mac SSD)" in result
+        assert "External Drive" not in result
+        # Should NOT have duplicate SSD entries
+        assert result.count("Mac SSD") == 1
 
 
 class TestUnknownAction:
