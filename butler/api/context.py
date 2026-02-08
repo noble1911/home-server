@@ -43,6 +43,8 @@ async def load_user_context(
     *,
     current_message: str | None = None,
     embedding_service: EmbeddingService | None = None,
+    channel: str | None = None,
+    history_limit: int | None = None,
 ) -> UserContext:
     """Load all context needed for a personalized LLM call.
 
@@ -53,6 +55,9 @@ async def load_user_context(
             search. If provided with an embedding_service, facts are loaded
             by relevance to this message instead of just by confidence.
         embedding_service: Optional embedding service for semantic search.
+        channel: If provided, only load history from this channel ('pwa',
+            'voice'). Prevents cross-channel contamination.
+        history_limit: Override the default max_history_messages setting.
     """
     db = pool.pool
 
@@ -76,7 +81,9 @@ async def load_user_context(
         embedding_service=embedding_service,
     )
 
-    history = await load_conversation_messages(pool, user_id)
+    history = await load_conversation_messages(
+        pool, user_id, limit=history_limit, channel=channel,
+    )
 
     return UserContext(
         system_prompt=_build_system_prompt(user_name, soul, facts),
@@ -179,26 +186,47 @@ async def load_conversation_messages(
     pool: DatabasePool,
     user_id: str,
     limit: int | None = None,
+    channel: str | None = None,
 ) -> list[dict]:
     """Load recent conversation history as message objects for the Claude API.
 
     Returns a list of {"role": "user"|"assistant", "content": "..."} dicts
     in chronological order, ready to prepend to the messages array.
+
+    Args:
+        channel: If provided, only load messages from this channel.
+            Prevents voice sessions from seeing text chat and vice versa.
     """
     max_msgs = limit if limit is not None else settings.max_history_messages
     db = pool.pool
 
-    rows = await db.fetch(
-        """
-        SELECT role, content
-        FROM butler.conversation_history
-        WHERE user_id = $1 AND created_at > NOW() - INTERVAL '7 days'
-        ORDER BY created_at DESC
-        LIMIT $2
-        """,
-        user_id,
-        max_msgs,
-    )
+    if channel:
+        rows = await db.fetch(
+            """
+            SELECT role, content
+            FROM butler.conversation_history
+            WHERE user_id = $1
+              AND channel = $2
+              AND created_at > NOW() - INTERVAL '7 days'
+            ORDER BY created_at DESC
+            LIMIT $3
+            """,
+            user_id,
+            channel,
+            max_msgs,
+        )
+    else:
+        rows = await db.fetch(
+            """
+            SELECT role, content
+            FROM butler.conversation_history
+            WHERE user_id = $1 AND created_at > NOW() - INTERVAL '7 days'
+            ORDER BY created_at DESC
+            LIMIT $2
+            """,
+            user_id,
+            max_msgs,
+        )
 
     # Reverse to chronological order and build message dicts.
     # Ensure messages alternate user/assistant — Claude requires this.

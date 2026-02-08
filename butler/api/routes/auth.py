@@ -7,6 +7,8 @@ POST /api/auth/token         — Authenticated user gets a LiveKit room token
 
 from __future__ import annotations
 
+import uuid
+
 import jwt as pyjwt
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -227,9 +229,11 @@ async def get_livekit_token(
 ):
     """Generate a LiveKit room token for the authenticated user.
 
-    Each user gets a dedicated room (butler_{user_id}) so conversations
-    don't cross. The token is valid for 1 hour.
+    Each voice session gets a unique room so a fresh agent is always
+    dispatched. Without this, reconnecting to the same static room
+    reuses a dead agent session (close_on_disconnect kills it).
     """
-    room_name = f"butler_{user_id}"
+    session_suffix = uuid.uuid4().hex[:8]
+    room_name = f"butler_{user_id}_{session_suffix}"
     token = create_livekit_token(user_id, room_name)
     return LiveKitTokenResponse(livekit_token=token, room_name=room_name)

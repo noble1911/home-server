@@ -41,14 +41,15 @@ class ButlerAgent(Agent):
 async def entrypoint(ctx: agents.JobContext) -> None:
     """Called when a user joins a LiveKit room.
 
-    The room name format is 'butler_{user_id}', set by Butler API's
-    /api/auth/token endpoint. We extract the user_id to pass through
-    to the Butler API so it can load the right personality and context.
+    Room name format: 'butler_{user_id}_{session_hex}', set by Butler
+    API's /api/auth/token endpoint. Each voice button press creates a
+    unique room so a fresh agent is always dispatched.
     """
     await ctx.connect()
 
-    # Room name: "butler_{user_id}" — extract user identity
-    user_id = ctx.room.name.removeprefix("butler_")
+    # Room name: "butler_{user_id}_{hex}" — strip prefix and session suffix
+    parts = ctx.room.name.removeprefix("butler_")
+    user_id = parts.rsplit("_", 1)[0] if "_" in parts else parts
     session_id = str(uuid.uuid4())
 
     logger.info("Voice session started for user=%s room=%s", user_id, ctx.room.name)
@@ -79,10 +80,8 @@ async def entrypoint(ctx: agents.JobContext) -> None:
 
     await session.start(room=ctx.room, agent=ButlerAgent(user_id))
 
-    # Greet the user on connection
-    await session.generate_reply(
-        instructions="Greet the user briefly. Keep it to one short sentence."
-    )
+    # Greet the user directly via TTS (bypasses LLM — instant feedback)
+    await session.say("Hello! How can I help you?")
 
 
 if __name__ == "__main__":
