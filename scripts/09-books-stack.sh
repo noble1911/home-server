@@ -121,6 +121,20 @@ echo ""
 echo -e "${BLUE}==>${NC} Configuring Readarr..."
 
 if [[ -n "$READARR_API_KEY" ]]; then
+    # Metadata source: upstream api.bookinfo.club is dead, use rreading-glasses community mirror
+    CURRENT_META=$(curl -sf "http://localhost:8787/api/v1/config/development" \
+        -H "X-Api-Key: ${READARR_API_KEY}" 2>/dev/null)
+    if echo "$CURRENT_META" | grep -q '"metadataSource":"https://api.bookinfo.pro"'; then
+        echo -e "  ${GREEN}✓${NC} Readarr metadata source already set"
+    else
+        DEV_CONFIG=$(echo "$CURRENT_META" | sed 's/"metadataSource":"[^"]*"/"metadataSource":"https:\/\/api.bookinfo.pro"/')
+        curl -sf -X PUT "http://localhost:8787/api/v1/config/development" \
+            -H "X-Api-Key: ${READARR_API_KEY}" \
+            -H "Content-Type: application/json" \
+            -d "$DEV_CONFIG" > /dev/null 2>&1 || true
+        echo -e "  ${GREEN}✓${NC} Readarr metadata source: api.bookinfo.pro (rreading-glasses)"
+    fi
+
     # Root folders (Readarr uses API v1)
     EXISTING_RF=$(arr_api_get "http://localhost:8787/api/v1/rootfolder" "$READARR_API_KEY")
 

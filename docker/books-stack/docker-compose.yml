@@ -45,11 +45,11 @@ services:
       start_period: 30s
 
   readarr:
-    image: lscr.io/linuxserver/readarr:0.4.18-develop
+    # pennydreadful/bookshelf softcover — Readarr revival with rreading-glasses support
+    # (upstream Readarr was archived June 2025, api.bookinfo.club is dead)
+    image: ghcr.io/pennydreadful/bookshelf:softcover-v0.4.20
     container_name: readarr
     environment:
-      - PUID=501
-      - PGID=20
       - TZ=Europe/London
     volumes:
       - readarr-config:/config

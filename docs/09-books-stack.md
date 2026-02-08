@@ -75,7 +75,11 @@ brew install --cask calibre
    - Sleep timer
    - Playback speed control
 
-### Readarr
+### Readarr (via Bookshelf)
+
+> We use [pennydreadful/bookshelf](https://github.com/pennydreadful/bookshelf) (softcover variant), a community revival of Readarr.
+> The original Readarr project was archived in June 2025 and its metadata service (`api.bookinfo.club`) no longer exists.
+> Bookshelf uses [rreading-glasses](https://github.com/blampe/rreading-glasses) at `api.bookinfo.pro` as the metadata provider.
 
 1. Open http://localhost:8787
 2. **Settings > Media Management:**
@@ -172,6 +176,16 @@ The `metadata.db` file must exist. Either:
 ### Readarr shows "No root folders"
 
 Add root folders in Settings > Media Management before searching for books.
+
+### Readarr book search returns errors
+
+If searches fail with metadata/Goodreads errors, the metadata source may not be configured:
+
+1. Navigate to `http://localhost:8787/settings/development` (type the URL manually — it's hidden from the menu)
+2. Set **Metadata Provider Source** to `https://api.bookinfo.pro`
+3. Click Save and restart Readarr
+
+This points Readarr at the [rreading-glasses](https://github.com/blampe/rreading-glasses) community metadata service.
 
 ## Related Guides
 
