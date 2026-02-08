@@ -20,8 +20,26 @@ if command -v docker &>/dev/null && docker info &>/dev/null 2>&1; then
     exit 0
 fi
 
-# Install OrbStack
-brew install --cask orbstack
+# Install OrbStack (architecture-aware)
+ARCH=$(uname -m)
+if [[ "$ARCH" == "arm64" ]]; then
+    echo -e "${BLUE}==>${NC} Detected Apple Silicon, downloading arm64 build..."
+    curl -fsSL -o /tmp/OrbStack.dmg "https://orbstack.dev/download/stable/latest/arm64"
+elif [[ "$ARCH" == "x86_64" ]]; then
+    echo -e "${BLUE}==>${NC} Detected Intel, downloading amd64 build..."
+    curl -fsSL -o /tmp/OrbStack.dmg "https://orbstack.dev/download/stable/latest/amd64"
+else
+    echo -e "${YELLOW}⚠${NC} Unknown architecture: $ARCH. Falling back to brew."
+    brew install --cask orbstack
+    ARCH=""
+fi
+
+if [[ -n "$ARCH" ]]; then
+    hdiutil attach /tmp/OrbStack.dmg -nobrowse -quiet
+    cp -R "/Volumes/OrbStack/OrbStack.app" /Applications/
+    hdiutil detach "/Volumes/OrbStack" -quiet
+    rm -f /tmp/OrbStack.dmg
+fi
 
 # Start OrbStack
 echo -e "${BLUE}==>${NC} Starting OrbStack..."
