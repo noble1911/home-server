@@ -52,6 +52,10 @@ services:
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
       - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI:-http://localhost:8000/api/oauth/google/callback}
       - OAUTH_FRONTEND_URL=${OAUTH_FRONTEND_URL:-http://localhost:5173}
+      # qBittorrent (download management)
+      - QBITTORRENT_URL=${QBITTORRENT_URL:-http://qbittorrent:8081}
+      - QBITTORRENT_USERNAME=${QBITTORRENT_USERNAME:-admin}
+      - QBITTORRENT_PASSWORD=${QBITTORRENT_PASSWORD:-adminadmin}
       # WhatsApp Gateway (outbound notifications)
       - WHATSAPP_GATEWAY_URL=${WHATSAPP_GATEWAY_URL:-}
     volumes:

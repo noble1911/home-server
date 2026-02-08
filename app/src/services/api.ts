@@ -275,3 +275,54 @@ export function getSystemStorage(): Promise<SystemStorageResponse> {
 export function getSystemStats(): Promise<SystemStatsResponse> {
   return api.get<SystemStatsResponse>('/system/stats')
 }
+
+// ── Downloads (qBittorrent proxy) ────────────────────────────────────
+
+export interface TorrentInfo {
+  hash: string
+  name: string
+  progress: number
+  size: number
+  sizeFormatted: string
+  downloaded: number
+  downloadedFormatted: string
+  dlSpeed: number
+  dlSpeedFormatted: string
+  upSpeed: number
+  upSpeedFormatted: string
+  eta: number
+  etaFormatted: string
+  state: string
+  category: string
+  addedOn: string | null
+}
+
+export interface DownloadsSummary {
+  total: number
+  downloading: number
+  seeding: number
+  paused: number
+  dlSpeed: number
+  dlSpeedFormatted: string
+}
+
+export interface DownloadsResponse {
+  torrents: TorrentInfo[]
+  summary: DownloadsSummary
+}
+
+export function getDownloads(): Promise<DownloadsResponse> {
+  return api.get<DownloadsResponse>('/downloads')
+}
+
+export function pauseTorrent(hash: string): Promise<void> {
+  return api.post(`/downloads/${hash}/pause`)
+}
+
+export function resumeTorrent(hash: string): Promise<void> {
+  return api.post(`/downloads/${hash}/resume`)
+}
+
+export function deleteTorrent(hash: string, deleteFiles = false): Promise<void> {
+  return api.delete(`/downloads/${hash}?deleteFiles=${deleteFiles}`)
+}

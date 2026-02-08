@@ -5,6 +5,7 @@ import { useUserStore } from './stores/userStore'
 import Layout from './components/layout/Layout'
 import Home from './pages/Home'
 import Services from './pages/Services'
+import Downloads from './pages/Downloads'
 import Dashboard from './pages/Dashboard'
 import Settings from './pages/Settings'
 import Login from './pages/Login'
@@ -54,6 +55,7 @@ function AppContent() {
       }>
         <Route path="/" element={<Home />} />
         <Route path="/services" element={<Services />} />
+        <Route path="/downloads" element={<Downloads />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/settings" element={<Settings />} />
       </Route>

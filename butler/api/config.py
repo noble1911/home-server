@@ -92,6 +92,11 @@ class Settings(BaseSettings):
     # Media files management (direct filesystem access to media directories)
     media_files_enabled: bool = True
 
+    # qBittorrent (download management)
+    qbittorrent_url: str = ""
+    qbittorrent_username: str = "admin"
+    qbittorrent_password: str = ""
+
     # Health & storage monitoring
     external_drive_path: str = "/mnt/external"
     storage_thresholds: str = "70,80,90"
