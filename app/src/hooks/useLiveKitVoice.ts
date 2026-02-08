@@ -6,7 +6,13 @@ import { useSettingsStore } from '../stores/settingsStore'
 import { getLiveKitToken } from '../services/api'
 import type { LiveKitDataMessage } from '../types/conversation'
 
-const LIVEKIT_URL = import.meta.env.VITE_LIVEKIT_URL || 'ws://localhost:7880'
+function getLiveKitUrl(): string {
+  if (import.meta.env.VITE_LIVEKIT_URL) return import.meta.env.VITE_LIVEKIT_URL
+  // Auto-detect: use the same hostname the page was loaded from
+  const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  return `${proto}//${window.location.hostname}:7880`
+}
+const LIVEKIT_URL = getLiveKitUrl()
 const BARS = 20
 const IDLE_TIMEOUT_MS = 10_000
 const DEMO_PROCESSING_MS = 1500

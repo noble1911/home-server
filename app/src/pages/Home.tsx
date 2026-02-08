@@ -262,11 +262,9 @@ export default function Home() {
 
       {/* Voice Interface */}
       <div className="p-4 space-y-4">
-        {showWaveform && (
-          <div className="flex justify-center">
-            <Waveform isActive={showWaveform} levels={audioLevels} />
-          </div>
-        )}
+        <div className={`flex justify-center transition-opacity duration-200 ${showWaveform ? 'opacity-100' : 'opacity-0'}`}>
+          <Waveform isActive={showWaveform} levels={audioLevels} />
+        </div>
 
         <div className="flex justify-center">
           <VoiceButton
