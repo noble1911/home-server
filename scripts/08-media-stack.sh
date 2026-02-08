@@ -195,7 +195,7 @@ if [[ -n "$RADARR_API_KEY" ]]; then
         echo -e "  ${GREEN}✓${NC} Radarr download client already set"
     else
         arr_api_post "http://localhost:7878/api/v3/downloadclient" "$RADARR_API_KEY" \
-            '{"name":"qBittorrent","implementation":"QBittorrent","configContract":"QBittorrentSettings","protocol":"torrent","enable":true,"fields":[{"name":"host","value":"qbittorrent"},{"name":"port","value":8081},{"name":"username","value":"admin"},{"name":"password","value":"adminadmin"},{"name":"movieCategory","value":"movies"}]}' > /dev/null 2>&1 || true
+            '{"name":"qBittorrent","implementation":"QBittorrent","configContract":"QBittorrentSettings","protocol":"torrent","priority":1,"enable":true,"fields":[{"name":"host","value":"qbittorrent"},{"name":"port","value":8081},{"name":"username","value":"admin"},{"name":"password","value":"adminadmin"},{"name":"movieCategory","value":"movies"}]}' > /dev/null 2>&1 || true
         echo -e "  ${GREEN}✓${NC} Radarr download client: qBittorrent"
     fi
 else
@@ -233,7 +233,7 @@ if [[ -n "$SONARR_API_KEY" ]]; then
         echo -e "  ${GREEN}✓${NC} Sonarr download client already set"
     else
         arr_api_post "http://localhost:8989/api/v3/downloadclient" "$SONARR_API_KEY" \
-            '{"name":"qBittorrent","implementation":"QBittorrent","configContract":"QBittorrentSettings","protocol":"torrent","enable":true,"fields":[{"name":"host","value":"qbittorrent"},{"name":"port","value":8081},{"name":"username","value":"admin"},{"name":"password","value":"adminadmin"},{"name":"tvCategory","value":"tv"}]}' > /dev/null 2>&1 || true
+            '{"name":"qBittorrent","implementation":"QBittorrent","configContract":"QBittorrentSettings","protocol":"torrent","priority":1,"enable":true,"fields":[{"name":"host","value":"qbittorrent"},{"name":"port","value":8081},{"name":"username","value":"admin"},{"name":"password","value":"adminadmin"},{"name":"tvCategory","value":"tv"}]}' > /dev/null 2>&1 || true
         echo -e "  ${GREEN}✓${NC} Sonarr download client: qBittorrent"
     fi
 else
@@ -246,20 +246,37 @@ fi
 echo ""
 echo -e "${BLUE}==>${NC} Configuring Bazarr..."
 
-# Bazarr generates its own API key on first boot. We need to read it.
-BAZARR_API_KEY=$(curl -sf http://localhost:6767/api/system/settings 2>/dev/null \
-    | grep -o '"apikey":"[^"]*"' | cut -d'"' -f4)
-
-if [[ -n "$BAZARR_API_KEY" ]] && [[ -n "$RADARR_API_KEY" ]] && [[ -n "$SONARR_API_KEY" ]]; then
-    # Bazarr settings API uses a PATCH-like approach
-    curl -sf -X POST "http://localhost:6767/api/system/settings" \
-        -H "x-api-key: ${BAZARR_API_KEY}" \
-        -H "Content-Type: application/json" \
-        -d "{\"settings\":{\"radarr\":{\"ip\":\"radarr\",\"port\":7878,\"apikey\":\"${RADARR_API_KEY}\",\"enabled\":true},\"sonarr\":{\"ip\":\"sonarr\",\"port\":8989,\"apikey\":\"${SONARR_API_KEY}\",\"enabled\":true}}}" > /dev/null 2>&1 \
-        && echo -e "  ${GREEN}✓${NC} Bazarr connected to Radarr + Sonarr" \
+# Bazarr's API requires auth, but we can configure it via its config file.
+if [[ -n "$RADARR_API_KEY" ]] && [[ -n "$SONARR_API_KEY" ]]; then
+    # Write Radarr/Sonarr connection details directly into Bazarr config
+    docker exec bazarr python3 -c "
+lines = []
+with open('/config/config/config.yaml') as f:
+    content = f.read()
+lines = content.split(chr(10))
+in_radarr = in_sonarr = False
+new_lines = []
+for line in lines:
+    stripped = line.strip()
+    if line and not line[0].isspace():
+        in_radarr = stripped.startswith('radarr:')
+        in_sonarr = stripped.startswith('sonarr:')
+    if in_radarr and stripped.startswith('ip:'):
+        line = '  ip: radarr'
+    elif in_radarr and stripped.startswith('apikey:'):
+        line = \"  apikey: '${RADARR_API_KEY}'\"
+    elif in_sonarr and stripped.startswith('ip:'):
+        line = '  ip: sonarr'
+    elif in_sonarr and stripped.startswith('apikey:'):
+        line = \"  apikey: '${SONARR_API_KEY}'\"
+    new_lines.append(line)
+with open('/config/config/config.yaml', 'w') as f:
+    f.write(chr(10).join(new_lines))
+" 2>/dev/null \
+        && echo -e "  ${GREEN}✓${NC} Bazarr configured for Radarr + Sonarr (restart may be needed)" \
         || echo -e "  ${YELLOW}⚠${NC} Bazarr connection may need manual setup at http://localhost:6767"
 else
-    echo -e "  ${YELLOW}⚠${NC} Bazarr API not available yet — configure manually at http://localhost:6767"
+    echo -e "  ${YELLOW}⚠${NC} Missing API keys — configure Bazarr manually at http://localhost:6767"
 fi
 
 # ─────────────────────────────────────────────
