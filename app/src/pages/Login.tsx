@@ -73,7 +73,7 @@ export default function Login() {
               id="invite-code"
               type="text"
               value={inviteCode}
-              onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+              onChange={(e) => setInviteCode(e.target.value)}
               placeholder="Enter code"
               className="input text-center text-xl tracking-widest font-mono"
               maxLength={10}
