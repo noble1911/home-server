@@ -406,10 +406,42 @@ else
     echo "   Check logs with: docker logs butler-api"
 fi
 
+# ──────────────────────────────────────────────────
+# Build and deploy Butler PWA
+# ──────────────────────────────────────────────────
 echo ""
-echo -e "${GREEN}✓${NC} Butler API deployed"
+echo -e "${BLUE}==>${NC} Building and deploying Butler PWA..."
+APP_DIR="${SCRIPT_DIR}/../app"
+cd "$APP_DIR"
+docker compose build
+docker compose up -d
+
+# Wait for PWA health check
+PWA_OK=false
+for i in {1..20}; do
+    if curl -s http://localhost:3000/health 2>/dev/null | grep -q "ok\|OK\|healthy\|<!DOCTYPE"; then
+        PWA_OK=true
+        break
+    fi
+    echo -n "."
+    sleep 1
+done
+echo ""
+
+if [ "$PWA_OK" = true ]; then
+    echo -e "  ${GREEN}✓${NC} Butler PWA running at http://localhost:3000"
+else
+    echo -e "  ${YELLOW}⚠${NC} Butler PWA may still be starting"
+    echo "   Check logs with: docker logs butler-app"
+fi
+
+echo ""
+echo -e "${GREEN}✓${NC} Butler deployed"
 echo ""
 echo -e "${YELLOW}Service Details:${NC}"
+echo ""
+echo "  Butler PWA:"
+echo "    - URL: http://localhost:3000"
 echo ""
 echo "  Butler API:"
 echo "    - URL: http://localhost:8000"
