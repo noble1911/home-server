@@ -70,10 +70,25 @@ class DatabasePool:
         if not url:
             raise ValueError("DATABASE_URL environment variable not set")
 
+        async def _init_connection(conn):
+            await conn.set_type_codec(
+                "jsonb",
+                encoder=json.dumps,
+                decoder=json.loads,
+                schema="pg_catalog",
+            )
+            await conn.set_type_codec(
+                "json",
+                encoder=json.dumps,
+                decoder=json.loads,
+                schema="pg_catalog",
+            )
+
         pool = await asyncpg.create_pool(
             url,
             min_size=min_size,
             max_size=max_size,
+            init=_init_connection,
         )
         return cls(pool)
 
