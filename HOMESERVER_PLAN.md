@@ -3,7 +3,7 @@
 > **Hardware:** Mac Mini M4 (24GB Unified Memory, 512GB SSD) + External USB Drive
 > **Goal:** Self-hosted, privacy-focused media server with AI voice assistant + Alexa
 > **Monthly Cost:** ~£7.21 (API + electricity) — backup optional, Alexa via free haaska
-> **Butler Engine:** [Butler API (~4k lines, FastAPI + custom Python tools)
+> **Butler Engine:** Butler API (~4k lines, FastAPI + custom Python tools)
 >
 > ⚠️ **Note (2026-02-05):** Butler API uses a "skills" system (markdown instruction files) and custom Python tools. Skills teach the agent how to use tools; the agent then calls built-in executors (shell, filesystem, web). Custom Python tools are registered in `butler/tools/`.
 
@@ -130,9 +130,7 @@
 
 | Service | Homepage | Purpose | Run Method | RAM (Idle) | RAM (Peak) | Port |
 |---------|----------|---------|------------|------------|------------|------|
-| [**Butler API**](https://github.com/Butler API) | [GitHub](https://github.com/Butler API) | Ultra-lightweight AI agent (~4k lines) | Docker container | 100MB | 300MB | 8100 |
-| **Butler API** | Self-built | FastAPI gateway for PWA, voice, and chat (uses Claude API + tools) | Docker container | 50MB | 200MB | 8000 |
-| Custom Skills/Tools | Self-built | Skills (markdown) + Tools (Python) for service integrations | Part of Butler API | Included | Included | - |
+| **Butler API** | Self-built | FastAPI backend for PWA, voice, and chat (Claude API + custom Python tools) | Docker container | 100MB | 300MB | 8000 |
 | [**APScheduler**](https://apscheduler.readthedocs.io/) | [Docs](https://apscheduler.readthedocs.io/) | Cron-style task scheduling | Part of Agent | Included | Included | - |
 
 > **Note:** The LLM (Claude) and STT (Groq Whisper) run in the cloud to preserve local RAM. TTS (Kokoro) runs locally for low latency.
@@ -236,20 +234,18 @@
 
 ### Technology Choice: Butler API
 
-After evaluating options, **[Butler API** is the chosen foundation:
+We built our own lightweight FastAPI backend rather than adopting an existing framework:
 
-| Factor | Butler API | OpenClaw | Winner |
-|--------|---------|----------|--------|
-| Codebase | ~4,000 lines | 430,000+ lines | ✅ Butler API |
-| Auditability | Easy to read entire codebase | Requires significant time | ✅ Butler API |
-| Tool Support | Native | Native | Tie |
-| WhatsApp | WebSocket (no public IP) | Yes | ✅ Butler API |
-| Voice | Groq Whisper (free tier) | Various | ✅ Butler API |
-| Scheduling | Cron + intervals | Yes | Tie |
-| Customization | Research-friendly, designed for forking | Feature-complete but complex | ✅ Butler API |
-| Security surface | Minimal | Large | ✅ Butler API |
-
-> *"Butler API does not aim to replace full-featured frameworks for production, but it is perfect for prototyping, learning, and quickly starting your own experiments with autonomous AI agents."* - [HKUDS](https://github.com/Butler API)
+| Factor | Butler API (self-built) | OpenClaw | Why we built our own |
+|--------|------------------------|----------|----------------------|
+| Codebase | ~4,000 lines | 430,000+ lines | Easy to audit and maintain |
+| Auditability | Read in an afternoon | Requires significant time | Security-critical for home use |
+| Tool Support | Custom Python tools | Native | Full control over integrations |
+| WhatsApp | WebSocket (no public IP) | Yes | No port forwarding needed |
+| Voice | Groq Whisper (free tier) | Various | Cost-effective STT |
+| Scheduling | Cron + intervals | Yes | Simple and sufficient |
+| Customization | Designed for our use case | Feature-complete but complex | No unnecessary abstractions |
+| Security surface | Minimal | Large | Smaller attack surface |
 
 ### Design Philosophy
 
@@ -320,7 +316,7 @@ The Butler is built on **custom Python tools**, keeping the codebase minimal and
 │  │  │  └───────────┘ └───────────┘ └───────────┘ └───────────┘       │ │ │
 │  │  │                                                                 │ │ │
 │  │  │  ┌───────────────────────────────────────────────────────────┐ │ │ │
-│  │  │  │           BUTLER API + CUSTOM PYTHON TOOLS                   │ │ │ │
+│  │  │  │           BUTLER API + CUSTOM TOOLS                       │ │ │ │
 │  │  │  │                                                           │ │ │ │
 │  │  │  │  ╔═══════════════════════════════════════════════════╗   │ │ │ │
 │  │  │  │  ║  READ-ONLY TOOLS                                   ║   │ │ │ │
@@ -1382,7 +1378,7 @@ All software used in this project with links to official sources.
 | [Groq Whisper](https://console.groq.com/) | [groq.com](https://console.groq.com/) | Cloud speech-to-text (Whisper large-v3-turbo, free tier) | Commercial |
 | [Kokoro TTS](https://github.com/remsky/Kokoro-FastAPI) | [GitHub](https://github.com/remsky/Kokoro-FastAPI) | High-quality local text-to-speech | Apache 2.0 |
 | [Claude API](https://www.anthropic.com/api) | [anthropic.com](https://www.anthropic.com/api) | LLM for understanding, reasoning, function calling | Commercial |
-| [Butler API | [GitHub](https://github.com/Butler API) | Ultra-lightweight AI agent framework (~4k lines) | MIT |
+| Butler API | Self-built | FastAPI backend with custom Python tools (~4k lines) | - |
 
 ### Media & Entertainment
 
