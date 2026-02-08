@@ -126,7 +126,7 @@ if [[ "$STARTUP_DONE" == "true" ]] && [[ -n "$JELLYFIN_ADMIN_USER" ]] && [[ -n "
         EXISTING_LIBS=$(curl -sf "http://localhost:8096/Library/VirtualFolders" \
             -H "$JF_AUTH" 2>/dev/null) || true
 
-        # Add missing libraries (idempotent)
+        # Add missing libraries and ensure paths are attached
         for lib_entry in "Movies:movies:/media/movies" "TV%20Shows:tvshows:/media/tv" "Anime%20Movies:movies:/media/anime-movies" "Anime%20Series:tvshows:/media/anime-series" "Music:music:/media/music"; do
             IFS=':' read -r lib_url_name coll_type media_path <<< "$lib_entry"
             lib_display="${lib_url_name//%20/ }"
@@ -137,6 +137,16 @@ if [[ "$STARTUP_DONE" == "true" ]] && [[ -n "$JELLYFIN_ADMIN_USER" ]] && [[ -n "
                     -H "$JF_AUTH" -H "Content-Type: application/json" \
                     -d "{\"LibraryOptions\":{},\"PathInfos\":[{\"Path\":\"${media_path}\"}]}" > /dev/null 2>&1 || true
                 echo -e "  ${GREEN}✓${NC} Jellyfin library '${lib_display}' created"
+            fi
+
+            # Ensure path is attached (library creation sometimes drops PathInfos)
+            EXISTING_LIBS_UPDATED=$(curl -sf "http://localhost:8096/Library/VirtualFolders" \
+                -H "$JF_AUTH" 2>/dev/null) || true
+            if ! echo "$EXISTING_LIBS_UPDATED" | grep -q "\"${media_path}\""; then
+                curl -sf -X POST "http://localhost:8096/Library/VirtualFolders/Paths?refreshLibrary=false" \
+                    -H "$JF_AUTH" -H "Content-Type: application/json" \
+                    -d "{\"Name\":\"${lib_display}\",\"PathInfo\":{\"Path\":\"${media_path}\"}}" > /dev/null 2>&1 || true
+                echo -e "  ${GREEN}✓${NC} Jellyfin library '${lib_display}' path added: ${media_path}"
             fi
         done
 
@@ -238,6 +248,42 @@ if [[ -n "$SONARR_API_KEY" ]]; then
     fi
 else
     echo -e "  ${YELLOW}⚠${NC} No Sonarr API key — configure manually at http://localhost:8989"
+fi
+
+# ─────────────────────────────────────────────
+# Jellyfin Notifications: Radarr + Sonarr → library update
+# ─────────────────────────────────────────────
+echo ""
+echo -e "${BLUE}==>${NC} Connecting Radarr + Sonarr → Jellyfin library updates..."
+
+if [[ -n "$JELLYFIN_API_KEY" ]]; then
+    JELLYFIN_NOTIFICATION_FIELDS='[{"name":"host","value":"jellyfin"},{"name":"port","value":8096},{"name":"useSsl","value":false},{"name":"apiKey","value":"'"${JELLYFIN_API_KEY}"'"},{"name":"notify","value":false},{"name":"updateLibrary","value":true}]'
+
+    # Radarr → Jellyfin
+    if [[ -n "$RADARR_API_KEY" ]]; then
+        EXISTING_NOTIF=$(arr_api_get "http://localhost:7878/api/v3/notification" "$RADARR_API_KEY")
+        if echo "$EXISTING_NOTIF" | grep -q 'MediaBrowser'; then
+            echo -e "  ${GREEN}✓${NC} Radarr → Jellyfin notification already set"
+        else
+            arr_api_post "http://localhost:7878/api/v3/notification" "$RADARR_API_KEY" \
+                '{"name":"Jellyfin","implementation":"MediaBrowser","configContract":"MediaBrowserSettings","onDownload":true,"onUpgrade":true,"onRename":true,"onMovieDelete":true,"onMovieFileDelete":true,"fields":'"${JELLYFIN_NOTIFICATION_FIELDS}"'}' > /dev/null 2>&1 || true
+            echo -e "  ${GREEN}✓${NC} Radarr → Jellyfin connected (library update on import)"
+        fi
+    fi
+
+    # Sonarr → Jellyfin
+    if [[ -n "$SONARR_API_KEY" ]]; then
+        EXISTING_NOTIF=$(arr_api_get "http://localhost:8989/api/v3/notification" "$SONARR_API_KEY")
+        if echo "$EXISTING_NOTIF" | grep -q 'MediaBrowser'; then
+            echo -e "  ${GREEN}✓${NC} Sonarr → Jellyfin notification already set"
+        else
+            arr_api_post "http://localhost:8989/api/v3/notification" "$SONARR_API_KEY" \
+                '{"name":"Jellyfin","implementation":"MediaBrowser","configContract":"MediaBrowserSettings","onDownload":true,"onUpgrade":true,"onRename":true,"onSeriesDelete":true,"onEpisodeFileDelete":true,"fields":'"${JELLYFIN_NOTIFICATION_FIELDS}"'}' > /dev/null 2>&1 || true
+            echo -e "  ${GREEN}✓${NC} Sonarr → Jellyfin connected (library update on import)"
+        fi
+    fi
+else
+    echo -e "  ${YELLOW}⚠${NC} No Jellyfin API key — configure notifications manually"
 fi
 
 # ─────────────────────────────────────────────

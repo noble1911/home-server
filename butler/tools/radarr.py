@@ -225,12 +225,13 @@ class RadarrTool(Tool):
         if not movie_data or not isinstance(movie_data, dict):
             return f"Error: Could not find movie data for TMDB ID {tmdb_id}."
 
-        # Auto-detect quality profile and root folder
+        # Auto-detect quality profile, content type, and root folder
         quality_profile_id = await self._get_default_quality_profile_id()
         if quality_profile_id is None:
             return "Error: No quality profiles configured in Radarr."
 
-        root_folder_path = await self._get_default_root_folder()
+        is_anime = self._is_anime(movie_data)
+        root_folder_path = await self._get_root_folder(is_anime=is_anime)
         if root_folder_path is None:
             return "Error: No root folders configured in Radarr."
 
@@ -250,7 +251,11 @@ class RadarrTool(Tool):
                 result = await resp.json()
                 movie_title = result.get("title", title or "Movie")
                 year = result.get("year", "")
-                return f"Added '{movie_title}' ({year}) to Radarr. Searching for releases now."
+                library = "Anime Movies" if is_anime else "Movies"
+                return (
+                    f"Added '{movie_title}' ({year}) to Radarr. "
+                    f"Library: {library}. Searching for releases now."
+                )
             elif resp.status == 400:
                 error = await resp.text()
                 if "already" in error.lower():
@@ -344,8 +349,13 @@ class RadarrTool(Tool):
             return self._quality_profiles[0].get("id")
         return None
 
-    async def _get_default_root_folder(self) -> str | None:
-        """Return the first root folder path, caching after first call."""
+    async def _get_root_folder(self, is_anime: bool = False) -> str | None:
+        """Return the appropriate root folder path based on content type.
+
+        Anime movies are routed to the folder containing 'anime' in its path
+        (e.g. /anime-movies), while regular movies go to the standard folder
+        (e.g. /movies).  Falls back to the first available folder.
+        """
         if self._root_folders is None:
             session = await self._get_session()
             async with session.get(
@@ -355,9 +365,32 @@ class RadarrTool(Tool):
                     return None
                 self._root_folders = await resp.json()
 
-        if self._root_folders:
-            return self._root_folders[0].get("path")
-        return None
+        if not self._root_folders:
+            return None
+
+        if is_anime:
+            for folder in self._root_folders:
+                if "anime" in folder.get("path", "").lower():
+                    return folder["path"]
+
+        # Default: prefer non-anime folder, fall back to first
+        for folder in self._root_folders:
+            if "anime" not in folder.get("path", "").lower():
+                return folder["path"]
+        return self._root_folders[0].get("path")
+
+    @staticmethod
+    def _is_anime(movie_data: dict) -> bool:
+        """Detect anime from TMDB genres and original language.
+
+        TMDB tags anime as 'Animation' genre with Japanese original language,
+        which distinguishes it from Western animation (Pixar, Disney, etc.).
+        """
+        genres = [g.lower() for g in movie_data.get("genres", [])]
+        original_language = (
+            movie_data.get("originalLanguage", {}).get("name", "").lower()
+        )
+        return "animation" in genres and original_language == "japanese"
 
     # ------------------------------------------------------------------
     # Formatting helpers

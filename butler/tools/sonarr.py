@@ -227,12 +227,13 @@ class SonarrTool(Tool):
 
         series_data = results[0]
 
-        # Auto-detect quality profile and root folder
+        # Auto-detect quality profile, content type, and root folder
         quality_profile_id = await self._get_default_quality_profile_id()
         if quality_profile_id is None:
             return "Error: No quality profiles configured in Sonarr."
 
-        root_folder_path = await self._get_default_root_folder()
+        is_anime = self._is_anime(series_data)
+        root_folder_path = await self._get_root_folder(is_anime=is_anime)
         if root_folder_path is None:
             return "Error: No root folders configured in Sonarr."
 
@@ -241,6 +242,7 @@ class SonarrTool(Tool):
             **series_data,
             "qualityProfileId": quality_profile_id,
             "rootFolderPath": root_folder_path,
+            "seriesType": "anime" if is_anime else "standard",
             "monitored": True,
             "addOptions": {"searchForMissingEpisodes": True},
         }
@@ -254,9 +256,10 @@ class SonarrTool(Tool):
                 year = result.get("year", "")
                 season_count = result.get("seasonCount", 0)
                 seasons = f"{season_count} season{'s' if season_count != 1 else ''}"
+                library = "Anime Series" if is_anime else "TV Shows"
                 return (
                     f"Added '{series_title}' ({year}) to Sonarr ({seasons}). "
-                    f"Searching for missing episodes now."
+                    f"Library: {library}. Searching for missing episodes now."
                 )
             elif resp.status == 400:
                 error = await resp.text()
@@ -351,8 +354,13 @@ class SonarrTool(Tool):
             return self._quality_profiles[0].get("id")
         return None
 
-    async def _get_default_root_folder(self) -> str | None:
-        """Return the first root folder path, caching after first call."""
+    async def _get_root_folder(self, is_anime: bool = False) -> str | None:
+        """Return the appropriate root folder path based on content type.
+
+        Anime series are routed to the folder containing 'anime' in its path
+        (e.g. /anime-series), while regular TV goes to the standard folder
+        (e.g. /tv).  Falls back to the first available folder.
+        """
         if self._root_folders is None:
             session = await self._get_session()
             async with session.get(
@@ -362,9 +370,25 @@ class SonarrTool(Tool):
                     return None
                 self._root_folders = await resp.json()
 
-        if self._root_folders:
-            return self._root_folders[0].get("path")
-        return None
+        if not self._root_folders:
+            return None
+
+        if is_anime:
+            for folder in self._root_folders:
+                if "anime" in folder.get("path", "").lower():
+                    return folder["path"]
+
+        # Default: prefer non-anime folder, fall back to first
+        for folder in self._root_folders:
+            if "anime" not in folder.get("path", "").lower():
+                return folder["path"]
+        return self._root_folders[0].get("path")
+
+    @staticmethod
+    def _is_anime(series_data: dict) -> bool:
+        """Detect anime from TVDB genre tags."""
+        genres = [g.lower() for g in series_data.get("genres", [])]
+        return "anime" in genres
 
     # ------------------------------------------------------------------
     # Formatting helpers
