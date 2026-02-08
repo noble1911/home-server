@@ -20,6 +20,7 @@ API Reference:
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 import aiohttp
@@ -230,21 +231,14 @@ class ReadarrTool(Tool):
 
         session = await self._get_session()
 
-        # Use cached search result if available (avoids slow edition lookup)
+        # Use cached search result (the edition lookup hangs on many books
+        # due to an upstream Bookshelf/api.bookinfo.pro bug)
         book_data = self._last_search_results.get(book_foreign_id)
         if not book_data:
-            lookup_url = f"{self.base_url}/api/v1/book/lookup"
-            async with session.get(
-                lookup_url, params={"term": f"edition:{book_foreign_id}"}
-            ) as resp:
-                if resp.status != 200:
-                    return f"Error fetching book details: HTTP {resp.status}"
-                results = await resp.json()
-
-            if not results or not isinstance(results, list) or len(results) == 0:
-                return f"Error: Could not find book data for ID {book_foreign_id}."
-
-            book_data = results[0]
+            return (
+                "Error: Book data not found in cache. "
+                "Please search_book first, then use the ID from the results."
+            )
 
         # Auto-detect quality profile, metadata profile, and root folder
         quality_profile_id = await self._get_default_quality_profile_id()
@@ -259,17 +253,41 @@ class ReadarrTool(Tool):
         if root_folder_path is None:
             return "Error: No root folders configured in Readarr."
 
-        # Prepare author data (Readarr requires the author when adding a book)
-        author = book_data.get("author", {})
+        # Resolve author data — search results return an empty author object,
+        # so we scrape the GoodReads book page for the author's foreign ID
+        # and parse the author name from the authorTitle field.
+        author = book_data.get("author") or {}
+        if not author.get("foreignAuthorId"):
+            author_gr_id = await self._resolve_author_id(book_data)
+            author_name = self._parse_author_name(book_data)
+            author = {
+                "foreignAuthorId": author_gr_id,
+                "authorName": author_name,
+            }
+
         author["qualityProfileId"] = quality_profile_id
         author["metadataProfileId"] = metadata_profile_id
         author["rootFolderPath"] = root_folder_path
         author["monitored"] = True
 
+        # Ensure editions list exists (search results return editions=null)
+        editions = book_data.get("editions")
+        if not editions:
+            editions = [{
+                "foreignEditionId": book_data.get("foreignEditionId"),
+                "title": book_data.get("title"),
+                "monitored": True,
+                "images": book_data.get("images", []),
+                "links": book_data.get("links", []),
+                "ratings": book_data.get("ratings", {}),
+                "pageCount": book_data.get("pageCount", 0),
+            }]
+
         # Build payload
         payload = {
             **book_data,
             "author": author,
+            "editions": editions,
             "monitored": True,
             "addOptions": {"searchForNewBook": True},
         }
@@ -280,8 +298,10 @@ class ReadarrTool(Tool):
             if resp.status in (200, 201):
                 result = await resp.json()
                 book_title = result.get("title", title or "Book")
-                author_name = result.get("author", {}).get("authorName", "Unknown")
-                return f"Added '{book_title}' by {author_name} to Readarr. Searching for releases now."
+                result_author = result.get("author", {}).get(
+                    "authorName", author.get("authorName", "Unknown")
+                )
+                return f"Added '{book_title}' by {result_author} to Readarr. Searching for releases now."
             elif resp.status == 400:
                 error = await resp.text()
                 if "already" in error.lower():
@@ -410,6 +430,51 @@ class ReadarrTool(Tool):
         return None
 
     # ------------------------------------------------------------------
+    # Author resolution helpers
+    # ------------------------------------------------------------------
+
+    async def _resolve_author_id(self, book_data: dict) -> str | None:
+        """Get the GoodReads author ID from the book's GoodReads page."""
+        gr_url = next(
+            (
+                link["url"]
+                for link in book_data.get("links", [])
+                if "goodreads.com/book" in link.get("url", "")
+            ),
+            None,
+        )
+        if not gr_url:
+            return None
+
+        try:
+            short_timeout = aiohttp.ClientTimeout(total=10)
+            async with aiohttp.ClientSession(timeout=short_timeout) as s:
+                async with s.get(gr_url) as resp:
+                    if resp.status != 200:
+                        return None
+                    html = await resp.text()
+                    matches = re.findall(r"/author/show/(\d+)", html)
+                    return matches[0] if matches else None
+        except Exception:
+            return None
+
+    @staticmethod
+    def _parse_author_name(book_data: dict) -> str:
+        """Parse author name from Readarr's authorTitle field.
+
+        The field format is "lastname, firstname BookTitle",
+        e.g. "herbert, frank Dune" -> "Frank Herbert".
+        """
+        author_title = book_data.get("authorTitle", "")
+        if "," not in author_title:
+            return "Unknown"
+        comma_idx = author_title.index(",")
+        last = author_title[:comma_idx].strip().title()
+        rest = author_title[comma_idx + 1 :].strip()
+        first = rest.split()[0].title() if rest else ""
+        return f"{first} {last}".strip() or "Unknown"
+
+    # ------------------------------------------------------------------
     # Formatting helpers
     # ------------------------------------------------------------------
 
@@ -418,7 +483,9 @@ class ReadarrTool(Tool):
         lines = [f"Found {len(results)} result(s) for '{query}':\n"]
         for i, book in enumerate(results, 1):
             title = book.get("title", "Unknown")
-            author_name = book.get("author", {}).get("authorName", "Unknown")
+            author_name = book.get("author", {}).get("authorName")
+            if not author_name:
+                author_name = self._parse_author_name(book)
             foreign_id = book.get("foreignBookId", "?")
             overview = book.get("overview", "")
             # Truncate overview to keep response concise
