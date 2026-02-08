@@ -67,7 +67,7 @@ else
 fi
 
 # ─────────────────────────────────────────────
-# Jellyfin Startup Wizard
+# Jellyfin: Phase A — Startup Wizard
 # ─────────────────────────────────────────────
 echo ""
 echo -e "${BLUE}==>${NC} Configuring Jellyfin..."
@@ -76,78 +76,92 @@ STARTUP_DONE=$(curl -sf http://localhost:8096/System/Info/Public 2>/dev/null \
     | grep -o '"StartupWizardCompleted":[a-z]*' | cut -d: -f2)
 
 if [[ "$STARTUP_DONE" == "true" ]]; then
-    echo -e "  ${GREEN}✓${NC} Jellyfin already configured"
+    echo -e "  ${GREEN}✓${NC} Jellyfin startup wizard already completed"
 elif [[ -n "$JELLYFIN_ADMIN_USER" ]] && [[ -n "$JELLYFIN_ADMIN_PASS" ]]; then
     # Step 1: Language/locale
     curl -sf -X POST http://localhost:8096/Startup/Configuration \
         -H "Content-Type: application/json" \
-        -d '{"UICulture":"en-GB","MetadataCountryCode":"GB","PreferredMetadataLanguage":"en"}' > /dev/null
+        -d '{"UICulture":"en-GB","MetadataCountryCode":"GB","PreferredMetadataLanguage":"en"}' > /dev/null 2>&1 || true
 
     # Step 2: Create admin user (use jq for safe JSON encoding of passwords)
     curl -sf -X POST http://localhost:8096/Startup/User \
         -H "Content-Type: application/json" \
         -d "$(jq -n --arg u "$JELLYFIN_ADMIN_USER" --arg p "$JELLYFIN_ADMIN_PASS" \
-            '{Name: $u, Password: $p}')" > /dev/null
+            '{Name: $u, Password: $p}')" > /dev/null 2>&1 || true
 
     # Step 3: Remote access
     curl -sf -X POST http://localhost:8096/Startup/RemoteAccess \
         -H "Content-Type: application/json" \
-        -d '{"EnableRemoteAccess":true,"EnableAutomaticPortMapping":false}' > /dev/null
+        -d '{"EnableRemoteAccess":true,"EnableAutomaticPortMapping":false}' > /dev/null 2>&1 || true
 
     # Step 4: Complete wizard
-    curl -sf -X POST http://localhost:8096/Startup/Complete > /dev/null
+    curl -sf -X POST http://localhost:8096/Startup/Complete > /dev/null 2>&1 || true
     echo -e "  ${GREEN}✓${NC} Jellyfin startup wizard completed"
+else
+    echo -e "  ${YELLOW}⚠${NC} No Jellyfin credentials available — configure manually at http://localhost:8096"
+fi
 
-    # Step 5: Authenticate to add libraries
+# ─────────────────────────────────────────────
+# Jellyfin: Phase B — Libraries + API Key
+# (runs whenever wizard is complete and creds exist)
+# ─────────────────────────────────────────────
+
+# Re-check wizard status (may have just completed above)
+STARTUP_DONE=$(curl -sf http://localhost:8096/System/Info/Public 2>/dev/null \
+    | grep -o '"StartupWizardCompleted":[a-z]*' | cut -d: -f2)
+
+if [[ "$STARTUP_DONE" == "true" ]] && [[ -n "$JELLYFIN_ADMIN_USER" ]] && [[ -n "$JELLYFIN_ADMIN_PASS" ]]; then
+    # Authenticate
     AUTH_RESPONSE=$(curl -sf -X POST http://localhost:8096/Users/AuthenticateByName \
         -H "Content-Type: application/json" \
         -H 'X-Emby-Authorization: MediaBrowser Client="Setup", Device="Script", DeviceId="setup-sh", Version="1.0"' \
         -d "$(jq -n --arg u "$JELLYFIN_ADMIN_USER" --arg p "$JELLYFIN_ADMIN_PASS" \
-            '{Username: $u, Pw: $p}')" 2>/dev/null)
+            '{Username: $u, Pw: $p}')" 2>/dev/null) || true
     JELLYFIN_TOKEN=$(echo "$AUTH_RESPONSE" | grep -o '"AccessToken":"[^"]*"' | cut -d'"' -f4)
 
     if [[ -n "$JELLYFIN_TOKEN" ]]; then
         JF_AUTH="X-Emby-Token: ${JELLYFIN_TOKEN}"
 
-        # Add Movies library
-        curl -sf -X POST "http://localhost:8096/Library/VirtualFolders?name=Movies&collectionType=movies&refreshLibrary=false" \
-            -H "$JF_AUTH" -H "Content-Type: application/json" \
-            -d '{"LibraryOptions":{},"PathInfos":[{"Path":"/media/movies"}]}' > /dev/null 2>&1 || true
+        # Check existing libraries
+        EXISTING_LIBS=$(curl -sf "http://localhost:8096/Library/VirtualFolders" \
+            -H "$JF_AUTH" 2>/dev/null) || true
 
-        # Add TV Shows library
-        curl -sf -X POST "http://localhost:8096/Library/VirtualFolders?name=TV%20Shows&collectionType=tvshows&refreshLibrary=false" \
-            -H "$JF_AUTH" -H "Content-Type: application/json" \
-            -d '{"LibraryOptions":{},"PathInfos":[{"Path":"/media/tv"}]}' > /dev/null 2>&1 || true
+        # Add missing libraries (idempotent)
+        for lib_entry in "Movies:movies:/media/movies" "TV%20Shows:tvshows:/media/tv" "Anime%20Movies:movies:/media/anime-movies" "Anime%20Series:tvshows:/media/anime-series" "Music:music:/media/music"; do
+            IFS=':' read -r lib_url_name coll_type media_path <<< "$lib_entry"
+            lib_display="${lib_url_name//%20/ }"
+            if echo "$EXISTING_LIBS" | grep -q "\"${lib_display}\""; then
+                echo -e "  ${GREEN}✓${NC} Jellyfin library '${lib_display}' already exists"
+            else
+                curl -sf -X POST "http://localhost:8096/Library/VirtualFolders?name=${lib_url_name}&collectionType=${coll_type}&refreshLibrary=false" \
+                    -H "$JF_AUTH" -H "Content-Type: application/json" \
+                    -d "{\"LibraryOptions\":{},\"PathInfos\":[{\"Path\":\"${media_path}\"}]}" > /dev/null 2>&1 || true
+                echo -e "  ${GREEN}✓${NC} Jellyfin library '${lib_display}' created"
+            fi
+        done
 
-        # Add Anime Movies library
-        curl -sf -X POST "http://localhost:8096/Library/VirtualFolders?name=Anime%20Movies&collectionType=movies&refreshLibrary=false" \
-            -H "$JF_AUTH" -H "Content-Type: application/json" \
-            -d '{"LibraryOptions":{},"PathInfos":[{"Path":"/media/anime-movies"}]}' > /dev/null 2>&1 || true
-
-        # Add Anime Series library
-        curl -sf -X POST "http://localhost:8096/Library/VirtualFolders?name=Anime%20Series&collectionType=tvshows&refreshLibrary=false" \
-            -H "$JF_AUTH" -H "Content-Type: application/json" \
-            -d '{"LibraryOptions":{},"PathInfos":[{"Path":"/media/anime-series"}]}' > /dev/null 2>&1 || true
-
-        # Add Music library
-        curl -sf -X POST "http://localhost:8096/Library/VirtualFolders?name=Music&collectionType=music&refreshLibrary=false" \
-            -H "$JF_AUTH" -H "Content-Type: application/json" \
-            -d '{"LibraryOptions":{},"PathInfos":[{"Path":"/media/music"}]}' > /dev/null 2>&1 || true
-
-        echo -e "  ${GREEN}✓${NC} Jellyfin libraries added (Movies, TV Shows, Anime Movies, Anime Series, Music)"
-
-        # Save Jellyfin API key to credentials file for Butler
-        JELLYFIN_API_KEY="$JELLYFIN_TOKEN"
+        # Generate a server-level API key for Butler (persists across restarts)
         if [[ -f "$CREDENTIALS_FILE" ]] && ! grep -q "JELLYFIN_API_KEY" "$CREDENTIALS_FILE"; then
-            echo "" >> "$CREDENTIALS_FILE"
-            echo "# Jellyfin API key (from admin auth)" >> "$CREDENTIALS_FILE"
-            echo "JELLYFIN_API_KEY=${JELLYFIN_API_KEY}" >> "$CREDENTIALS_FILE"
+            curl -sf -X POST "http://localhost:8096/Auth/Keys?app=Butler" \
+                -H "$JF_AUTH" > /dev/null 2>&1 || true
+            # Fetch the key we just created
+            ALL_KEYS=$(curl -sf "http://localhost:8096/Auth/Keys" \
+                -H "$JF_AUTH" 2>/dev/null) || true
+            BUTLER_KEY=$(echo "$ALL_KEYS" | jq -r '.Items[] | select(.AppName == "Butler") | .AccessToken' 2>/dev/null | tail -1)
+            if [[ -n "$BUTLER_KEY" ]]; then
+                echo "" >> "$CREDENTIALS_FILE"
+                echo "# Jellyfin server API key (for Butler)" >> "$CREDENTIALS_FILE"
+                echo "JELLYFIN_API_KEY=${BUTLER_KEY}" >> "$CREDENTIALS_FILE"
+                echo -e "  ${GREEN}✓${NC} Jellyfin API key saved to credentials"
+            else
+                echo -e "  ${YELLOW}⚠${NC} Could not retrieve Jellyfin API key — create one manually in Dashboard > API Keys"
+            fi
+        elif grep -q "JELLYFIN_API_KEY" "$CREDENTIALS_FILE" 2>/dev/null; then
+            echo -e "  ${GREEN}✓${NC} Jellyfin API key already in credentials"
         fi
     else
         echo -e "  ${YELLOW}⚠${NC} Could not authenticate to Jellyfin — libraries must be added manually"
     fi
-else
-    echo -e "  ${YELLOW}⚠${NC} No Jellyfin credentials available — configure manually at http://localhost:8096"
 fi
 
 # ─────────────────────────────────────────────
@@ -163,7 +177,7 @@ if [[ -n "$RADARR_API_KEY" ]]; then
         echo -e "  ${GREEN}✓${NC} Radarr root folder /movies already set"
     else
         arr_api_post "http://localhost:7878/api/v3/rootfolder" "$RADARR_API_KEY" \
-            '{"path":"/movies","accessible":true}' > /dev/null
+            '{"path":"/movies","accessible":true}' > /dev/null 2>&1 || true
         echo -e "  ${GREEN}✓${NC} Radarr root folder: /movies"
     fi
 
@@ -171,7 +185,7 @@ if [[ -n "$RADARR_API_KEY" ]]; then
         echo -e "  ${GREEN}✓${NC} Radarr root folder /anime-movies already set"
     else
         arr_api_post "http://localhost:7878/api/v3/rootfolder" "$RADARR_API_KEY" \
-            '{"path":"/anime-movies","accessible":true}' > /dev/null
+            '{"path":"/anime-movies","accessible":true}' > /dev/null 2>&1 || true
         echo -e "  ${GREEN}✓${NC} Radarr root folder: /anime-movies"
     fi
 
@@ -181,7 +195,7 @@ if [[ -n "$RADARR_API_KEY" ]]; then
         echo -e "  ${GREEN}✓${NC} Radarr download client already set"
     else
         arr_api_post "http://localhost:7878/api/v3/downloadclient" "$RADARR_API_KEY" \
-            '{"name":"qBittorrent","implementation":"QBittorrent","configContract":"QBittorrentSettings","protocol":"torrent","enable":true,"fields":[{"name":"host","value":"qbittorrent"},{"name":"port","value":8081},{"name":"username","value":"admin"},{"name":"password","value":"adminadmin"},{"name":"movieCategory","value":"movies"}]}' > /dev/null
+            '{"name":"qBittorrent","implementation":"QBittorrent","configContract":"QBittorrentSettings","protocol":"torrent","enable":true,"fields":[{"name":"host","value":"qbittorrent"},{"name":"port","value":8081},{"name":"username","value":"admin"},{"name":"password","value":"adminadmin"},{"name":"movieCategory","value":"movies"}]}' > /dev/null 2>&1 || true
         echo -e "  ${GREEN}✓${NC} Radarr download client: qBittorrent"
     fi
 else
@@ -201,7 +215,7 @@ if [[ -n "$SONARR_API_KEY" ]]; then
         echo -e "  ${GREEN}✓${NC} Sonarr root folder /tv already set"
     else
         arr_api_post "http://localhost:8989/api/v3/rootfolder" "$SONARR_API_KEY" \
-            '{"path":"/tv","accessible":true}' > /dev/null
+            '{"path":"/tv","accessible":true}' > /dev/null 2>&1 || true
         echo -e "  ${GREEN}✓${NC} Sonarr root folder: /tv"
     fi
 
@@ -209,7 +223,7 @@ if [[ -n "$SONARR_API_KEY" ]]; then
         echo -e "  ${GREEN}✓${NC} Sonarr root folder /anime-series already set"
     else
         arr_api_post "http://localhost:8989/api/v3/rootfolder" "$SONARR_API_KEY" \
-            '{"path":"/anime-series","accessible":true}' > /dev/null
+            '{"path":"/anime-series","accessible":true}' > /dev/null 2>&1 || true
         echo -e "  ${GREEN}✓${NC} Sonarr root folder: /anime-series"
     fi
 
@@ -219,7 +233,7 @@ if [[ -n "$SONARR_API_KEY" ]]; then
         echo -e "  ${GREEN}✓${NC} Sonarr download client already set"
     else
         arr_api_post "http://localhost:8989/api/v3/downloadclient" "$SONARR_API_KEY" \
-            '{"name":"qBittorrent","implementation":"QBittorrent","configContract":"QBittorrentSettings","protocol":"torrent","enable":true,"fields":[{"name":"host","value":"qbittorrent"},{"name":"port","value":8081},{"name":"username","value":"admin"},{"name":"password","value":"adminadmin"},{"name":"tvCategory","value":"tv"}]}' > /dev/null
+            '{"name":"qBittorrent","implementation":"QBittorrent","configContract":"QBittorrentSettings","protocol":"torrent","enable":true,"fields":[{"name":"host","value":"qbittorrent"},{"name":"port","value":8081},{"name":"username","value":"admin"},{"name":"password","value":"adminadmin"},{"name":"tvCategory","value":"tv"}]}' > /dev/null 2>&1 || true
         echo -e "  ${GREEN}✓${NC} Sonarr download client: qBittorrent"
     fi
 else
@@ -264,7 +278,7 @@ if [[ -n "$PROWLARR_API_KEY" ]]; then
             echo -e "  ${GREEN}✓${NC} Prowlarr → Radarr already connected"
         else
             arr_api_post "http://localhost:9696/api/v1/applications" "$PROWLARR_API_KEY" \
-                "{\"name\":\"Radarr\",\"syncLevel\":\"fullSync\",\"implementation\":\"Radarr\",\"configContract\":\"RadarrSettings\",\"fields\":[{\"name\":\"prowlarrUrl\",\"value\":\"http://prowlarr:9696\"},{\"name\":\"baseUrl\",\"value\":\"http://radarr:7878\"},{\"name\":\"apiKey\",\"value\":\"${RADARR_API_KEY}\"}]}" > /dev/null
+                "{\"name\":\"Radarr\",\"syncLevel\":\"fullSync\",\"implementation\":\"Radarr\",\"configContract\":\"RadarrSettings\",\"fields\":[{\"name\":\"prowlarrUrl\",\"value\":\"http://prowlarr:9696\"},{\"name\":\"baseUrl\",\"value\":\"http://radarr:7878\"},{\"name\":\"apiKey\",\"value\":\"${RADARR_API_KEY}\"}]}" > /dev/null 2>&1 || true
             echo -e "  ${GREEN}✓${NC} Prowlarr → Radarr connected"
         fi
     fi
@@ -275,7 +289,7 @@ if [[ -n "$PROWLARR_API_KEY" ]]; then
             echo -e "  ${GREEN}✓${NC} Prowlarr → Sonarr already connected"
         else
             arr_api_post "http://localhost:9696/api/v1/applications" "$PROWLARR_API_KEY" \
-                "{\"name\":\"Sonarr\",\"syncLevel\":\"fullSync\",\"implementation\":\"Sonarr\",\"configContract\":\"SonarrSettings\",\"fields\":[{\"name\":\"prowlarrUrl\",\"value\":\"http://prowlarr:9696\"},{\"name\":\"baseUrl\",\"value\":\"http://sonarr:8989\"},{\"name\":\"apiKey\",\"value\":\"${SONARR_API_KEY}\"}]}" > /dev/null
+                "{\"name\":\"Sonarr\",\"syncLevel\":\"fullSync\",\"implementation\":\"Sonarr\",\"configContract\":\"SonarrSettings\",\"fields\":[{\"name\":\"prowlarrUrl\",\"value\":\"http://prowlarr:9696\"},{\"name\":\"baseUrl\",\"value\":\"http://sonarr:8989\"},{\"name\":\"apiKey\",\"value\":\"${SONARR_API_KEY}\"}]}" > /dev/null 2>&1 || true
             echo -e "  ${GREEN}✓${NC} Prowlarr → Sonarr connected"
         fi
     fi
