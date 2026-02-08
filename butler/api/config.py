@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     web_search_enabled: bool = True
     web_search_max_uses: int = 5
 
+    # Tool routing (two-phase: send catalog first, load schemas on demand)
+    tool_routing_enabled: bool = True
+
     # LiveKit (must match voice-stack/livekit.yaml)
     livekit_url: str = "ws://livekit:7880"
     livekit_api_key: str = "devkey"

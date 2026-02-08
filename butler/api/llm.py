@@ -12,6 +12,12 @@ Three main functions:
 All three accept an optional `history` parameter for multi-turn conversation
 context. History messages are prepended to the messages array so Claude sees
 the full conversation.
+
+Two-phase tool routing:
+When many tools are registered, Phase 1 sends only a lightweight catalog
+(~800 tokens) instead of all tool schemas (~15,000 tokens). Claude picks
+which tools it needs via a `request_tools` meta-tool, then Phase 2 loads
+only those schemas. This reduces API costs by 80-95%.
 """
 
 from __future__ import annotations
@@ -72,6 +78,150 @@ def _build_tool_definitions(tools: dict[str, Tool]) -> list[dict]:
 
     return defs
 
+
+# ── Two-phase tool routing ──────────────────────────────────────────
+
+# Tools always sent with full schemas (small, frequently used).
+# Others go in the lightweight catalog and are loaded on demand.
+ROUTING_CORE_TOOLS: set[str] = {
+    "remember_fact", "recall_facts", "get_user",
+    "weather", "display_in_chat",
+}
+
+# Only enable routing when there are this many non-core tools.
+ROUTING_MIN_TOOLS = 4
+
+# Meta-tool schema for requesting additional tools.
+_REQUEST_TOOLS_SCHEMA: dict = {
+    "name": "request_tools",
+    "description": (
+        "Activate additional tools to fulfill the user's request. "
+        "Review the ADDITIONAL TOOLS list in your instructions and "
+        "request the ones you need. You can request multiple at once."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "tools": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Tool names from the ADDITIONAL TOOLS list.",
+            },
+        },
+        "required": ["tools"],
+    },
+}
+
+
+def _build_tool_catalog(tools: dict[str, Tool], core_names: set[str]) -> str:
+    """Build a compact one-line-per-tool catalog for the system prompt.
+
+    Only includes tools NOT in the core set (those already have full schemas).
+    Uses the first sentence of each tool's description to keep it short.
+    """
+    lines = [
+        "ADDITIONAL TOOLS (call request_tools to activate any you need):",
+    ]
+    for name in sorted(tools):
+        if name in core_names:
+            continue
+        desc = tools[name].description.split(".")[0].strip()
+        lines.append(f"- {name}: {desc}")
+    return "\n".join(lines)
+
+
+class _ToolRouter:
+    """Manage two-phase tool routing state across API rounds.
+
+    Phase 1 (routing): Sends core tool schemas + request_tools meta-tool +
+    a lightweight text catalog of all other tools.  If Claude answers
+    directly or only uses core tools, Phase 2 never happens.
+
+    Phase 2 (execution): After Claude calls request_tools, subsequent
+    rounds include only the requested tool schemas (+ core tools).
+    """
+
+    def __init__(
+        self,
+        all_tools: dict[str, Tool],
+        system_prompt: str,
+    ) -> None:
+        self._all_tools = all_tools
+        self._base_system_prompt = system_prompt
+
+        # Decide which tools the user has that are core vs on-demand
+        core_names = ROUTING_CORE_TOOLS & set(all_tools)
+        non_core_names = set(all_tools) - core_names
+
+        # Only route if there are enough on-demand tools to justify it
+        self._enabled = (
+            settings.tool_routing_enabled
+            and len(non_core_names) >= ROUTING_MIN_TOOLS
+        )
+
+        if self._enabled:
+            self._phase = "routing"
+            self._core_tools = {n: all_tools[n] for n in core_names}
+            self._catalog = _build_tool_catalog(all_tools, core_names)
+            self._active_tools = dict(self._core_tools)
+        else:
+            self._phase = "execution"
+            self._core_tools = all_tools
+            self._active_tools = all_tools
+
+    @property
+    def tool_definitions(self) -> list[dict]:
+        """Tool schemas for the current API round."""
+        if self._phase == "routing":
+            defs = [tool_to_anthropic_schema(t) for t in self._core_tools.values()]
+            defs.append(_REQUEST_TOOLS_SCHEMA)
+            if settings.web_search_enabled:
+                defs.append({
+                    "type": "web_search_20250305",
+                    "name": "web_search",
+                    "max_uses": settings.web_search_max_uses,
+                })
+            return defs
+        return _build_tool_definitions(self._active_tools)
+
+    @property
+    def system_prompt(self) -> str:
+        """System prompt — includes the tool catalog during routing phase."""
+        if self._phase == "routing":
+            return self._base_system_prompt + "\n\n" + self._catalog
+        return self._base_system_prompt
+
+    @property
+    def active_tools(self) -> dict[str, Tool]:
+        """Tools available for execution in the current round."""
+        return self._active_tools
+
+    def handle_request_tools(self, tool_names: list[str]) -> str:
+        """Transition from routing to execution phase.
+
+        Adds the requested tools (+ core tools) and returns a confirmation
+        message to send back as the tool result.
+        """
+        valid = [n for n in tool_names if n in self._all_tools]
+        invalid = [n for n in tool_names if n not in self._all_tools]
+
+        # Build the execution-phase tool set
+        selected = {n: self._all_tools[n] for n in valid}
+        selected.update(self._core_tools)
+        self._active_tools = selected
+        self._phase = "execution"
+
+        parts = []
+        if valid:
+            parts.append(f"Tools activated: {', '.join(valid)}. You can now use them.")
+        if invalid:
+            parts.append(f"Unknown tools (ignored): {', '.join(invalid)}")
+
+        logger.info("Tool routing: requested=%s valid=%s", tool_names, valid)
+        return " ".join(parts) or "No valid tools requested."
+
+
+# ── Message building ────────────────────────────────────────────────
 
 def _build_messages(
     user_message: str,
@@ -148,6 +298,41 @@ def _build_messages(
     return messages
 
 
+# ── Tool execution helpers ──────────────────────────────────────────
+
+async def _execute_tool_blocks(
+    tool_use_blocks: list,
+    router: _ToolRouter,
+    *,
+    db_pool: DatabasePool | None = None,
+    user_id: str | None = None,
+    channel: str | None = None,
+) -> list[dict]:
+    """Execute tool blocks and return results, handling request_tools specially.
+
+    If request_tools is among the blocks, it transitions the router to
+    execution phase. Other tools are executed normally via active_tools.
+    """
+    tool_results: list[dict] = []
+    for block in tool_use_blocks:
+        if block.name == "request_tools":
+            requested = block.input.get("tools", [])
+            result = router.handle_request_tools(requested)
+        else:
+            result = await execute_and_log_tool(
+                block.name, block.input, router.active_tools,
+                db_pool=db_pool, user_id=user_id, channel=channel,
+            )
+        tool_results.append({
+            "type": "tool_result",
+            "tool_use_id": block.id,
+            "content": result,
+        })
+    return tool_results
+
+
+# ── Main API functions ──────────────────────────────────────────────
+
 async def chat_with_tools(
     system_prompt: str,
     user_message: str,
@@ -168,6 +353,10 @@ async def chat_with_tools(
     3. Send tool results back and repeat
     4. Return final text when Claude responds without tool use
 
+    When tool routing is enabled, Phase 1 sends only a lightweight catalog
+    instead of all tool schemas. Claude picks tools via request_tools, then
+    Phase 2 loads the selected schemas.
+
     Args:
         system_prompt: Personalized system prompt from context.py
         user_message: User's text message or voice transcript
@@ -179,15 +368,15 @@ async def chat_with_tools(
         Claude's final text response
     """
     client = _get_client()
-    tool_definitions = _build_tool_definitions(tools)
+    router = _ToolRouter(tools, system_prompt)
     messages = _build_messages(user_message, history, image=image)
 
     for round_num in range(max_tool_rounds):
         response = await client.messages.create(
             model=settings.anthropic_model,
             max_tokens=settings.max_tokens,
-            system=system_prompt,
-            tools=tool_definitions,
+            system=router.system_prompt,
+            tools=router.tool_definitions,
             messages=messages,
         )
 
@@ -217,20 +406,11 @@ async def chat_with_tools(
         # Append the full assistant response (including tool_use blocks)
         messages.append({"role": "assistant", "content": response.content})
 
-        # Execute tools and collect results
-        tool_results = []
-        for block in tool_use_blocks:
-            result = await execute_and_log_tool(
-                block.name, block.input, tools,
-                db_pool=db_pool, user_id=user_id, channel=channel,
-            )
-            tool_results.append(
-                {
-                    "type": "tool_result",
-                    "tool_use_id": block.id,
-                    "content": result,
-                }
-            )
+        # Execute tools (including request_tools routing)
+        tool_results = await _execute_tool_blocks(
+            tool_use_blocks, router,
+            db_pool=db_pool, user_id=user_id, channel=channel,
+        )
 
         # Send tool results back
         messages.append({"role": "user", "content": tool_results})
@@ -273,15 +453,15 @@ async def stream_chat_with_tools(
         Text chunks as they arrive from Claude's streaming API
     """
     client = _get_client()
-    tool_definitions = _build_tool_definitions(tools)
+    router = _ToolRouter(tools, system_prompt)
     messages = _build_messages(user_message, history, image=image)
 
     for round_num in range(max_tool_rounds):
         async with client.messages.stream(
             model=settings.anthropic_model,
             max_tokens=settings.max_tokens,
-            system=system_prompt,
-            tools=tool_definitions,
+            system=router.system_prompt,
+            tools=router.tool_definitions,
             messages=messages,
         ) as stream:
             # Iterate raw events (instead of text_stream) so we can detect
@@ -327,10 +507,15 @@ async def stream_chat_with_tools(
                     "title": block.input.get("title", ""),
                 }
 
-            result = await execute_and_log_tool(
-                block.name, block.input, tools,
-                db_pool=db_pool, user_id=user_id, channel=channel,
-            )
+            if block.name == "request_tools":
+                result = router.handle_request_tools(
+                    block.input.get("tools", []),
+                )
+            else:
+                result = await execute_and_log_tool(
+                    block.name, block.input, router.active_tools,
+                    db_pool=db_pool, user_id=user_id, channel=channel,
+                )
             tool_results.append(
                 {
                     "type": "tool_result",
@@ -370,7 +555,7 @@ async def stream_chat_with_events(
     Used by the PWA chat streaming endpoint to surface tool activity in the UI.
     """
     client = _get_client()
-    tool_definitions = _build_tool_definitions(tools)
+    router = _ToolRouter(tools, system_prompt)
     messages = _build_messages(user_message, history, image=image)
 
     for round_num in range(max_tool_rounds):
@@ -379,8 +564,8 @@ async def stream_chat_with_events(
         async with client.messages.stream(
             model=settings.anthropic_model,
             max_tokens=settings.max_tokens,
-            system=system_prompt,
-            tools=tool_definitions,
+            system=router.system_prompt,
+            tools=router.tool_definitions,
             messages=messages,
         ) as stream:
             # Iterate raw streaming events instead of text_stream so we can
@@ -424,10 +609,21 @@ async def stream_chat_with_events(
 
         tool_results = []
         for block in tool_use_blocks:
+            if block.name == "request_tools":
+                result = router.handle_request_tools(
+                    block.input.get("tools", []),
+                )
+                tool_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": block.id,
+                    "content": result,
+                })
+                continue
+
             yield {"type": "tool_start", "tool": block.name}
 
             result = await execute_and_log_tool(
-                block.name, block.input, tools,
+                block.name, block.input, router.active_tools,
                 db_pool=db_pool, user_id=user_id, channel=channel,
             )
 
