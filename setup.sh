@@ -9,7 +9,7 @@
 #   --no-ssh           Skip SSH setup (if managing Mac Mini directly)
 #   --drive-name=NAME  Use a different external drive name (default: HomeServer)
 #   --skip-voice       Skip voice stack (if not using voice features)
-#   --skip-nanobot     Skip Nanobot AI agent deployment
+#   --skip-butler      Skip Butler API deployment
 #
 
 set -e
@@ -21,7 +21,7 @@ BASE_URL="https://raw.githubusercontent.com/noble1911/home-server/main/scripts"
 ENABLE_SSH=true
 DRIVE_NAME="HomeServer"
 SKIP_VOICE=false
-SKIP_NANOBOT=false
+SKIP_BUTLER=false
 
 for arg in "$@"; do
     case $arg in
@@ -34,8 +34,8 @@ for arg in "$@"; do
         --skip-voice)
             SKIP_VOICE=true
             ;;
-        --skip-nanobot)
-            SKIP_NANOBOT=true
+        --skip-butler)
+            SKIP_BUTLER=true
             ;;
     esac
 done
@@ -185,12 +185,12 @@ else
     echo -e "\n${YELLOW}==>${NC} Skipping voice stack (--skip-voice flag)"
 fi
 
-# Phase 8: AI Agent
-if [[ "$SKIP_NANOBOT" == "false" ]]; then
-    echo -e "\n${GREEN}Phase 8: AI Agent (Nanobot)${NC}"
-    curl -fsSL "${BASE_URL}/13-nanobot.sh" | bash
+# Phase 8: Butler API
+if [[ "$SKIP_BUTLER" == "false" ]]; then
+    echo -e "\n${GREEN}Phase 8: Butler API${NC}"
+    curl -fsSL "${BASE_URL}/13-butler.sh" | bash
 else
-    echo -e "\n${YELLOW}==>${NC} Skipping Nanobot (--skip-nanobot flag)"
+    echo -e "\n${YELLOW}==>${NC} Skipping Butler API (--skip-butler flag)"
 fi
 
 # Summary
@@ -229,9 +229,9 @@ echo "    - LiveKit:         ws://localhost:7880"
 echo "    - Kokoro TTS:      http://localhost:8880"
 echo ""
 fi
-if [[ "$SKIP_NANOBOT" == "false" ]]; then
-echo "  AI Agent:"
-echo "    - Nanobot:         http://localhost:8100"
+if [[ "$SKIP_BUTLER" == "false" ]]; then
+echo "  Butler API:"
+echo "    - Butler API:      http://localhost:8000"
 echo ""
 fi
 echo -e "${GREEN}Auto-configured:${NC}"
@@ -253,7 +253,7 @@ echo "  4. Install mobile apps (Jellyfin, Immich, Audiobookshelf, Nextcloud)"
 echo "  5. (Optional) Add private indexers to Prowlarr at http://localhost:9696"
 echo "  6. (Optional) Set up Kindle email — see docs/kindle-email-setup.md"
 echo ""
-if [[ "$SKIP_NANOBOT" == "false" ]]; then
+if [[ "$SKIP_BUTLER" == "false" ]]; then
 echo "  7. Access Butler PWA at http://localhost:3000"
 if [[ "$SKIP_VOICE" == "false" ]]; then
 echo "     See docs/VOICE_ARCHITECTURE.md for voice integration details"

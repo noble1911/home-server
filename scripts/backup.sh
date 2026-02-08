@@ -36,7 +36,6 @@ CONFIG_VOLUMES=(
     prowlarr-config
     qbittorrent-config
     homeassistant-config
-    nanobot-data
     nextcloud-data
 )
 

@@ -17,7 +17,7 @@ MAX_RETRIES="${MAX_RETRIES:-30}"
 RETRY_INTERVAL="${RETRY_INTERVAL:-2}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-MIGRATION_FILE="${SCRIPT_DIR}/../nanobot/migrations/001_butler_schema.sql"
+MIGRATION_FILE="${SCRIPT_DIR}/../butler/migrations/001_butler_schema.sql"
 
 echo -e "${BLUE}==>${NC} Initializing Butler schema..."
 

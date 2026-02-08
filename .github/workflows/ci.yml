@@ -6,7 +6,7 @@ on:
     branches: [main]
     paths:
       - 'app/**'
-      - 'nanobot/**'
+      - 'butler/**'
       - '.github/workflows/ci.yml'
 
 jobs:
@@ -66,13 +66,13 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  test-nanobot:
-    name: Test (Nanobot)
+  test-butler:
+    name: Test (Butler)
     runs-on: ubuntu-latest
 
     defaults:
       run:
-        working-directory: nanobot
+        working-directory: butler
 
     steps:
       - name: Checkout
@@ -83,12 +83,12 @@ jobs:
         with:
           python-version: '3.12'
           cache: 'pip'
-          cache-dependency-path: nanobot/requirements.txt
+          cache-dependency-path: butler/requirements-api.txt
 
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
+          pip install -r requirements-api.txt
           pip install pytest pytest-asyncio
 
       - name: Run tests
-        run: python -m pytest tools/ -v
+        run: python -m pytest tools/ api/ -v

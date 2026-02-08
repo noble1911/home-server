@@ -5,7 +5,7 @@
 
 ## Overview
 
-This document defines how real-time voice works in Butler, integrating LiveKit with Nanobot for AI-powered voice conversations.
+This document defines how real-time voice works in Butler, integrating LiveKit with Butler API for AI-powered voice conversations.
 
 **Target latency:** ~650ms from speech end to first audio response
 
@@ -13,14 +13,14 @@ This document defines how real-time voice works in Butler, integrating LiveKit w
 
 ## Key Decisions
 
-### 1. Separate Service or Extend Nanobot?
+### 1. Separate Service or Extend Butler API?
 
-**Decision: LiveKit Agents as a separate service that delegates to Nanobot**
+**Decision: LiveKit Agents as a separate service that delegates to Butler API**
 
 | Option | Verdict | Rationale |
 |--------|---------|-----------|
-| Extend Nanobot with LiveKit | :x: | Nanobot not designed for WebRTC; complex integration |
-| **LiveKit Agents + Nanobot** | :white_check_mark: | Each does what it does best |
+| Extend Butler API with LiveKit | :x: | Butler API not designed for WebRTC; complex integration |
+| **LiveKit Agents + Butler API** | :white_check_mark: | Each does what it does best |
 | Custom voice service | :x: | Reinventing the wheel; months of work |
 
 **Responsibilities:**
@@ -32,14 +32,14 @@ This document defines how real-time voice works in Butler, integrating LiveKit w
 
 ### 2. How to Share Tools Between Voice and Text?
 
-**Decision: Nanobot is the single tool executor**
+**Decision: Butler API is the single tool executor**
 
-All channels route through Nanobot's API for tool execution. No duplication of tool logic.
+All channels route through Butler API for tool execution. No duplication of tool logic.
 
 ```
 Voice:    PWA → LiveKit → Groq STT → [Butler API] → Kokoro → LiveKit → PWA
 Text:     PWA → [Butler API] → PWA
-WhatsApp: WhatsApp → [Nanobot gateway] → WhatsApp
+WhatsApp: WhatsApp → [Butler API] → WhatsApp
 ```
 
 ### 3. Session Management Across Channels
@@ -112,7 +112,7 @@ All channels write to the same database, enabling cross-channel continuity.
 
 ```
 1. USER PRESSES MIC
-   └─► PWA requests LiveKit token from Nanobot API
+   └─► PWA requests LiveKit token from Butler API
    └─► PWA connects to LiveKit room with JWT
    └─► PWA publishes local audio track
 
@@ -167,7 +167,7 @@ TOTAL: ~650ms from speech end to first audio
 
 ## API Interfaces
 
-### Nanobot API Endpoints
+### Butler API Endpoints
 
 ```http
 POST /api/auth/token
@@ -278,7 +278,7 @@ function VoiceAssistantUI() {
 
 | Phase | Issue | Description |
 |-------|-------|-------------|
-| 1 | #11 | Deploy Nanobot with HTTP API endpoints |
+| 1 | #11 | Deploy Butler API with HTTP API endpoints |
 | 2 | New | Build LiveKit Agents worker |
 | 3 | New | Connect PWA to LiveKit (replace placeholders) |
 | 4 | #4-9 | Implement tools for voice commands |
@@ -319,4 +319,4 @@ function VoiceAssistantUI() {
 - [LiveKit Agents Documentation](https://docs.livekit.io/agents/)
 - [Groq API Documentation](https://console.groq.com/docs/speech-text)
 - [Kokoro TTS FastAPI](https://github.com/remsky/Kokoro-FastAPI)
-- [HKUDS/nanobot](https://github.com/HKUDS/nanobot)
+- Butler API

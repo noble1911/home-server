@@ -24,7 +24,7 @@ DRIVE_STACKS=(
     "media-stack:docker/media-stack"
     "books-stack:docker/books-stack"
     "photos-files-stack:docker/photos-files-stack"
-    "nanobot:nanobot"
+    "butler:butler"
 )
 
 # Directory structure (matches 06-external-drive.sh)

@@ -44,7 +44,6 @@ launchctl list | grep homeserver.backup
 | Readarr, Calibre-Web, Audiobookshelf | Volume tarballs | Daily | Yes |
 | Prowlarr, qBittorrent configs | Volume tarballs | Daily | Yes |
 | Home Assistant config | Volume tarball | Daily | Yes |
-| Nanobot agent data | Volume tarball | Daily | Yes |
 | Nextcloud app data | Volume tarball | Daily | Yes |
 | Media files (Movies, TV, Books) | *Not backed up* | — | No (re-downloadable) |
 | Photos (Immich library) | *User manages* | — | No (use iCloud/Google) |
