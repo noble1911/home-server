@@ -983,8 +983,18 @@ Percentages scale to any drive size. Example values shown for an 8TB (~7.2TB usa
 
 ### Directory Structure
 
+Data lives on the external drive by default, or on the internal SSD when
+`--skip-drive` is used (`~/HomeServer`). The repo is always cloned to
+`~/home-server` for scripts, Docker Compose files, and configs.
+
 ```
-/Volumes/HomeServer/                    # External Drive
+~/home-server/                          # Cloned repo (code & configs)
+    ├── scripts/                        # Setup scripts (01-15)
+    ├── docker/                         # Docker Compose stacks
+    ├── butler/                         # Butler API source
+    └── app/                            # PWA source
+
+/Volumes/HomeServer/ (or ~/HomeServer)  # Data directory
 │
 ├── Media/                              # 5TB allocated
 │   ├── Movies/                         # Radarr root folder

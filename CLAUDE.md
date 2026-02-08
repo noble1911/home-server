@@ -154,8 +154,9 @@ home-server/
 ### Scripts
 - Numbered prefix: `01-`, `02-`, etc. for ordering
 - Each script is standalone (can run individually)
-- `setup.sh` orchestrates by curling individual scripts
+- `setup.sh` orchestrates: curls scripts 01-06 (self-contained), then clones repo to `~/home-server` and runs 07+ locally (they need sibling files like `docker/`, `lib/`)
 - Scripts output colored status: `==>` blue, `✓` green, `⚠` yellow
+- Data directory: `/Volumes/HomeServer` (external drive) or `~/HomeServer` (`--skip-drive`)
 
 ### Documentation
 - Each script has matching doc: `scripts/01-foo.sh` ↔ `docs/01-foo.md`

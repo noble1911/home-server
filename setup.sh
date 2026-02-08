@@ -10,6 +10,7 @@
 #   --drive-name=NAME  Use a different external drive name (default: HomeServer)
 #   --skip-voice       Skip voice stack (if not using voice features)
 #   --skip-butler      Skip Butler API deployment
+#   --skip-drive       Skip external drive setup (use internal SSD)
 #
 
 set -e
@@ -22,6 +23,7 @@ ENABLE_SSH=true
 DRIVE_NAME="HomeServer"
 SKIP_VOICE=false
 SKIP_BUTLER=false
+SKIP_DRIVE=false
 
 for arg in "$@"; do
     case $arg in
@@ -37,6 +39,9 @@ for arg in "$@"; do
         --skip-butler)
             SKIP_BUTLER=true
             ;;
+        --skip-drive)
+            SKIP_DRIVE=true
+            ;;
     esac
 done
 
@@ -49,11 +54,8 @@ BLUE='\033[0;34m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-# Run a remote script with TTY access preserved.
-# Downloading to a temp file and running it (instead of curl | bash) ensures
-# stdin stays connected to the terminal so scripts can prompt for sudo passwords
-# and interactive input.
-run_script() {
+# Run a remote script (for self-contained foundation scripts 01-06).
+run_remote() {
     local url="$1"
     shift
     local tmp
@@ -62,6 +64,13 @@ run_script() {
     chmod +x "$tmp"
     bash "$tmp" "$@" < /dev/tty
     rm -f "$tmp"
+}
+
+# Run a local script from the cloned repo (for scripts 07+ that need sibling files).
+run_local() {
+    local script="$1"
+    shift
+    bash "$script" "$@" < /dev/tty
 }
 
 echo -e "${GREEN}"
@@ -158,44 +167,65 @@ export JELLYFIN_ADMIN_USER JELLYFIN_ADMIN_PASS
 export ABS_ADMIN_USER ABS_ADMIN_PASS
 export NEXTCLOUD_ADMIN_USER NEXTCLOUD_ADMIN_PASS
 
-# Phase 1: Foundation
+# Phase 1: Foundation (self-contained scripts, fetched via curl)
 echo -e "\n${GREEN}Phase 1: Foundation${NC}"
-run_script "${BASE_URL}/01-homebrew.sh"
-run_script "${BASE_URL}/03-power-settings.sh"
+run_remote "${BASE_URL}/01-homebrew.sh"
+run_remote "${BASE_URL}/03-power-settings.sh"
 
 if [[ "$ENABLE_SSH" == "true" ]]; then
-    run_script "${BASE_URL}/04-ssh.sh"
+    run_remote "${BASE_URL}/04-ssh.sh"
 else
     echo -e "\n${GREEN}==>${NC} Skipping SSH setup (--no-ssh flag)"
 fi
 
-run_script "${BASE_URL}/05-orbstack.sh"
-run_script "${BASE_URL}/06-external-drive.sh" --drive-name="$DRIVE_NAME"
+run_remote "${BASE_URL}/05-orbstack.sh"
+if [[ "$SKIP_DRIVE" == "false" ]]; then
+    run_remote "${BASE_URL}/06-external-drive.sh" --drive-name="$DRIVE_NAME"
+else
+    echo -e "\n${YELLOW}==>${NC} Skipping external drive setup (--skip-drive flag)"
+    # Use a local directory so downstream scripts that reference DRIVE_PATH still work
+    DRIVE_PATH="$HOME/HomeServer"
+    export DRIVE_PATH
+    mkdir -p "$DRIVE_PATH"/{Media/{Movies,TV,Anime,Music},Books/{eBooks,Audiobooks},Photos/Immich/{library,upload,thumbs},Documents/Nextcloud,Downloads/{Complete/{Movies,TV,Anime,Books},Incomplete},Backups/{Databases,Configs}}
+    echo -e "  Using ${DRIVE_PATH} on internal SSD instead"
+fi
 
-# Phase 2: Download Infrastructure
+# Clone repo — scripts 07+ need sibling files (docker-compose, configs, lib/)
+REPO_DIR="$HOME/home-server"
+echo -e "\n${BLUE}==>${NC} Cloning repo for local scripts..."
+if [[ -d "$REPO_DIR/.git" ]]; then
+    git -C "$REPO_DIR" pull --ff-only 2>&1 || echo -e "  ${YELLOW}⚠${NC} Could not pull latest"
+    echo -e "  ${GREEN}✓${NC} Repo up to date at ${REPO_DIR}"
+else
+    git clone https://github.com/noble1911/home-server.git "$REPO_DIR"
+    echo -e "  ${GREEN}✓${NC} Repo cloned to ${REPO_DIR}"
+fi
+SCRIPTS_DIR="$REPO_DIR/scripts"
+
+# Phase 2: Download Infrastructure (local scripts from cloned repo)
 echo -e "\n${GREEN}Phase 2: Download Infrastructure${NC}"
-run_script "${BASE_URL}/07-download-stack.sh"
+run_local "${SCRIPTS_DIR}/07-download-stack.sh"
 
 # Phase 3: Media Stack
 echo -e "\n${GREEN}Phase 3: Media Stack${NC}"
-run_script "${BASE_URL}/08-media-stack.sh"
+run_local "${SCRIPTS_DIR}/08-media-stack.sh"
 
 # Phase 4: Books & Audio
 echo -e "\n${GREEN}Phase 4: Books & Audio${NC}"
-run_script "${BASE_URL}/09-books-stack.sh"
+run_local "${SCRIPTS_DIR}/09-books-stack.sh"
 
 # Phase 5: Photos & Files
 echo -e "\n${GREEN}Phase 5: Photos & Files${NC}"
-run_script "${BASE_URL}/10-photos-files.sh"
+run_local "${SCRIPTS_DIR}/10-photos-files.sh"
 
 # Phase 6: Smart Home
 echo -e "\n${GREEN}Phase 6: Smart Home${NC}"
-run_script "${BASE_URL}/11-smart-home.sh"
+run_local "${SCRIPTS_DIR}/11-smart-home.sh"
 
 # Phase 7: Voice (optional)
 if [[ "$SKIP_VOICE" == "false" ]]; then
     echo -e "\n${GREEN}Phase 7: Voice Stack${NC}"
-    run_script "${BASE_URL}/12-voice-stack.sh"
+    run_local "${SCRIPTS_DIR}/12-voice-stack.sh"
 else
     echo -e "\n${YELLOW}==>${NC} Skipping voice stack (--skip-voice flag)"
 fi
@@ -203,21 +233,9 @@ fi
 # Phase 8: Butler API
 if [[ "$SKIP_BUTLER" == "false" ]]; then
     echo -e "\n${GREEN}Phase 8: Butler API${NC}"
-    run_script "${BASE_URL}/13-butler.sh"
+    run_local "${SCRIPTS_DIR}/13-butler.sh"
 else
     echo -e "\n${YELLOW}==>${NC} Skipping Butler API (--skip-butler flag)"
-fi
-
-# Clone repo locally for future updates
-REPO_DIR="$HOME/home-server"
-echo -e "\n${GREEN}Cloning repo for future updates${NC}"
-if [[ -d "$REPO_DIR/.git" ]]; then
-    echo -e "  ${GREEN}✓${NC} Repo already cloned at ${REPO_DIR}"
-    git -C "$REPO_DIR" pull --ff-only 2>&1 || echo -e "  ${YELLOW}⚠${NC} Could not pull latest — run 'git -C $REPO_DIR pull' manually"
-else
-    git clone https://github.com/noble1911/home-server.git "$REPO_DIR" 2>/dev/null && \
-        echo -e "  ${GREEN}✓${NC} Repo cloned to ${REPO_DIR}" || \
-        echo -e "  ${YELLOW}⚠${NC} Could not clone repo — clone it manually later: git clone https://github.com/noble1911/home-server.git ${REPO_DIR}"
 fi
 
 # Summary
