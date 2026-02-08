@@ -27,8 +27,13 @@ function getToolLabel(name: string): string {
   return TOOL_LABELS[name] || `Using ${name.replace(/_/g, ' ')}...`
 }
 
+export interface ImagePayload {
+  data: string      // raw base64 (no data URI prefix)
+  mediaType: string  // e.g. "image/jpeg"
+}
+
 export interface UseChatStreamReturn {
-  sendMessage: (content: string) => void
+  sendMessage: (content: string, image?: ImagePayload) => void
   cancelStream: () => void
   isStreaming: boolean
   error: string | null
@@ -50,7 +55,7 @@ export function useChatStream(): UseChatStreamReturn {
   // Abort on unmount
   useEffect(() => () => { abortRef.current?.abort() }, [])
 
-  const sendMessage = useCallback((content: string) => {
+  const sendMessage = useCallback((content: string, image?: ImagePayload) => {
     // Abort any in-flight stream
     abortRef.current?.abort()
 
@@ -64,6 +69,7 @@ export function useChatStream(): UseChatStreamReturn {
       content,
       type: 'text',
       timestamp: new Date().toISOString(),
+      imageDataUrl: image ? `data:${image.mediaType};base64,${image.data}` : undefined,
     }
     addMessage(userMessage)
 
@@ -84,7 +90,7 @@ export function useChatStream(): UseChatStreamReturn {
 
     streamSSE<ChatStreamEvent>(
       '/chat/stream',
-      { message: content },
+      { message: content, ...(image && { image: { data: image.data, mediaType: image.mediaType } }) },
       {
         onEvent(event) {
           switch (event.type) {

@@ -8,6 +8,8 @@ export interface Message {
   type: MessageType
   timestamp: string
   toolStatus?: string
+  /** data:image/...;base64,... — set for current-session image messages only */
+  imageDataUrl?: string
 }
 
 export interface Conversation {
