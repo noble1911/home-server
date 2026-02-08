@@ -173,6 +173,12 @@ if ! docker exec calibre-web test -f "/books/Calibre Library/metadata.db" 2>/dev
     # calibredb auto-creates a valid library with all required tables
     docker exec calibre-web calibredb --with-library "/books/Calibre Library" \
         list_categories > /dev/null 2>&1 || true
+    # Newer Calibre moved isbn to identifiers table, but Calibre-Web still
+    # queries books.isbn and books.flags — add them if missing
+    docker exec calibre-web sh -c \
+        'sqlite3 "/books/Calibre Library/metadata.db" \
+        "ALTER TABLE books ADD COLUMN isbn TEXT DEFAULT \"\" ; \
+         ALTER TABLE books ADD COLUMN flags INTEGER NOT NULL DEFAULT 1;"' 2>/dev/null || true
     echo -e "  ${GREEN}✓${NC} Calibre metadata.db created (via calibredb)"
 else
     echo -e "  ${GREEN}✓${NC} Calibre metadata.db already exists"
