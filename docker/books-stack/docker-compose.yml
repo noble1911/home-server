@@ -11,7 +11,7 @@ services:
       - calibre-web-config:/config
       - ${DRIVE_PATH:-/Volumes/HomeServer}/Books/eBooks:/books
       - ${DRIVE_PATH:-/Volumes/HomeServer}/Downloads:/downloads
-      - ./book-import.sh:/custom-services.d/book-import/run
+      - ./book-import.sh:/custom-services.d/book-import
     ports:
       - "8083:8083"
     networks:
