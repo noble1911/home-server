@@ -275,28 +275,23 @@ Now that services are running, go back to the Cloudflare dashboard and add route
 | `books` | `http://audiobookshelf:80` | Audiobookshelf |
 | `files` | `http://nextcloud:80` | Nextcloud |
 | `ha` | `http://homeassistant:8123` | Home Assistant |
-| `shelfarr` | `http://shelfarr:5056` | Shelfarr |
+| `shelfarr` | `http://shelfarr:80` | Shelfarr |
 | `requests` | `http://seerr:5055` | Seerr |
 
 > **Important:** Use Docker container names (not `localhost`) because `cloudflared` runs inside Docker where `localhost` refers to the container itself, not the host machine.
 
 3. After adding routes, verify each service loads via its `https://subdomain.yourdomain.com` URL
 
-4. **Update Butler app service URLs** — so the Services tab links to your tunnel URLs instead of LAN addresses. Create `app/.env` with your subdomains:
+4. **Update Butler app service URLs** — so the Services tab links to your tunnel URLs instead of LAN addresses. Rebuild with your tunnel domain:
 
-   ```env
-   VITE_JELLYFIN_URL=https://jellyfin.yourdomain.com
-   VITE_AUDIOBOOKSHELF_URL=https://books.yourdomain.com
-   VITE_SHELFARR_URL=https://shelfarr.yourdomain.com
-   VITE_IMMICH_URL=https://photos.yourdomain.com
-   VITE_NEXTCLOUD_URL=https://files.yourdomain.com
-   VITE_HOMEASSISTANT_URL=https://ha.yourdomain.com
-   VITE_SEERR_URL=https://requests.yourdomain.com
+   ```bash
+   cd ~/home-server/app
+   VITE_TUNNEL_DOMAIN=yourdomain.com docker compose up -d --build
    ```
 
-   Then rebuild the Butler app: `cd app && npm run build` (or rebuild the Docker image).
+   This bakes `https://{subdomain}.yourdomain.com` URLs into the app for each service (e.g. `https://jellyfin.yourdomain.com`). You can also override individual services — see `app/.env.example` for details.
 
-> **Note:** On LAN, service URLs auto-detect from the browser hostname (e.g. `http://192.168.1.22:8096`), so no configuration is needed for local access.
+> **Note:** On LAN (without `VITE_TUNNEL_DOMAIN`), service URLs auto-detect from the browser hostname (e.g. `http://192.168.1.22:8096`), so no configuration is needed for local access.
 
 ### 4.2 Set Up Butler (AI Assistant)
 
