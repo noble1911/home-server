@@ -14,6 +14,7 @@ interface ConversationState {
   isRecording: boolean
   isLoadingHistory: boolean
   hasMoreHistory: boolean
+  historyLoaded: boolean
 
   // Actions
   addMessage: (message: Message) => void
@@ -26,6 +27,7 @@ interface ConversationState {
   setRecording: (isRecording: boolean) => void
   setLoadingHistory: (loading: boolean) => void
   setHasMoreHistory: (hasMore: boolean) => void
+  setHistoryLoaded: (loaded: boolean) => void
 }
 
 export const useConversationStore = create<ConversationState>((set) => ({
@@ -35,6 +37,7 @@ export const useConversationStore = create<ConversationState>((set) => ({
   isRecording: false,
   isLoadingHistory: false,
   hasMoreHistory: true,
+  historyLoaded: false,
 
   addMessage: (message) => set((state) => ({
     messages: [...state.messages, message],
@@ -52,7 +55,7 @@ export const useConversationStore = create<ConversationState>((set) => ({
 
   setMessages: (messages) => set({ messages }),
 
-  clearMessages: () => set({ messages: [], hasMoreHistory: true }),
+  clearMessages: () => set({ messages: [], hasMoreHistory: true, historyLoaded: false }),
 
   setConnectionStatus: (status) => set({ connectionStatus: status }),
 
@@ -63,4 +66,6 @@ export const useConversationStore = create<ConversationState>((set) => ({
   setLoadingHistory: (loading) => set({ isLoadingHistory: loading }),
 
   setHasMoreHistory: (hasMore) => set({ hasMoreHistory: hasMore }),
+
+  setHistoryLoaded: (loaded) => set({ historyLoaded: loaded }),
 }))
