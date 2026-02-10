@@ -1,5 +1,4 @@
 import type { Service } from '../../types/services'
-import { isMobile } from '../../utils/device'
 
 interface ServiceCardProps {
   service: Service
@@ -9,8 +8,7 @@ interface ServiceCardProps {
 export default function ServiceCard({ service, onSelect }: ServiceCardProps) {
   const handleQuickLaunch = (e: React.MouseEvent) => {
     e.stopPropagation()
-    const url = isMobile() && service.mobileUrl ? service.mobileUrl : service.url
-    window.open(url, '_blank', 'noopener,noreferrer')
+    window.open(service.url, '_blank', 'noopener,noreferrer')
   }
 
   return (
@@ -39,6 +37,7 @@ export default function ServiceCard({ service, onSelect }: ServiceCardProps) {
         {service.name}
       </h3>
       <p className="text-xs text-butler-400 mt-1">{service.description}</p>
+      <p className="text-xs text-butler-500 mt-1 font-mono truncate">{service.url.replace(/^https?:\/\//, '')}</p>
 
       {service.status && (
         <div className="flex items-center gap-1 mt-2">

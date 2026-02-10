@@ -16,25 +16,28 @@ const SERVICE_NAME_MAP: Record<string, string> = {
   'seerr': 'seerr',
 }
 
-// Optional: set VITE_SERVICE_HOSTNAME for Cloudflare Tunnel/remote access
+// Optional: set VITE_SERVICE_HOSTNAME for Cloudflare Tunnel/remote access,
+// or override individual services with VITE_<SERVICE>_URL.
 // e.g. VITE_SERVICE_HOSTNAME=home.yourdomain.com
 const HOSTNAME = import.meta.env.VITE_SERVICE_HOSTNAME || ''
 
-function serviceUrl(envVar: string, port: number, localDefault: string): string {
+function serviceUrl(envVar: string, port: number): string {
   const explicit = import.meta.env[envVar]
   if (explicit) return explicit
   if (HOSTNAME) return `http://${HOSTNAME}:${port}`
-  return localDefault
+  // Fall back to current hostname — works on LAN without any config
+  const host = typeof window !== 'undefined' ? window.location.hostname : 'localhost'
+  return `http://${host}:${port}`
 }
 
 // Pre-compute service URLs so guide text can reference them
-const jellyfinUrl = serviceUrl('VITE_JELLYFIN_URL', 8096, 'http://jellyfin.local')
-const audiobookshelfUrl = serviceUrl('VITE_AUDIOBOOKSHELF_URL', 13378, 'http://audiobooks.local')
-const shelfarrUrl = serviceUrl('VITE_SHELFARR_URL', 5056, 'http://shelfarr.local')
-const immichUrl = serviceUrl('VITE_IMMICH_URL', 2283, 'http://photos.local')
-const nextcloudUrl = serviceUrl('VITE_NEXTCLOUD_URL', 80, 'http://files.local')
-const homeAssistantUrl = serviceUrl('VITE_HOMEASSISTANT_URL', 8123, 'http://ha.local')
-const seerrUrl = serviceUrl('VITE_SEERR_URL', 5055, 'http://requests.local')
+const jellyfinUrl = serviceUrl('VITE_JELLYFIN_URL', 8096)
+const audiobookshelfUrl = serviceUrl('VITE_AUDIOBOOKSHELF_URL', 13378)
+const shelfarrUrl = serviceUrl('VITE_SHELFARR_URL', 5056)
+const immichUrl = serviceUrl('VITE_IMMICH_URL', 2283)
+const nextcloudUrl = serviceUrl('VITE_NEXTCLOUD_URL', 8080)
+const homeAssistantUrl = serviceUrl('VITE_HOMEASSISTANT_URL', 8123)
+const seerrUrl = serviceUrl('VITE_SEERR_URL', 5055)
 
 export const services: Service[] = [
   {
