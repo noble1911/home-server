@@ -97,6 +97,7 @@ class Settings(BaseSettings):
     external_drive_path: str = "/mnt/external"
     storage_thresholds: str = "70,80,90"
     health_check_timeout: int = 5
+    prowlarr_url: str = ""
     prowlarr_api_key: str = ""
 
     # Host system info (for accurate dashboard stats inside Docker)

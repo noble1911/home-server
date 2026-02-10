@@ -133,7 +133,7 @@ async def init_resources() -> None:
     # Books tool (Open Library + Prowlarr + qBittorrent)
     if settings.prowlarr_api_key:
         _tools["books"] = BookTool(
-            prowlarr_url="http://prowlarr:9696",
+            prowlarr_url=settings.prowlarr_url,
             prowlarr_api_key=settings.prowlarr_api_key,
             qbit_url=settings.qbittorrent_url,
             qbit_user=settings.qbittorrent_username,
