@@ -24,6 +24,7 @@ declare -A VOLUME_CONTAINER=(
     [radarr-config]=radarr
     [sonarr-config]=sonarr
     [bazarr-config]=bazarr
+    [seerr-config]=seerr
     [audiobookshelf-config]=audiobookshelf
     [audiobookshelf-metadata]=audiobookshelf
     [prowlarr-config]=prowlarr

@@ -33,6 +33,7 @@ from .gmail import GmailTool
 from .google_calendar import GoogleCalendarTool
 from .jellyfin import JellyfinTool
 from .radarr import RadarrTool
+from .seerr import SeerrTool
 from .books import BookTool
 from .sonarr import SonarrTool
 from .immich import ImmichTool
@@ -75,6 +76,8 @@ __all__ = [
     "PhoneLocationTool",
     # Radarr
     "RadarrTool",
+    # Seerr
+    "SeerrTool",
     # Books (Open Library + Prowlarr + qBittorrent)
     "BookTool",
     # Sonarr

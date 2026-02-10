@@ -29,6 +29,7 @@ CONFIG_VOLUMES=(
     radarr-config
     sonarr-config
     bazarr-config
+    seerr-config
     audiobookshelf-config
     audiobookshelf-metadata
     prowlarr-config

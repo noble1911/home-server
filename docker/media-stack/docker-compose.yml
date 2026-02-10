@@ -99,6 +99,25 @@ services:
       retries: 3
       start_period: 30s
 
+  seerr:
+    image: seerr/seerr:develop
+    container_name: seerr
+    environment:
+      - TZ=Europe/London
+    volumes:
+      - seerr-config:/app/config
+    ports:
+      - "5055:5055"
+    networks:
+      - homeserver
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:5055/api/v1/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
 networks:
   homeserver:
     external: true
@@ -114,3 +133,5 @@ volumes:
     name: sonarr-config
   bazarr-config:
     name: bazarr-config
+  seerr-config:
+    name: seerr-config

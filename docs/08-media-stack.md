@@ -1,6 +1,6 @@
 # Step 8: Deploy Media Stack
 
-Deploy Jellyfin (media server) and the *arr apps for movie/TV automation.
+Deploy Jellyfin (media server), the *arr apps for movie/TV automation, and Seerr for media requests.
 
 ## Automated
 
@@ -31,6 +31,7 @@ docker compose ps
 | Radarr | http://localhost:7878 | Movie automation |
 | Sonarr | http://localhost:8989 | TV series automation |
 | Bazarr | http://localhost:6767 | Subtitle automation |
+| Seerr | http://localhost:5055 | Media request management |
 
 ## Initial Configuration
 
@@ -91,6 +92,21 @@ docker compose ps
 5. **Settings > Languages:**
    - Configure preferred subtitle languages
 
+### Seerr
+
+1. Open http://localhost:5055
+2. Sign in with your Jellyfin admin account
+3. **Radarr Settings:**
+   - Host: `radarr`
+   - Port: `7878`
+   - API Key: (from Radarr Settings > General)
+4. **Sonarr Settings:**
+   - Host: `sonarr`
+   - Port: `8989`
+   - API Key: (from Sonarr Settings > General)
+5. Copy the **API Key** from Settings > General for Butler integration
+6. Optionally enable auto-approval for admin users
+
 ### Connect Prowlarr to *arr Apps
 
 In Prowlarr (http://localhost:9696):
@@ -127,7 +143,11 @@ In Prowlarr (http://localhost:9696):
 ## The Download Flow
 
 ```
-You search in Radarr/Sonarr
+You (or household members) request in Seerr
+        ↓
+Seerr sends to Radarr/Sonarr
+        ↓
+Or you search directly in Radarr/Sonarr
         ↓
 Prowlarr provides indexers
         ↓

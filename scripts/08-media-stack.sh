@@ -1,5 +1,5 @@
 #!/bin/bash
-# Step 8: Deploy Media Stack (Jellyfin + Radarr + Sonarr + Bazarr)
+# Step 8: Deploy Media Stack (Jellyfin + Radarr + Sonarr + Bazarr + Seerr)
 set -e
 
 GREEN='\033[0;32m'
@@ -323,6 +323,35 @@ with open('/config/config/config.yaml', 'w') as f:
         || echo -e "  ${YELLOW}⚠${NC} Bazarr connection may need manual setup at http://localhost:6767"
 else
     echo -e "  ${YELLOW}⚠${NC} Missing API keys — configure Bazarr manually at http://localhost:6767"
+fi
+
+# ─────────────────────────────────────────────
+# Seerr: Post-deploy info
+# (Seerr requires a web-based setup wizard on first run — cannot be
+# fully automated via API. Print instructions for the user.)
+# ─────────────────────────────────────────────
+echo ""
+echo -e "${BLUE}==>${NC} Seerr setup..."
+
+# Wait for Seerr to respond
+SEERR_READY=false
+for i in {1..15}; do
+    if curl -sf http://localhost:5055/api/v1/status &>/dev/null; then
+        SEERR_READY=true
+        break
+    fi
+    sleep 2
+done
+
+if $SEERR_READY; then
+    echo -e "  ${GREEN}✓${NC} Seerr is running at http://localhost:5055"
+    echo -e "  ${YELLOW}⚠${NC} Complete the setup wizard in your browser:"
+    echo -e "     1. Open http://localhost:5055"
+    echo -e "     2. Sign in with your Jellyfin account"
+    echo -e "     3. Connect Radarr (http://radarr:7878) and Sonarr (http://sonarr:8989)"
+    echo -e "     4. Copy the API key from Settings > General for Butler integration"
+else
+    echo -e "  ${YELLOW}⚠${NC} Seerr may still be starting — configure at http://localhost:5055"
 fi
 
 # ─────────────────────────────────────────────

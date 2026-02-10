@@ -34,7 +34,7 @@
 │  │  │ Jellyfin │ │  Radarr  │ │  Sonarr  │ │ Prowlarr │ │  Bazarr  │  │   │
 │  │  └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘  │   │
 │  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐  │   │
-│  │  │ Shelfarr │ │qBittorrent│ │  Immich  │ │Nextcloud │ │   Home   │  │   │
+│  │  │  Seerr   │ │qBittorrent│ │  Immich  │ │Nextcloud │ │   Home   │  │   │
 │  │  │          │ │          │ │          │ │          │ │Assistant │  │   │
 │  │  └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘  │   │
 │  │  ┌──────────┐ ┌──────────┐ ┌───────────────────────────────────┐   │   │
@@ -143,6 +143,7 @@
 | [**Radarr**](https://radarr.video/) | [radarr.video](https://radarr.video/) | Movie automation & management | Docker container | 300MB | 500MB | 7878 |
 | [**Sonarr**](https://sonarr.tv/) | [sonarr.tv](https://sonarr.tv/) | TV series automation & management | Docker container | 300MB | 500MB | 8989 |
 | [**Bazarr**](https://www.bazarr.media/) | [bazarr.media](https://www.bazarr.media/) | Subtitle automation | Docker container | 200MB | 400MB | 6767 |
+| [**Seerr**](https://github.com/seerr-team/seerr) | [docs.seerr.dev](https://docs.seerr.dev/) | Media request management | Docker container | 100MB | 200MB | 5055 |
 
 > *Jellyfin peaks during 4K transcoding. Direct play uses minimal resources.
 
@@ -197,14 +198,14 @@
 |----------|----------|------------|------------|
 | **macOS + OrbStack** | System overhead | 3.5GB | 5GB |
 | **Voice Assistant** | LiveKit, Kokoro, Butler API | 1.0GB | 2.1GB |
-| **Media** | Jellyfin, *arrs, qBit | 1.5GB | 5.9GB |
+| **Media** | Jellyfin, *arrs, Seerr, qBit | 1.6GB | 6.1GB |
 | **Photos/Files** | Immich, Nextcloud | 1.4GB | 5GB |
 | **Books** | Audiobookshelf, Shelfarr | 0.35GB | 0.7GB |
 | **Smart Home** | Home Assistant | 0.4GB | 1GB |
 | **Notifications** | WhatsApp | 0.1GB | 0.2GB |
 | | | | |
-| **TOTAL** | | **8.75GB** | **21.4GB** |
-| **Available** | 24GB | **15.25GB free** | **2.6GB free** |
+| **TOTAL** | | **8.85GB** | **21.6GB** |
+| **Available** | 24GB | **15.15GB free** | **2.4GB free** |
 
 ### Voice Assistant RAM Breakdown
 
@@ -1215,6 +1216,7 @@ This does NOT protect against: Mac Mini theft/fire (use cloud for that).
 | 7880 | LiveKit | LAN + Cloudflare Tunnel |
 | 7878 | Radarr | LAN only |
 | 8989 | Sonarr | LAN only |
+| 5055 | Seerr | LAN + Cloudflare Tunnel |
 | 6767 | Bazarr | LAN only |
 | 9696 | Prowlarr | LAN only |
 | 8081 | qBittorrent | LAN only |
