@@ -78,7 +78,7 @@ DEFAULT_SERVICES: dict[str, dict[str, Any]] = {
         "stack": "books",
     },
     "shelfarr": {
-        "url": "http://shelfarr:5056/up",
+        "url": "http://shelfarr:80/up",
         "stack": "books",
     },
     # Photos & files stack
