@@ -31,7 +31,10 @@ export default function TranscriptBubble({ message, butlerName }: TranscriptBubb
           />
         )}
         {message.role === 'assistant' && !message.content && !message.toolStatus ? (
-          <p className="text-sm text-butler-400 animate-pulse">...</p>
+          <div className="flex items-center gap-2 py-1">
+            <div className="w-4 h-4 border-2 border-butler-600 border-t-accent rounded-full animate-spin" />
+            <span className="text-sm text-butler-400">Thinking...</span>
+          </div>
         ) : isUser ? (
           <p className="text-sm">{message.content}</p>
         ) : (

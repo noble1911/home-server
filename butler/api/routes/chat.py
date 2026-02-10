@@ -62,6 +62,17 @@ async def text_chat(
     all_tools = await get_user_tools(user_id, tools, pool)
     image_payload, user_content, user_metadata = _prepare_image_context(req)
 
+    # Save user message first so it's visible to subsequent requests
+    await pool.pool.execute(
+        """
+        INSERT INTO butler.conversation_history (user_id, channel, role, content, metadata)
+        VALUES ($1, 'pwa', 'user', $2, $3::jsonb)
+        """,
+        user_id,
+        user_content,
+        user_metadata,
+    )
+
     response_text = await chat_with_tools(
         system_prompt=ctx.system_prompt,
         user_message=req.message,
@@ -75,26 +86,15 @@ async def text_chat(
 
     message_id = str(uuid.uuid4())
 
-    async with pool.pool.acquire() as conn:
-        async with conn.transaction():
-            await conn.execute(
-                """
-                INSERT INTO butler.conversation_history (user_id, channel, role, content, metadata)
-                VALUES ($1, 'pwa', 'user', $2, $3::jsonb)
-                """,
-                user_id,
-                user_content,
-                user_metadata,
-            )
-            await conn.execute(
-                """
-                INSERT INTO butler.conversation_history (user_id, channel, role, content, metadata)
-                VALUES ($1, 'pwa', 'assistant', $2, $3::jsonb)
-                """,
-                user_id,
-                response_text,
-                {"message_id": message_id},
-            )
+    await pool.pool.execute(
+        """
+        INSERT INTO butler.conversation_history (user_id, channel, role, content, metadata)
+        VALUES ($1, 'pwa', 'assistant', $2, $3::jsonb)
+        """,
+        user_id,
+        response_text,
+        {"message_id": message_id},
+    )
 
     # Auto-learn: extract facts in the background (fire-and-forget)
     asyncio.create_task(
@@ -126,7 +126,7 @@ async def chat_history(
         SELECT id, channel, role, content, metadata, created_at
         FROM butler.conversation_history
         WHERE user_id = $1 AND created_at < $2
-        ORDER BY created_at DESC
+        ORDER BY created_at DESC, id DESC
         LIMIT $3
         """,
         user_id,
@@ -180,6 +180,18 @@ async def stream_text_chat(
     all_tools = await get_user_tools(user_id, tools, pool)
     image_payload, user_content, user_metadata = _prepare_image_context(req)
 
+    # Save user message immediately so it's visible to subsequent requests
+    # even if the stream is interrupted or the client disconnects.
+    await pool.pool.execute(
+        """
+        INSERT INTO butler.conversation_history (user_id, channel, role, content, metadata)
+        VALUES ($1, 'pwa', 'user', $2, $3::jsonb)
+        """,
+        user_id,
+        user_content,
+        user_metadata,
+    )
+
     message_id = str(uuid.uuid4())
     full_response_parts: list[str] = []
 
@@ -205,28 +217,16 @@ async def stream_text_chat(
             full_text = "".join(full_response_parts)
             if full_text:
                 try:
-                    async with pool.pool.acquire() as conn:
-                        async with conn.transaction():
-                            await conn.execute(
-                                """
-                                INSERT INTO butler.conversation_history
-                                    (user_id, channel, role, content, metadata)
-                                VALUES ($1, 'pwa', 'user', $2, $3::jsonb)
-                                """,
-                                user_id,
-                                user_content,
-                                user_metadata,
-                            )
-                            await conn.execute(
-                                """
-                                INSERT INTO butler.conversation_history
-                                    (user_id, channel, role, content, metadata)
-                                VALUES ($1, 'pwa', 'assistant', $2, $3::jsonb)
-                                """,
-                                user_id,
-                                full_text,
-                                {"message_id": message_id},
-                            )
+                    await pool.pool.execute(
+                        """
+                        INSERT INTO butler.conversation_history
+                            (user_id, channel, role, content, metadata)
+                        VALUES ($1, 'pwa', 'assistant', $2, $3::jsonb)
+                        """,
+                        user_id,
+                        full_text,
+                        {"message_id": message_id},
+                    )
                     # Auto-learn: extract facts in the background
                     asyncio.create_task(
                         extract_and_store_facts(
@@ -236,7 +236,7 @@ async def stream_text_chat(
                     )
                 except Exception:
                     logger.exception(
-                        "Failed to save chat conversation history for user=%s",
+                        "Failed to save assistant response for user=%s",
                         user_id,
                     )
 
