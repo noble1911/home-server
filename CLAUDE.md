@@ -88,22 +88,32 @@ gh issue edit <number> --add-assignee @me  # Claim an issue
 
 **Owner:** Ron (GitHub: noble1911)
 **Hardware:** Mac Mini M4 (24GB RAM, 512GB SSD) + external USB drive
-**Status:** Pre-hardware - Mac Mini not yet purchased/arrived
+**Status:** Live and running — all stacks deployed, actively maintained
+**SSH Access:** `ssh 192.168.1.22`
 
 ## Current Progress
 
 > **Tasks are tracked in [GitHub Issues](https://github.com/noble1911/home-server/issues)**
 
-### Development Approach
-We're building the software FIRST, then deploying to Mac Mini later:
-1. Build PWA (React app) - can develop/test locally
-2. Build Butler tools (Python) - can develop/test locally
-3. Create Docker Compose files - define the infrastructure
-4. Build custom Docker images - package our code
-5. Create setup scripts - automate deployment
+### Server Status
+The Mac Mini is set up and all Docker stacks are deployed via OrbStack. Active work is now focused on bug fixes, new Butler tools, and UI improvements.
 
-### Blockers
-- Mac Mini hardware not yet arrived (but we can build software now!)
+### Deployed Stacks
+| Stack | Services | Status |
+|-------|----------|--------|
+| **media-stack** | Jellyfin, Radarr, Sonarr, Bazarr | Running |
+| **download-stack** | qBittorrent, Prowlarr | Running |
+| **books-stack** | Calibre-Web, Audiobookshelf | Running |
+| **photos-files-stack** | Immich, PostgreSQL, Redis, Nextcloud | Running |
+| **smart-home-stack** | Home Assistant, Cloudflare Tunnel | Running |
+| **voice-stack** | LiveKit, Kokoro TTS, LiveKit Agent | Running |
+| **messaging-stack** | WhatsApp Gateway | Running |
+
+### Butler API (~4k LOC, FastAPI)
+- **25+ custom Python tools** — media, smart home, memory, scheduling, email, calendar, etc.
+- **10 database migrations** — PostgreSQL with pgvector (768-dim nomic-embed-text embeddings)
+- **LiveKit voice agent** — STT → Claude → Kokoro TTS pipeline
+- **2-phase tool routing** — reduces API costs 80-95% by routing to relevant tools only
 
 ---
 
@@ -115,15 +125,16 @@ home-server/
 ├── README.md              # User-facing quick start
 ├── HOMESERVER_PLAN.md     # Complete architecture & plan
 ├── setup.sh               # All-in-one setup (calls scripts/)
+├── .github/workflows/     # CI/CD (build-and-push, CI)
 ├── app/                   # Butler PWA (React + Vite + LiveKit)
 ├── butler/                # Butler API (FastAPI) + LiveKit agent
 │   ├── api/               # Auth, chat, voice, tools routes
-│   ├── tools/             # Custom Python tools (15+)
+│   ├── tools/             # Custom Python tools (25+)
 │   ├── migrations/        # PostgreSQL schema migrations
 │   ├── livekit-agent/     # LiveKit Agents worker (STT → LLM → TTS)
 │   └── docker-compose.yml # Butler API container
 ├── docker/                # Docker Compose stacks
-│   ├── books-stack/       # Calibre-Web, Audiobookshelf, Readarr
+│   ├── books-stack/       # Calibre-Web, Audiobookshelf
 │   ├── download-stack/    # qBittorrent, Prowlarr
 │   ├── media-stack/       # Jellyfin, Radarr, Sonarr, Bazarr
 │   ├── messaging-stack/   # WhatsApp gateway
@@ -176,32 +187,35 @@ home-server/
 | Cloud backup | Optional (user choice) | Cost reduction, user accepts risk |
 | Docker runtime | OrbStack | Optimized for Apple Silicon |
 | AI backend | Butler API (FastAPI) | Custom Python tools, Claude API direct |
-| Memory storage | PostgreSQL (Immich's DB) | Already in stack, has vector extensions |
+| Memory storage | PostgreSQL (Immich's DB) | Already in stack, has pgvector |
+| Embeddings | nomic-embed-text (768-dim) | Local, fast, good quality |
 | Task tracking | GitHub Issues | Avoids merge conflicts with parallel agents |
-| Remote access | Cloudflare Tunnel | No port forwarding, works on any device with a browser |
-| SSH | Optional | Not everyone runs headless |
+| Remote access | Cloudflare Tunnel | No port forwarding, works on any device |
+| SSH | Available at 192.168.1.22 | Local network access for management |
+| Book management | BookTool (Open Library + Prowlarr) | Replaced Readarr — simpler, more reliable |
+| Tool routing | 2-phase (categorise → route) | 80-95% API cost reduction |
 
 ## Monthly Costs
 
 | Config | Cost |
 |--------|------|
-| No backup | ~£10.70 (Claude API + electricity) |
-| With iCloud 2TB | ~£17.69 |
+| No backup | ~£7.21 (Claude API + electricity) |
+| With iCloud 2TB | ~£14.20 |
 
-## Design Decisions Made (2026-02-05)
+## Design Decisions Made
 
-### Memory & Personalization - RESOLVED
+### Memory & Personalization - IMPLEMENTED
 
 | Question | Answer |
 |----------|--------|
-| Does Butler have built-in memory? | Yes, custom `memory.py` with vector search |
+| Does Butler have built-in memory? | Yes, `memory.py` with pgvector semantic search |
 | Memory storage? | PostgreSQL (Immich's DB, `butler` schema) |
+| Embedding model? | nomic-embed-text, 768-dim, runs locally |
 | How to inject user context? | Load soul config + facts into system prompt |
 | Where does soul config live? | PostgreSQL `butler.users` table |
 
 ### Remaining Questions
 
-- [ ] Best way to share tools between voice agent and text agent?
 - [ ] Voice identification vs app-based user identification?
 
 ## Notes for Future Sessions
@@ -209,11 +223,12 @@ home-server/
 - Ron prefers modular, DRY code - scripts should be reusable
 - Keep README minimal - detailed docs go in docs/
 - Always commit and push after making changes
-- SSH setup is OPTIONAL - some users manage Mac Mini directly
-- The Mac Mini hasn't arrived yet - we're in planning/prep phase
+- **Server is live** at `192.168.1.22` — SSH available for remote management
 - **Memory/personalization is important** - Butler should know users
 - **Always check `gh issue list` first** before starting work
 - **Claim issues with `gh issue edit --add-assignee @me`** to avoid conflicts
 - **Use `Closes #N` in PR body** to auto-close issues on merge
 - **Review HOMESERVER_PLAN.md before PR** — update if you learned something new
 - **Create issues for discovered work** — don't let insights get lost between sessions
+- **BookTool replaced Readarr** — uses Open Library for search, Prowlarr + qBit for downloads
+- **CI/CD exists** — `.github/workflows/` has build-and-push and CI pipelines
