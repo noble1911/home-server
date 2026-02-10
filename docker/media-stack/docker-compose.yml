@@ -105,7 +105,7 @@ services:
     environment:
       - TZ=Europe/London
     volumes:
-      - seerr-config:/app/config
+      - ${DRIVE_PATH:-/Volumes/HomeServer}/Config/seerr:/app/config
     ports:
       - "5055:5055"
     networks:
@@ -133,5 +133,3 @@ volumes:
     name: sonarr-config
   bazarr-config:
     name: bazarr-config
-  seerr-config:
-    name: seerr-config
