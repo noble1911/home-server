@@ -128,7 +128,7 @@ export default function Downloads() {
       {torrents.length === 0 ? (
         <div className="card p-8 text-center">
           <div className="text-butler-400 text-lg mb-2">No active downloads</div>
-          <p className="text-sm text-butler-500">Torrents added via Radarr, Sonarr, or Readarr will appear here.</p>
+          <p className="text-sm text-butler-500">Torrents added via Radarr, Sonarr, Shelfarr, or BookTool will appear here.</p>
         </div>
       ) : (
         <div className="space-y-3">
