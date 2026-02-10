@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import type { Service } from '../../types/services'
 import type { ServiceCredential } from '../../types/user'
 import { SERVICE_DISPLAY_NAMES } from '../../types/user'
-import { isMobile } from '../../utils/device'
 
 interface ServiceDetailProps {
   service: Service
@@ -44,8 +43,7 @@ export default function ServiceDetail({ service, credentials, onClose }: Service
     : null
 
   const handleOpen = () => {
-    const url = isMobile() && service.mobileUrl ? service.mobileUrl : service.url
-    window.open(url, '_blank', 'noopener,noreferrer')
+    window.open(service.url, '_blank', 'noopener,noreferrer')
   }
 
   return (
@@ -90,6 +88,20 @@ export default function ServiceDetail({ service, credentials, onClose }: Service
         </div>
 
         <div className="p-5 space-y-5">
+          {/* URL display */}
+          <div className="flex items-center gap-2 p-3 bg-butler-800 rounded-lg">
+            <span className="font-mono text-sm text-butler-300 truncate flex-1">{service.url}</span>
+            <button
+              onClick={() => navigator.clipboard.writeText(service.url)}
+              className="shrink-0 p-1.5 rounded-md text-butler-500 hover:text-accent hover:bg-butler-700 transition-colors"
+              title="Copy URL"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+            </button>
+          </div>
+
           {/* Open button */}
           <button
             onClick={handleOpen}

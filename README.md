@@ -282,6 +282,22 @@ Now that services are running, go back to the Cloudflare dashboard and add route
 
 3. After adding routes, verify each service loads via its `https://subdomain.yourdomain.com` URL
 
+4. **Update Butler app service URLs** — so the Services tab links to your tunnel URLs instead of LAN addresses. Create `app/.env` with your subdomains:
+
+   ```env
+   VITE_JELLYFIN_URL=https://jellyfin.yourdomain.com
+   VITE_AUDIOBOOKSHELF_URL=https://books.yourdomain.com
+   VITE_SHELFARR_URL=https://shelfarr.yourdomain.com
+   VITE_IMMICH_URL=https://photos.yourdomain.com
+   VITE_NEXTCLOUD_URL=https://files.yourdomain.com
+   VITE_HOMEASSISTANT_URL=https://ha.yourdomain.com
+   VITE_SEERR_URL=https://requests.yourdomain.com
+   ```
+
+   Then rebuild the Butler app: `cd app && npm run build` (or rebuild the Docker image).
+
+> **Note:** On LAN, service URLs auto-detect from the browser hostname (e.g. `http://192.168.1.22:8096`), so no configuration is needed for local access.
+
 ### 4.2 Set Up Butler (AI Assistant)
 
 Butler uses **invite codes** for registration. The first person to log in becomes the admin.
