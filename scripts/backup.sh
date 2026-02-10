@@ -29,14 +29,13 @@ CONFIG_VOLUMES=(
     radarr-config
     sonarr-config
     bazarr-config
-    readarr-config
-    calibre-web-config
     audiobookshelf-config
     audiobookshelf-metadata
     prowlarr-config
     qbittorrent-config
     homeassistant-config
     nextcloud-data
+    shelfarr-data
 )
 
 # Logging helper — writes to both stdout and log file

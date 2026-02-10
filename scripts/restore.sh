@@ -24,14 +24,13 @@ declare -A VOLUME_CONTAINER=(
     [radarr-config]=radarr
     [sonarr-config]=sonarr
     [bazarr-config]=bazarr
-    [readarr-config]=readarr
-    [calibre-web-config]=calibre-web
     [audiobookshelf-config]=audiobookshelf
     [audiobookshelf-metadata]=audiobookshelf
     [prowlarr-config]=prowlarr
     [qbittorrent-config]=qbittorrent
     [homeassistant-config]=homeassistant
     [nextcloud-data]=nextcloud
+    [shelfarr-data]=shelfarr
 )
 
 # ─────────────────────────────────────────────

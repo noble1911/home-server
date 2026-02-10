@@ -1,15 +1,14 @@
 """Auto-provision user accounts on downstream apps.
 
 Called during onboarding to create per-user accounts on Jellyfin,
-Audiobookshelf, Nextcloud, Immich, and Calibre-Web using the credentials
-the user chose during the onboarding wizard.
+Audiobookshelf, Nextcloud, and Immich using the credentials the user
+chose during the onboarding wizard.
 """
 
 from __future__ import annotations
 
 import base64
 import logging
-import re
 from typing import Callable, Awaitable
 
 import aiohttp
@@ -26,7 +25,7 @@ _HTTP_TIMEOUT = aiohttp.ClientTimeout(total=15)
 
 # Permission-to-service mapping
 PERMISSION_SERVICE_MAP: dict[str, list[str]] = {
-    "media": ["jellyfin", "audiobookshelf", "immich", "calibreweb"],
+    "media": ["jellyfin", "audiobookshelf", "immich"],
 }
 # Services everyone gets (regardless of permissions)
 UNIVERSAL_SERVICES: list[str] = ["nextcloud"]
@@ -53,11 +52,6 @@ def _service_is_configured(service: str) -> bool:
             and settings.nextcloud_admin_password
         ),
         "immich": bool(settings.immich_url and settings.immich_api_key),
-        "calibreweb": bool(
-            settings.calibreweb_url
-            and settings.calibreweb_admin_user
-            and settings.calibreweb_admin_password
-        ),
     }
     return checks.get(service, False)
 
@@ -287,112 +281,10 @@ async def _provision_immich(username: str, password: str) -> str:
             return data.get("id", "")
 
 
-async def _provision_calibreweb(username: str, password: str) -> str:
-    """Create Calibre-Web user via admin form scraping.
-
-    Calibre-Web has no REST API, so we log in as admin and submit
-    the user creation form with CSRF tokens.
-    """
-    async with aiohttp.ClientSession(timeout=_HTTP_TIMEOUT) as session:
-        base = settings.calibreweb_url
-
-        # 1. GET login page to extract CSRF token
-        async with session.get(f"{base}/login") as resp:
-            if resp.status != 200:
-                raise RuntimeError(
-                    f"Calibre-Web login page failed: HTTP {resp.status}"
-                )
-            html = await resp.text()
-
-        csrf_token = _extract_csrf_token(html)
-
-        # 2. POST login with admin credentials
-        login_data = {
-            "username": settings.calibreweb_admin_user,
-            "password": settings.calibreweb_admin_password,
-            "submit": "",
-        }
-        if csrf_token:
-            login_data["csrf_token"] = csrf_token
-
-        async with session.post(
-            f"{base}/login",
-            data=login_data,
-            allow_redirects=True,
-        ) as resp:
-            if resp.status != 200:
-                raise RuntimeError(
-                    f"Calibre-Web admin login failed: HTTP {resp.status}"
-                )
-            # Verify login succeeded — a failed login redirects back to /login
-            if resp.url and str(resp.url).rstrip("/").endswith("/login"):
-                raise RuntimeError(
-                    "Calibre-Web admin login failed: bad credentials (redirected back to login)"
-                )
-
-        # 3. GET new user page to extract CSRF token
-        async with session.get(f"{base}/admin/user/new") as resp:
-            # If we're not authenticated, this redirects to /login
-            if resp.url and str(resp.url).rstrip("/").endswith("/login"):
-                raise RuntimeError(
-                    "Calibre-Web admin session invalid: not authenticated"
-                )
-            if resp.status != 200:
-                raise RuntimeError(
-                    f"Calibre-Web new user page failed: HTTP {resp.status}"
-                )
-            html = await resp.text()
-
-        csrf_token = _extract_csrf_token(html)
-
-        # 4. POST new user form
-        user_data = {
-            "name": username,
-            "password": password,
-            "email": f"{username}@homeserver.local",
-            "submit": "",
-        }
-        if csrf_token:
-            user_data["csrf_token"] = csrf_token
-
-        async with session.post(
-            f"{base}/admin/user/new",
-            data=user_data,
-            allow_redirects=True,
-        ) as resp:
-            if resp.status != 200:
-                raise RuntimeError(
-                    f"Calibre-Web user creation failed: HTTP {resp.status}"
-                )
-            # Check for error messages in the response
-            body = await resp.text()
-            if "flash_danger" in body or "already taken" in body.lower():
-                raise RuntimeError("Calibre-Web user creation failed: username may already exist")
-
-        return username
-
-
-def _extract_csrf_token(html: str) -> str | None:
-    """Extract CSRF token from a Flask/WTForms hidden input field."""
-    match = re.search(
-        r'<input[^>]*name=["\']csrf_token["\'][^>]*value=["\']([^"\']+)["\']',
-        html,
-    )
-    if match:
-        return match.group(1)
-    # Try alternate pattern (value before name)
-    match = re.search(
-        r'<input[^>]*value=["\']([^"\']+)["\'][^>]*name=["\']csrf_token["\']',
-        html,
-    )
-    return match.group(1) if match else None
-
-
 # Dispatch table
 _PROVISIONERS: dict[str, Callable[[str, str], Awaitable[str]]] = {
     "jellyfin": _provision_jellyfin,
     "audiobookshelf": _provision_audiobookshelf,
     "nextcloud": _provision_nextcloud,
     "immich": _provision_immich,
-    "calibreweb": _provision_calibreweb,
 }

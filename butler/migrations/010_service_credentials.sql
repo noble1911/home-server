@@ -4,7 +4,7 @@
 CREATE TABLE IF NOT EXISTS butler.service_credentials (
     id              SERIAL PRIMARY KEY,
     user_id         TEXT NOT NULL REFERENCES butler.users(id) ON DELETE CASCADE,
-    service         TEXT NOT NULL,           -- 'jellyfin', 'audiobookshelf', 'nextcloud', 'immich', 'calibreweb'
+    service         TEXT NOT NULL,           -- 'jellyfin', 'audiobookshelf', 'nextcloud', 'immich'
     username        TEXT NOT NULL,
     password_encrypted TEXT,                 -- Fernet-encrypted password (NULL on failure)
     external_id     TEXT,                    -- Service-specific user ID (for idempotency/future ops)
