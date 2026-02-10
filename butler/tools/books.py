@@ -225,7 +225,9 @@ class BookTool(Tool):
         download_url = best["downloadUrl"]
 
         # 3. Send to qBittorrent
-        add_result = await self._qbit_add(download_url, category="books")
+        add_result = await self._qbit_add(
+            download_url, category="books", savepath="/downloads/Complete/Books"
+        )
         if add_result is not None:
             return add_result  # Error message
 
@@ -259,7 +261,7 @@ class BookTool(Tool):
             return f"Error connecting to qBittorrent: {e}"
 
     async def _qbit_add(
-        self, download_url: str, category: str = ""
+        self, download_url: str, category: str = "", savepath: str = ""
     ) -> str | None:
         """Add a torrent to qBittorrent. Returns error message or None on success."""
         if not self._qbit_sid:
@@ -271,6 +273,8 @@ class BookTool(Tool):
         data: dict[str, str] = {"urls": download_url}
         if category:
             data["category"] = category
+        if savepath:
+            data["savepath"] = savepath
 
         async with session.post(
             f"{self.qbit_url}/api/v2/torrents/add",

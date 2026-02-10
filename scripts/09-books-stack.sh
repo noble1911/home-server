@@ -48,8 +48,8 @@ else
     echo -e "  ${GREEN}✓${NC} Readarr config already exists (or no API key available)"
 fi
 
-# Ensure Calibre Library directory exists (metadata.db created post-deploy via calibredb)
-mkdir -p "${DRIVE_PATH}/Books/eBooks/Calibre Library"
+# Ensure eBooks directory exists (metadata.db created post-deploy via calibredb)
+mkdir -p "${DRIVE_PATH}/Books/eBooks"
 
 # Deploy containers and wait for health checks
 echo -e "${BLUE}==>${NC} Starting containers (waiting for health checks)..."
@@ -169,14 +169,14 @@ sleep 3
 
 # Create a proper Calibre metadata.db if missing (requires full schema).
 # The calibre-web container has the complete Calibre toolkit via DOCKER_MODS.
-if ! docker exec calibre-web test -f "/books/Calibre Library/metadata.db" 2>/dev/null; then
+if ! docker exec calibre-web test -f "/books/metadata.db" 2>/dev/null; then
     # calibredb auto-creates a valid library with all required tables
-    docker exec calibre-web calibredb --with-library "/books/Calibre Library" \
+    docker exec calibre-web calibredb --with-library "/books" \
         list_categories > /dev/null 2>&1 || true
     # Newer Calibre moved isbn to identifiers table, but Calibre-Web still
     # queries books.isbn and books.flags — add them if missing
     docker exec calibre-web sh -c \
-        'sqlite3 "/books/Calibre Library/metadata.db" \
+        'sqlite3 "/books/metadata.db" \
         "ALTER TABLE books ADD COLUMN isbn TEXT DEFAULT \"\" ; \
          ALTER TABLE books ADD COLUMN flags INTEGER NOT NULL DEFAULT 1;"' 2>/dev/null || true
     echo -e "  ${GREEN}✓${NC} Calibre metadata.db created (via calibredb)"
@@ -187,16 +187,16 @@ fi
 CALIBRE_CONFIGURED=$(docker exec calibre-web sh -c \
     'sqlite3 /config/app.db "SELECT config_calibre_dir FROM settings WHERE id=1;" 2>/dev/null' 2>/dev/null)
 
-if [[ "$CALIBRE_CONFIGURED" == "/books/Calibre Library" ]]; then
+if [[ "$CALIBRE_CONFIGURED" == "/books" ]]; then
     echo -e "  ${GREEN}✓${NC} Calibre-Web library path already set"
 elif docker exec calibre-web sh -c \
-    'sqlite3 /config/app.db "UPDATE settings SET config_calibre_dir = \"/books/Calibre Library\" WHERE id = 1;" 2>/dev/null' 2>/dev/null; then
-    echo -e "  ${GREEN}✓${NC} Calibre-Web library path set to /books/Calibre Library"
+    'sqlite3 /config/app.db "UPDATE settings SET config_calibre_dir = \"/books\" WHERE id = 1;" 2>/dev/null' 2>/dev/null; then
+    echo -e "  ${GREEN}✓${NC} Calibre-Web library path set to /books"
     echo -e "  ${YELLOW}⚠${NC} Default login: admin / admin123 — change the password!"
 else
     echo -e "  ${YELLOW}⚠${NC} Could not configure Calibre-Web — set library path manually"
     echo "     Login at http://localhost:8083 (admin/admin123)"
-    echo "     Set database location to: /books/Calibre Library/metadata.db"
+    echo "     Set database location to: /books"
 fi
 
 # ─────────────────────────────────────────────
