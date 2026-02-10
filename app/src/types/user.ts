@@ -112,7 +112,7 @@ export const SERVICE_DISPLAY_NAMES: Record<string, { label: string; description:
   audiobookshelf: { label: 'Audiobookshelf', description: 'Audiobooks & Podcasts' },
   nextcloud: { label: 'Nextcloud', description: 'File Sync & Storage' },
   immich: { label: 'Immich', description: 'Photo Management' },
-  calibreweb: { label: 'Calibre-Web', description: 'E-Book Library' },
+  shelfarr: { label: 'Shelfarr', description: 'Book Search & Downloads' },
 }
 
 export interface AdminUser {
@@ -123,7 +123,7 @@ export interface AdminUser {
 }
 
 export const PERMISSION_INFO: Record<ToolPermission, { label: string; description: string }> = {
-  media: { label: 'Media', description: 'Radarr, Sonarr, Readarr, Immich, Jellyfin' },
+  media: { label: 'Media', description: 'Radarr, Sonarr, Immich, Jellyfin, Books' },
   home: { label: 'Smart Home', description: 'Home Assistant, entity control' },
   location: { label: 'Location', description: 'Phone location tracking' },
   calendar: { label: 'Calendar', description: 'Google Calendar' },

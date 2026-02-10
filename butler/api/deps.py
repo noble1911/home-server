@@ -25,7 +25,6 @@ from tools import (
     MediaFilesTool,
     PhoneLocationTool,
     RadarrTool,
-    ReadarrTool,
     RecallFactsTool,
     RememberFactTool,
     GetUserTool,
@@ -60,7 +59,7 @@ ALWAYS_ALLOWED_TOOLS: set[str] = {
 }
 
 PERMISSION_TOOL_MAP: dict[str, list[str]] = {
-    "media": ["radarr", "readarr", "books", "sonarr", "immich", "jellyfin", "media_files"],
+    "media": ["radarr", "books", "sonarr", "immich", "jellyfin", "media_files"],
     "home": ["home_assistant", "list_ha_entities"],
     "location": ["phone_location"],
     "calendar": ["google_calendar"],
@@ -123,14 +122,7 @@ async def init_resources() -> None:
             api_key=settings.radarr_api_key,
         )
 
-    # Only register Readarr tool if configured
-    if settings.readarr_url:
-        _tools["readarr"] = ReadarrTool(
-            base_url=settings.readarr_url,
-            api_key=settings.readarr_api_key,
-        )
-
-    # Books tool (Open Library + Prowlarr + qBittorrent) — replaces Readarr for search/download
+    # Books tool (Open Library + Prowlarr + qBittorrent)
     if settings.prowlarr_api_key:
         _tools["books"] = BookTool(
             prowlarr_url="http://prowlarr:9696",
@@ -183,8 +175,6 @@ async def init_resources() -> None:
         api_keys["radarr_api_key"] = settings.radarr_api_key
     if settings.sonarr_api_key:
         api_keys["sonarr_api_key"] = settings.sonarr_api_key
-    if settings.readarr_api_key:
-        api_keys["readarr_api_key"] = settings.readarr_api_key
     if settings.prowlarr_api_key:
         api_keys["prowlarr_api_key"] = settings.prowlarr_api_key
     if settings.home_assistant_token:

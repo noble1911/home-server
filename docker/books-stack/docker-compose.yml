@@ -1,29 +1,4 @@
 services:
-  calibre-web:
-    image: lscr.io/linuxserver/calibre-web:0.6.25
-    container_name: calibre-web
-    environment:
-      - PUID=501
-      - PGID=20
-      - TZ=Europe/London
-      - DOCKER_MODS=linuxserver/mods:universal-calibre
-    volumes:
-      - calibre-web-config:/config
-      - ${DRIVE_PATH:-/Volumes/HomeServer}/Books/eBooks:/books
-      - ${DRIVE_PATH:-/Volumes/HomeServer}/Downloads:/downloads
-      - ./book-import.sh:/custom-services.d/book-import
-    ports:
-      - "8083:8083"
-    networks:
-      - homeserver
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:8083/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-
   audiobookshelf:
     image: ghcr.io/advplyr/audiobookshelf:2.32.1
     container_name: audiobookshelf
@@ -46,39 +21,39 @@ services:
       retries: 3
       start_period: 30s
 
-  readarr:
-    # pennydreadful/bookshelf softcover — Readarr revival with rreading-glasses support
-    # (upstream Readarr was archived June 2025, api.bookinfo.club is dead)
-    image: ghcr.io/pennydreadful/bookshelf:softcover-v0.4.20
-    container_name: readarr
+  shelfarr:
+    image: ghcr.io/pedro-revez-silva/shelfarr:latest
+    container_name: shelfarr
     environment:
+      - SOLID_QUEUE_IN_PUMA=1
+      - PUID=501
+      - PGID=20
       - TZ=Europe/London
     volumes:
-      - readarr-config:/config
-      - ${DRIVE_PATH:-/Volumes/HomeServer}/Books:/books
+      - shelfarr-data:/rails/storage
+      - ${DRIVE_PATH:-/Volumes/HomeServer}/Books/Audiobooks:/audiobooks
+      - ${DRIVE_PATH:-/Volumes/HomeServer}/Books/eBooks:/ebooks
       - ${DRIVE_PATH:-/Volumes/HomeServer}/Downloads:/downloads
     ports:
-      - "8787:8787"
+      - "5056:80"
     networks:
       - homeserver
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:8787/ping"]
+      test: ["CMD", "curl", "-f", "http://localhost:80/up"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 30s
+      start_period: 40s
 
 networks:
   homeserver:
     external: true
 
 volumes:
-  calibre-web-config:
-    name: calibre-web-config
   audiobookshelf-config:
     name: audiobookshelf-config
   audiobookshelf-metadata:
     name: audiobookshelf-metadata
-  readarr-config:
-    name: readarr-config
+  shelfarr-data:
+    name: shelfarr-data

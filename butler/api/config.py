@@ -53,10 +53,6 @@ class Settings(BaseSettings):
     radarr_url: str = ""
     radarr_api_key: str = ""
 
-    # Readarr (book management)
-    readarr_url: str = ""
-    readarr_api_key: str = ""
-
     # Sonarr (TV series management)
     sonarr_url: str = ""
     sonarr_api_key: str = ""
@@ -83,11 +79,6 @@ class Settings(BaseSettings):
     nextcloud_url: str = ""
     nextcloud_admin_user: str = ""
     nextcloud_admin_password: str = ""
-
-    # Calibre-Web (user provisioning via admin form)
-    calibreweb_url: str = ""
-    calibreweb_admin_user: str = ""
-    calibreweb_admin_password: str = ""
 
     # Media files management (direct filesystem access to media directories)
     media_files_enabled: bool = True

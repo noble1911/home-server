@@ -69,18 +69,13 @@ DEFAULT_SERVICES: dict[str, dict[str, Any]] = {
         "headers": {"X-Api-Key": "{prowlarr_api_key}"},
     },
     # Books stack
-    "calibre-web": {
-        "url": "http://calibre-web:8083",
-        "stack": "books",
-    },
     "audiobookshelf": {
         "url": "http://audiobookshelf:80/healthcheck",
         "stack": "books",
     },
-    "readarr": {
-        "url": "http://readarr:8787/api/v1/health",
+    "shelfarr": {
+        "url": "http://shelfarr:5056/up",
         "stack": "books",
-        "headers": {"X-Api-Key": "{readarr_api_key}"},
     },
     # Photos & files stack
     "immich-server": {

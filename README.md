@@ -122,7 +122,7 @@ Decide which services you want accessible remotely. Example mapping:
 | `books.yourdomain.com` | Audiobookshelf | 13378 |
 | `files.yourdomain.com` | Nextcloud | 8080 |
 | `ha.yourdomain.com` | Home Assistant | 8123 |
-| `ebooks.yourdomain.com` | Calibre-Web | 8083 |
+| `shelfarr.yourdomain.com` | Shelfarr | 5056 |
 
 You'll configure these routes in the Cloudflare dashboard after `setup.sh` has deployed the services.
 
@@ -161,20 +161,6 @@ Required if you want Butler to answer weather questions.
 4. Copy your API key
 
 > **Cost:** Free tier gives 1,000 API calls/day — plenty for personal use.
-
-### Step 6: Gmail App Password for Kindle Delivery (Optional)
-
-Required if you want one-click "Send to Kindle" from Calibre-Web.
-
-1. Go to [myaccount.google.com](https://myaccount.google.com) → **Security**
-2. Enable **2-Step Verification** (required for App Passwords)
-3. Go to [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)
-4. Create an App Password named `Calibre-Web`
-5. Copy the 16-character password
-6. On Amazon, go to [Manage Your Content and Devices](https://www.amazon.co.uk/hz/mycd/myx#/home/settings/payment) → **Preferences** → **Personal Document Settings**
-7. Add your Gmail address to the **Approved Personal Document E-mail List**
-
-> See [docs/kindle-email-setup.md](docs/kindle-email-setup.md) for the full setup guide.
 
 ### Checklist Before Running setup.sh
 
@@ -248,7 +234,7 @@ cd ~/home-server && ./scripts/change-drive.sh
 | 5 | `06-external-drive.sh` | External drive directory structure |
 | 6 | `07-download-stack.sh` | qBittorrent + Prowlarr |
 | 7 | `08-media-stack.sh` | Jellyfin + Radarr + Sonarr + Bazarr |
-| 8 | `09-books-stack.sh` | Calibre-Web + Audiobookshelf + Readarr |
+| 8 | `09-books-stack.sh` | Audiobookshelf + Shelfarr |
 | 9 | `10-photos-files.sh` | Immich + Nextcloud |
 | 10 | `11-smart-home.sh` | Home Assistant + Cloudflare Tunnel |
 | 11 | `12-voice-stack.sh` | LiveKit + Kokoro TTS |
@@ -288,7 +274,7 @@ Now that services are running, go back to the Cloudflare dashboard and add route
 | `books` | `http://audiobookshelf:80` | Audiobookshelf |
 | `files` | `http://nextcloud:80` | Nextcloud |
 | `ha` | `http://homeassistant:8123` | Home Assistant |
-| `ebooks` | `http://calibre-web:8083` | Calibre-Web |
+| `shelfarr` | `http://shelfarr:5056` | Shelfarr |
 
 > **Important:** Use Docker container names (not `localhost`) because `cloudflared` runs inside Docker where `localhost` refers to the container itself, not the host machine.
 
@@ -321,8 +307,7 @@ Butler uses **invite codes** for registration. The first person to log in become
 | Service | URL | First-Time Setup |
 |---------|-----|-----------------|
 | **Audiobookshelf** | `http://<server-ip>:13378` | Auto-configured — create accounts for household members |
-| **Calibre-Web** | `http://<server-ip>:8083` | Default login: `admin` / `admin123` — **change password immediately** |
-| **Readarr** | `http://<server-ip>:8787` | Auto-configured — add password in Settings |
+| **Shelfarr** | `http://<server-ip>:5056` | Configure Prowlarr + qBittorrent + ABS connections |
 
 ### 4.5 Set Up Photos & Files
 
@@ -434,9 +419,8 @@ docker compose down && docker compose up -d
 
 | Component | Purpose | Port |
 |-----------|---------|------|
-| [Calibre-Web](https://github.com/janeczku/calibre-web) | E-book library + Kindle delivery | 8083 |
-| [Audiobookshelf](https://www.audiobookshelf.org/) | Audiobook streaming | 13378 |
-| [Readarr](https://readarr.com/) | Book automation | 8787 |
+| [Audiobookshelf](https://www.audiobookshelf.org/) | Ebook + audiobook library | 13378 |
+| [Shelfarr](https://github.com/Pedro-Revez-Silva/shelfarr) | Book search + download management | 5056 |
 
 ### Photos & Files
 
@@ -517,7 +501,6 @@ This interactively stops running stacks, copies data with `rsync`, and restarts 
 - **[HOMESERVER_PLAN.md](HOMESERVER_PLAN.md)** — Complete architecture, storage layout, and resource budget
 - **[docs/](docs/)** — Step-by-step manual guides for each setup script
 - **[docs/google-oauth-setup.md](docs/google-oauth-setup.md)** — Google OAuth for Calendar/Gmail
-- **[docs/kindle-email-setup.md](docs/kindle-email-setup.md)** — Send-to-Kindle setup
 - **[docs/prowlarr-indexers.md](docs/prowlarr-indexers.md)** — Adding indexers to Prowlarr
 - **[docs/VOICE_ARCHITECTURE.md](docs/VOICE_ARCHITECTURE.md)** — Voice pipeline technical details
 

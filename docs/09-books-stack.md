@@ -1,6 +1,6 @@
 # Step 9: Deploy Books Stack
 
-Deploy Calibre-Web (ebooks), Audiobookshelf (audiobooks), and Readarr (automation).
+Deploy Audiobookshelf (ebooks + audiobooks) and Shelfarr (book search + download management).
 
 ## Automated
 
@@ -27,128 +27,84 @@ docker compose ps
 
 | Service | URL | Purpose |
 |---------|-----|---------|
-| Calibre-Web | http://localhost:8083 | E-book library & Kindle sync |
-| Audiobookshelf | http://localhost:13378 | Audiobook streaming |
-| Readarr | http://localhost:8787 | Book/audiobook automation |
+| Audiobookshelf | http://localhost:13378 | Ebook + audiobook library, reading, streaming |
+| Shelfarr | http://localhost:5056 | Book search, download management, ABS auto-import |
 
 ## Initial Configuration
-
-### Calibre-Web
-
-1. Open http://localhost:8083
-2. Login: `admin` / `admin123`
-3. **First-time setup:**
-   - Database path: `/books/Calibre Library/metadata.db`
-   - If no Calibre library exists yet, you'll need to create one first
-4. **Admin > Edit Basic Configuration:**
-   - Enable uploads
-   - Configure Kindle email (for Send to Kindle)
-5. **Change the default password!**
-
-#### Creating a Calibre Library (if new)
-
-If you don't have an existing Calibre library:
-
-```bash
-# Install Calibre on your Mac temporarily
-brew install --cask calibre
-
-# Create a library at your external drive
-# Open Calibre, set library location to /Volumes/HomeServer/Books/eBooks/Calibre Library
-# Add a few books, then close Calibre
-```
 
 ### Audiobookshelf
 
 1. Open http://localhost:13378
 2. Create admin account
-3. **Add Library:**
-   - Name: Audiobooks
-   - Folders: `/audiobooks`
-   - Media Type: Audiobooks
+3. **Add Libraries:**
+   - Name: Audiobooks, Folder: `/audiobooks`, Media Type: Audiobooks
+   - Name: eBooks, Folder: `/books`, Media Type: Books
 4. **Install mobile apps:**
    - iOS: App Store "Audiobookshelf"
    - Android: Google Play "Audiobookshelf"
 5. **Features:**
+   - Built-in EPUB reader (browser-based)
    - Progress sync across devices
-   - Offline downloads
-   - Sleep timer
-   - Playback speed control
+   - Offline downloads via mobile app
+   - Sleep timer and playback speed control
 
-### Readarr (via Bookshelf)
+### Shelfarr
 
-> We use [pennydreadful/bookshelf](https://github.com/pennydreadful/bookshelf) (softcover variant), a community revival of Readarr.
-> The original Readarr project was archived in June 2025 and its metadata service (`api.bookinfo.club`) no longer exists.
-> Bookshelf uses [rreading-glasses](https://github.com/blampe/rreading-glasses) at `api.bookinfo.pro` as the metadata provider.
-
-1. Open http://localhost:8787
-2. **Settings > Media Management:**
-   - Add Root Folder: `/books/eBooks` (for ebooks)
-   - Add Root Folder: `/books/Audiobooks` (for audiobooks)
-3. **Settings > Download Clients:**
-   - Add qBittorrent:
-     - Host: `qbittorrent`
-     - Port: `8081`
-     - Category: `books`
-4. **Settings > General:**
-   - Copy API Key for Prowlarr
-
-### Connect to Prowlarr
-
-In Prowlarr (http://localhost:9696):
-
-1. **Settings > Apps > Add Application:**
-   - **Readarr:**
-     - Prowlarr Server: `http://prowlarr:9696`
-     - Readarr Server: `http://readarr:8787`
-     - API Key: (from Readarr)
+1. Open http://localhost:5056
+2. Create admin account
+3. **Admin Settings > Prowlarr:**
+   - URL: `http://prowlarr:9696`
+   - API Key: (from Prowlarr > Settings > General)
+4. **Admin Settings > Download Client:**
+   - Type: qBittorrent
+   - URL: `http://qbittorrent:8081`
+   - Username: `admin`
+   - Password: (your qBittorrent password)
+5. **Admin Settings > Audiobookshelf:**
+   - URL: `http://audiobookshelf:80`
+   - API Token: (from ABS > Settings > Users > your admin user)
 
 ## Volume Mappings
 
 | Service | Container Path | Host Path |
 |---------|----------------|-----------|
-| Calibre-Web | `/books` | `/Volumes/HomeServer/Books/eBooks` |
 | Audiobookshelf | `/audiobooks` | `/Volumes/HomeServer/Books/Audiobooks` |
 | Audiobookshelf | `/books` | `/Volumes/HomeServer/Books/eBooks` |
-| Readarr | `/books` | `/Volumes/HomeServer/Books` |
-| Readarr | `/downloads` | `/Volumes/HomeServer/Downloads` |
+| Shelfarr | `/audiobooks` | `/Volumes/HomeServer/Books/Audiobooks` |
+| Shelfarr | `/ebooks` | `/Volumes/HomeServer/Books/eBooks` |
+| Shelfarr | `/downloads` | `/Volumes/HomeServer/Downloads` |
 
 ## The Book Download Flow
 
 ```
-Search in Readarr
+Search in Shelfarr (or ask Butler AI)
        ↓
 Prowlarr provides indexers
        ↓
-Readarr sends to qBittorrent
+qBittorrent downloads to /Downloads
        ↓
-qBittorrent downloads to /Downloads/Complete/Books
+Shelfarr organizes files by author/title
        ↓
-Readarr moves to /Books/eBooks or /Books/Audiobooks
+Shelfarr imports into Audiobookshelf
        ↓
-Calibre-Web or Audiobookshelf shows in library
+ABS shows book in library (ebook reader + mobile apps)
 ```
 
-## Send to Kindle
-
-Calibre-Web can send ebooks directly to your Kindle with one click. This requires:
-1. SMTP email settings configured in Calibre-Web (Gmail App Password)
-2. Your Kindle email address set in your user profile
-3. Your sending email approved in Amazon's settings
-
-See the **[Kindle Email Delivery Setup Guide](./kindle-email-setup.md)** for full step-by-step instructions.
-
-> **Quick start:** If you added `CALIBRE_SMTP_*` variables to `~/.homeserver-credentials` before running setup, SMTP is already configured. Just set your Kindle email in your Calibre-Web profile.
->
-> The variables are: `CALIBRE_SMTP_SERVER`, `CALIBRE_SMTP_PORT` (default: 587), `CALIBRE_SMTP_ENCRYPTION` (1=STARTTLS), `CALIBRE_SMTP_LOGIN`, `CALIBRE_SMTP_PASSWORD`, `CALIBRE_SMTP_FROM`. See the [Kindle Email Delivery guide](./kindle-email-setup.md) for details.
+Butler's BookTool can also trigger downloads via voice/chat:
+```
+"Find me the new Dune audiobook"
+       ↓
+BookTool → Open Library (metadata) → Prowlarr (torrent) → qBittorrent
+       ↓
+Shelfarr picks up completed download → organizes → ABS import
+```
 
 ## Docker Commands
 
 ```bash
 # View logs
-docker logs calibre-web
 docker logs audiobookshelf
-docker logs readarr
+docker logs shelfarr
 
 # Restart
 cd docker/books-stack
@@ -161,38 +117,28 @@ docker compose up -d
 
 ## Troubleshooting
 
-### Calibre-Web can't find database
-
-The `metadata.db` file must exist. Either:
-- Copy an existing Calibre library
-- Create one with Calibre desktop app first
-
 ### Audiobookshelf not detecting books
 
 - Check folder structure: `/audiobooks/Author/Book Title/`
 - Audiobooks should have audio files (.m4b, .mp3, etc.)
 - Use "Scan" button in library settings
 
-### Readarr shows "No root folders"
+### Shelfarr search returns no results
 
-Add root folders in Settings > Media Management before searching for books.
+- Verify Prowlarr connection in Admin Settings
+- Check that Prowlarr has indexers configured (see [Prowlarr Indexer Setup](./prowlarr-indexers.md))
+- Try a broader search query
 
-### Readarr book search returns errors
+### Downloads stuck or failing
 
-If searches fail with metadata/Goodreads errors, the metadata source may not be configured:
-
-1. Navigate to `http://localhost:8787/settings/development` (type the URL manually — it's hidden from the menu)
-2. Set **Metadata Provider Source** to `https://api.bookinfo.pro`
-3. Click Save and restart Readarr
-
-This points Readarr at the [rreading-glasses](https://github.com/blampe/rreading-glasses) community metadata service.
+- Check qBittorrent at http://localhost:8081 for download status
+- Verify qBittorrent connection in Shelfarr Admin Settings
+- Check torrent indexer health in Prowlarr
 
 ## Related Guides
 
 - [Ebook Reading Guide](./ebook-reading-guide.md) — Read your library on phones, tablets, and e-readers
-- [OPDS Feed Setup](./opds-setup.md) — Connect mobile reading apps to browse and download books
-- [Kindle Email Delivery](./kindle-email-setup.md) — Send books directly to your Kindle
-- [Prowlarr Indexer Setup](./prowlarr-indexers.md) — Configure indexers for Readarr book search
+- [Prowlarr Indexer Setup](./prowlarr-indexers.md) — Configure indexers for book search
 
 ## Next Step
 

@@ -14,7 +14,7 @@ const TOOL_LABELS: Record<string, string> = {
   get_user: 'Looking up user info...',
   radarr: 'Searching movies...',
   sonarr: 'Searching TV shows...',
-  readarr: 'Searching books...',
+  books: 'Searching books...',
   jellyfin: 'Checking media library...',
   immich: 'Searching photos...',
   google_calendar: 'Checking calendar...',

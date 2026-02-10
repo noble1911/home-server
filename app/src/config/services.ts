@@ -9,7 +9,7 @@ import type { ServiceStatus } from '../services/api'
 const SERVICE_NAME_MAP: Record<string, string> = {
   'jellyfin': 'jellyfin',
   'audiobookshelf': 'audiobookshelf',
-  'calibre-web': 'calibre',
+  'shelfarr': 'shelfarr',
   'immich-server': 'immich',
   'nextcloud': 'nextcloud',
   'homeassistant': 'home-assistant',
@@ -29,7 +29,7 @@ function serviceUrl(envVar: string, port: number, localDefault: string): string 
 // Pre-compute service URLs so guide text can reference them
 const jellyfinUrl = serviceUrl('VITE_JELLYFIN_URL', 8096, 'http://jellyfin.local')
 const audiobookshelfUrl = serviceUrl('VITE_AUDIOBOOKSHELF_URL', 13378, 'http://audiobooks.local')
-const calibreUrl = serviceUrl('VITE_CALIBRE_URL', 8083, 'http://books.local')
+const shelfarrUrl = serviceUrl('VITE_SHELFARR_URL', 5056, 'http://shelfarr.local')
 const immichUrl = serviceUrl('VITE_IMMICH_URL', 2283, 'http://photos.local')
 const nextcloudUrl = serviceUrl('VITE_NEXTCLOUD_URL', 80, 'http://files.local')
 const homeAssistantUrl = serviceUrl('VITE_HOMEASSISTANT_URL', 8123, 'http://ha.local')
@@ -65,18 +65,18 @@ export const services: Service[] = [
   {
     id: 'audiobookshelf',
     name: 'Audiobookshelf',
-    description: 'Audiobooks & Podcasts',
+    description: 'Ebooks & Audiobooks',
     icon: '🎧',
     url: audiobookshelfUrl,
     mobileUrl: 'audiobookshelf://',
     category: 'media',
     guide: {
-      whatItDoes: 'Listen to audiobooks and podcasts with progress tracking, sleep timer, and offline downloads.',
+      whatItDoes: 'Read ebooks and listen to audiobooks with progress sync, sleep timer, and offline downloads across all your devices.',
       steps: [
         'Install the Audiobookshelf app on your phone',
         `Enter the server address when prompted: ${audiobookshelfUrl}`,
         'Log in with your credentials',
-        'Browse the library and tap any book to start listening',
+        'Browse the library — ebooks and audiobooks are in separate sections',
       ],
       mobileApp: {
         name: 'ShelfPlayer',
@@ -84,45 +84,31 @@ export const services: Service[] = [
         android: 'https://play.google.com/store/apps/details?id=com.audiobookshelf.app',
       },
       tips: [
+        'Read ebooks in the browser using the built-in EPUB reader',
         'Download audiobooks for offline listening on long trips',
         'Playback speed and sleep timer are in the player controls',
       ],
     },
   },
   {
-    id: 'calibre',
-    name: 'Calibre-Web',
-    description: 'E-Books Library',
+    id: 'shelfarr',
+    name: 'Shelfarr',
+    description: 'Book Search & Downloads',
     icon: '📚',
-    url: calibreUrl,
+    url: shelfarrUrl,
     category: 'books',
     guide: {
-      whatItDoes: 'Browse, read, and download ebooks from your home library. Connect reader apps via OPDS for the best mobile experience.',
+      whatItDoes: 'Search for books, manage downloads, and automatically import them into Audiobookshelf.',
       steps: [
-        'Open Calibre-Web in your browser and log in with your credentials',
-        'Find a book and tap its cover — use "Read in Browser" or download it',
-        `For mobile apps, add the OPDS feed in your reader: ${calibreUrl}/opds`,
-        'Enter your Calibre-Web username and password when the reader app asks',
-      ],
-      recommendedApps: [
-        {
-          name: 'FBReader',
-          ios: 'https://apps.apple.com/app/fbreader-ebook-reader/id1067172178',
-          android: 'https://play.google.com/store/apps/details?id=org.geometerplus.zlibrary.ui.android',
-        },
-        {
-          name: 'Moon+ Reader',
-          android: 'https://play.google.com/store/apps/details?id=com.flyersoft.moonreader',
-        },
-        {
-          name: 'Panels',
-          ios: 'https://apps.apple.com/app/panels-comic-reader/id1236567663',
-        },
+        `Open Shelfarr in your browser: ${shelfarrUrl}`,
+        'Search for a book by title or author',
+        'Select a result and Shelfarr will download it via qBittorrent',
+        'Once downloaded, Shelfarr organizes the file and imports it into Audiobookshelf automatically',
       ],
       tips: [
-        'OPDS lets reader apps browse and download books directly — no browser needed',
-        'EPUB format works best on most devices — use the Convert button if you need a different format',
-        'Apple Books (iOS) and Moon+ Reader (Android) give the best reading experience for downloaded books',
+        'You can also ask Butler to find and download books for you via chat or voice',
+        'Ebooks appear in Audiobookshelf after import — read them in the browser or mobile app',
+        'Shelfarr connects to Prowlarr for indexers, so make sure your indexers are configured',
       ],
     },
   },
