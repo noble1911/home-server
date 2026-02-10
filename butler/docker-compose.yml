@@ -25,6 +25,7 @@ services:
       # Home Assistant
       - HOME_ASSISTANT_URL=http://homeassistant:8123
       - HOME_ASSISTANT_TOKEN=${HA_TOKEN:-}
+      - HA_WEBHOOK_SECRET=${HA_WEBHOOK_SECRET:-}
       # Weather
       - OPENWEATHERMAP_API_KEY=${OPENWEATHERMAP_API_KEY:-}
       # Ollama (for local embeddings / semantic memory search)
@@ -38,8 +39,6 @@ services:
       # Jellyfin
       - JELLYFIN_URL=http://jellyfin:8096
       - JELLYFIN_API_KEY=${JELLYFIN_API_KEY:-}
-      # Prowlarr
-      - PROWLARR_API_KEY=${PROWLARR_API_KEY:-}
       # Health & storage monitoring
       - EXTERNAL_DRIVE_PATH=${EXTERNAL_DRIVE_PATH:-/mnt/external}
       - STORAGE_THRESHOLDS=${STORAGE_THRESHOLDS:-70,80,90}
@@ -53,8 +52,32 @@ services:
       - QBITTORRENT_URL=${QBITTORRENT_URL:-http://qbittorrent:8081}
       - QBITTORRENT_USERNAME=${QBITTORRENT_USERNAME:-admin}
       - QBITTORRENT_PASSWORD=${QBITTORRENT_PASSWORD:-adminadmin}
+      # Prowlarr
+      - PROWLARR_URL=${PROWLARR_URL:-http://prowlarr:9696}
+      - PROWLARR_API_KEY=${PROWLARR_API_KEY:-}
+      # Immich (photo management + user provisioning)
+      - IMMICH_URL=${IMMICH_URL:-http://immich-server:2283}
+      - IMMICH_API_KEY=${IMMICH_API_KEY:-}
+      # Audiobookshelf (user provisioning)
+      - AUDIOBOOKSHELF_URL=${AUDIOBOOKSHELF_URL:-http://audiobookshelf:80}
+      - AUDIOBOOKSHELF_ADMIN_TOKEN=${AUDIOBOOKSHELF_ADMIN_TOKEN:-}
+      # Nextcloud (user provisioning)
+      - NEXTCLOUD_URL=${NEXTCLOUD_URL:-http://nextcloud:80}
+      - NEXTCLOUD_ADMIN_USER=${NEXTCLOUD_ADMIN_USER:-}
+      - NEXTCLOUD_ADMIN_PASSWORD=${NEXTCLOUD_ADMIN_PASSWORD:-}
       # WhatsApp Gateway (outbound notifications)
       - WHATSAPP_GATEWAY_URL=${WHATSAPP_GATEWAY_URL:-}
+      # Features & limits
+      - MAX_TOKENS=${MAX_TOKENS:-4096}
+      - MAX_HISTORY_MESSAGES=${MAX_HISTORY_MESSAGES:-20}
+      - WEB_SEARCH_ENABLED=${WEB_SEARCH_ENABLED:-true}
+      - WEB_SEARCH_MAX_USES=${WEB_SEARCH_MAX_USES:-5}
+      - MEDIA_FILES_ENABLED=${MEDIA_FILES_ENABLED:-true}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
+      # Web Push (VAPID keys for PWA push notifications)
+      - VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY:-}
+      - VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY:-}
+      - VAPID_SUBJECT=${VAPID_SUBJECT:-mailto:admin@homeserver.local}
       # Host system info (accurate dashboard stats inside Docker)
       - HOST_PLATFORM=${HOST_PLATFORM:-}
       - HOST_ARCHITECTURE=${HOST_ARCHITECTURE:-}

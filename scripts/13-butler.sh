@@ -225,7 +225,32 @@ if [[ -f "$CREDENTIALS_FILE" ]]; then
     [[ -n "$JELLYFIN_API_KEY" ]] && set_env_val "JELLYFIN_API_KEY" "$JELLYFIN_API_KEY"
 
     echo -e "  ${GREEN}✓${NC} *arr API keys synced to butler .env"
+
+    # Sync service admin credentials for user provisioning
+    echo -e "${BLUE}==>${NC} Syncing service admin credentials for user provisioning..."
+
+    [[ -n "$NEXTCLOUD_ADMIN_USER" ]] && set_env_val "NEXTCLOUD_ADMIN_USER" "$NEXTCLOUD_ADMIN_USER"
+    [[ -n "$NEXTCLOUD_ADMIN_PASS" ]] && set_env_val "NEXTCLOUD_ADMIN_PASSWORD" "$NEXTCLOUD_ADMIN_PASS"
+
+    echo -e "  ${GREEN}✓${NC} Service admin credentials synced to butler .env"
 fi
+
+# Ensure service URLs have Docker-network defaults (idempotent)
+echo ""
+echo -e "${BLUE}==>${NC} Setting service URL defaults..."
+for pair in \
+    "IMMICH_URL=http://immich-server:2283" \
+    "AUDIOBOOKSHELF_URL=http://audiobookshelf:80" \
+    "NEXTCLOUD_URL=http://nextcloud:80" \
+    "PROWLARR_URL=http://prowlarr:9696"; do
+    key="${pair%%=*}"
+    default="${pair#*=}"
+    current_val=$(get_env_val "$key")
+    if [ -z "$current_val" ]; then
+        set_env_val "$key" "$default"
+    fi
+done
+echo -e "  ${GREEN}✓${NC} Service URL defaults set"
 
 # Home Assistant token
 echo ""

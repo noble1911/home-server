@@ -18,7 +18,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 
 from tools import DatabasePool
 
-from ..deps import ALL_PERMISSION_GROUPS, get_admin_user, get_db_pool
+from ..deps import ALL_PERMISSION_GROUPS, DEFAULT_PERMISSIONS, get_admin_user, get_db_pool
 from ..models import (
     AdminUserInfo,
     AdminUserListResponse,
@@ -50,9 +50,19 @@ async def create_invite_code(
     admin_id: str = Depends(get_admin_user),
     pool: DatabasePool = Depends(get_db_pool),
 ):
-    """Generate a new invite code. Admin only."""
+    """Generate a new invite code with optional permissions. Admin only."""
     db = pool.pool
     expires_at = datetime.now(timezone.utc) + timedelta(days=req.expiresInDays)
+
+    # Resolve and validate permissions
+    perms = req.permissions if req.permissions is not None else list(DEFAULT_PERMISSIONS)
+    # Non-admin users cannot grant admin tool access via invite codes
+    perms = [p for p in perms if p != "admin"]
+    invalid = set(perms) - set(ALL_PERMISSION_GROUPS)
+    if invalid:
+        raise HTTPException(
+            400, f"Unknown permission groups: {', '.join(sorted(invalid))}"
+        )
 
     # Retry on collision (extremely unlikely with 6 chars from 31-char alphabet)
     for _ in range(10):
@@ -62,14 +72,15 @@ async def create_invite_code(
         )
         if not existing:
             await db.execute(
-                """INSERT INTO butler.invite_codes (code, created_by, expires_at)
-                   VALUES ($1, $2, $3)""",
+                """INSERT INTO butler.invite_codes (code, created_by, expires_at, permissions)
+                   VALUES ($1, $2, $3, $4::jsonb)""",
                 code,
                 admin_id,
                 expires_at,
+                json.dumps(perms),
             )
             return CreateInviteCodeResponse(
-                code=code, expiresAt=expires_at.isoformat()
+                code=code, expiresAt=expires_at.isoformat(), permissions=perms
             )
 
     raise HTTPException(500, "Failed to generate unique code")
@@ -83,23 +94,29 @@ async def list_invite_codes(
     """List all invite codes with their status. Admin only."""
     db = pool.pool
     rows = await db.fetch(
-        """SELECT code, created_by, used_by, expires_at, created_at, used_at
+        """SELECT code, created_by, used_by, expires_at, created_at, used_at, permissions
            FROM butler.invite_codes ORDER BY created_at DESC"""
     )
     now = datetime.now(timezone.utc)
-    codes = [
-        InviteCodeInfo(
-            code=r["code"],
-            createdBy=r["created_by"],
-            usedBy=r["used_by"],
-            expiresAt=r["expires_at"].isoformat(),
-            createdAt=r["created_at"].isoformat(),
-            usedAt=r["used_at"].isoformat() if r["used_at"] else None,
-            isExpired=r["expires_at"] < now,
-            isUsed=r["used_by"] is not None,
+    codes = []
+    for r in rows:
+        raw = r["permissions"]
+        perms = (
+            json.loads(raw) if isinstance(raw, str) else raw
+        ) if raw is not None else list(DEFAULT_PERMISSIONS)
+        codes.append(
+            InviteCodeInfo(
+                code=r["code"],
+                createdBy=r["created_by"],
+                usedBy=r["used_by"],
+                expiresAt=r["expires_at"].isoformat(),
+                createdAt=r["created_at"].isoformat(),
+                usedAt=r["used_at"].isoformat() if r["used_at"] else None,
+                isExpired=r["expires_at"] < now,
+                isUsed=r["used_by"] is not None,
+                permissions=perms,
+            )
         )
-        for r in rows
-    ]
     return InviteCodeListResponse(codes=codes)
 
 

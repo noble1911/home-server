@@ -46,6 +46,7 @@ class LiveKitTokenResponse(BaseModel):
 
 class CreateInviteCodeRequest(BaseModel):
     expiresInDays: int = 7
+    permissions: list[str] | None = None  # None = use DEFAULT_PERMISSIONS
 
 
 class InviteCodeInfo(BaseModel):
@@ -57,6 +58,7 @@ class InviteCodeInfo(BaseModel):
     usedAt: str | None
     isExpired: bool
     isUsed: bool
+    permissions: list[str]
 
 
 class InviteCodeListResponse(BaseModel):
@@ -66,6 +68,7 @@ class InviteCodeListResponse(BaseModel):
 class CreateInviteCodeResponse(BaseModel):
     code: str
     expiresAt: str
+    permissions: list[str]
 
 
 # --- Admin: User & Permission Management ---
