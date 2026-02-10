@@ -36,7 +36,7 @@ DIRECTORIES=(
     "Media/Anime/Movies"
     "Media/Anime/Series"
     "Media/Music"
-    "Books/eBooks/Calibre Library"
+    "Books/eBooks"
     "Books/Audiobooks"
     "Photos/Immich/library"
     "Photos/Immich/upload"

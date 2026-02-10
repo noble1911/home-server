@@ -223,4 +223,4 @@ For anime, you may want both Radarr and Sonarr to receive anime results:
 
 - [Step 7: Download Stack](./07-download-stack.md) — qBittorrent + Prowlarr deployment
 - [Step 8: Media Stack](./08-media-stack.md) — Radarr, Sonarr, Jellyfin setup
-- [Step 9: Books Stack](./09-books-stack.md) — Readarr, Calibre-Web, Audiobookshelf setup
+- [Step 9: Books Stack](./09-books-stack.md) — Audiobookshelf, Shelfarr setup

@@ -10,6 +10,8 @@ services:
     volumes:
       - qbittorrent-config:/config
       - ${DRIVE_PATH:-/Volumes/HomeServer}/Downloads:/downloads
+      - ${DRIVE_PATH:-/Volumes/HomeServer}/Books/Audiobooks:/audiobooks
+      - ${DRIVE_PATH:-/Volumes/HomeServer}/Books/eBooks:/ebooks
     ports:
       - "8081:8081"
       - "6881:6881"

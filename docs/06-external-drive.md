@@ -38,7 +38,7 @@ mkdir -p "$DRIVE/Media/Anime/Series"
 mkdir -p "$DRIVE/Media/Music"
 
 # Books
-mkdir -p "$DRIVE/Books/eBooks/Calibre Library"
+mkdir -p "$DRIVE/Books/eBooks"
 mkdir -p "$DRIVE/Books/Audiobooks"
 
 # Photos

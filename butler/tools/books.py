@@ -111,6 +111,14 @@ class BookTool(Tool):
                         "For download, be specific (e.g. 'Dune Frank Herbert epub')."
                     ),
                 },
+                "format": {
+                    "type": "string",
+                    "enum": ["audiobook", "ebook"],
+                    "description": (
+                        "Whether to download as audiobook or ebook. "
+                        "Defaults to ebook."
+                    ),
+                },
             },
             "required": ["action", "query"],
         }
@@ -126,7 +134,8 @@ class BookTool(Tool):
             if action == "search":
                 return await self._search(query)
             elif action == "download":
-                return await self._download(query)
+                fmt = kwargs.get("format", "ebook")
+                return await self._download(query, fmt=fmt)
             else:
                 return f"Error: Unknown action '{action}'"
         except aiohttp.ClientError as e:
@@ -177,7 +186,7 @@ class BookTool(Tool):
     # Download via Prowlarr → qBittorrent
     # ------------------------------------------------------------------
 
-    async def _download(self, query: str) -> str:
+    async def _download(self, query: str, fmt: str = "ebook") -> str:
         """Search Prowlarr for book torrents and send the best one to qBittorrent."""
         if not self.prowlarr_api_key:
             return "Error: PROWLARR_API_KEY not configured."
@@ -224,18 +233,25 @@ class BookTool(Tool):
         indexer = best.get("indexer", "Unknown")
         download_url = best["downloadUrl"]
 
-        # 3. Send to qBittorrent
+        # 3. Send to qBittorrent with format-aware path
+        if fmt == "audiobook":
+            savepath = "/audiobooks"
+            category = "audiobooks"
+        else:
+            savepath = "/ebooks"
+            category = "ebooks"
+
         add_result = await self._qbit_add(
-            download_url, category="books", savepath="/downloads/Complete/Books"
+            download_url, category=category, savepath=savepath
         )
         if add_result is not None:
             return add_result  # Error message
 
         return (
-            f"Downloading: {title}\n"
+            f"Downloading {fmt}: {title}\n"
             f"Size: {size_mb:.1f} MB | Seeders: {seeders} | Source: {indexer}\n"
-            f"Sent to qBittorrent (category: books). "
-            f"Check the Downloads page to monitor progress."
+            f"Sent to qBittorrent (category: {category}). "
+            f"It will appear in Audiobookshelf once complete."
         )
 
     # ------------------------------------------------------------------

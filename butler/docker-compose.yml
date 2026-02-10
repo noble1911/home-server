@@ -86,6 +86,7 @@ services:
     volumes:
       - ./api:/app/api:ro
       - ./tools:/app/tools:ro
+      - ./migrations:/app/migrations:ro
       - ${DRIVE_PATH:-/Volumes/HomeServer}:/mnt/external
       - /private/var/empty:/mnt/host-ssd:ro
     ports:

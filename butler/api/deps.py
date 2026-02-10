@@ -6,6 +6,7 @@ lifespan handler in server.py, then injected into route handlers via Depends().
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Annotated
 
 import jwt as pyjwt
@@ -80,11 +81,37 @@ _tools: dict[str, Tool] | None = None
 _scheduler: TaskScheduler | None = None
 _embedding_service: EmbeddingService | None = None
 
+MIGRATIONS_DIR = Path("/app/migrations")
+
+
+async def _run_migrations(pool: DatabasePool) -> None:
+    """Apply all SQL migrations in order. Safe to re-run (all are idempotent)."""
+    if not MIGRATIONS_DIR.is_dir():
+        print(f"WARNING:  Migrations directory {MIGRATIONS_DIR} not found, skipping")
+        return
+
+    sql_files = sorted(MIGRATIONS_DIR.glob("*.sql"))
+    if not sql_files:
+        return
+
+    db = pool.pool
+    for path in sql_files:
+        sql = path.read_text()
+        try:
+            await db.execute(sql)
+        except Exception:
+            print(f"ERROR:    Migration failed: {path.name}")
+            raise
+    print(f"INFO:     Applied {len(sql_files)} database migrations")
+
 
 async def init_resources() -> None:
     """Initialize database pool and tool instances. Called once at startup."""
     global _db_pool, _tools, _scheduler, _embedding_service
     _db_pool = await DatabasePool.create(settings.database_url)
+
+    # Apply all DB migrations before initializing tools
+    await _run_migrations(_db_pool)
 
     # Embedding service for semantic memory search (optional)
     _embedding_service = EmbeddingService(settings.ollama_url) if settings.ollama_url else None
