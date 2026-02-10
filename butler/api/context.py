@@ -208,7 +208,7 @@ async def load_conversation_messages(
             WHERE user_id = $1
               AND channel = $2
               AND created_at > NOW() - INTERVAL '7 days'
-            ORDER BY created_at DESC
+            ORDER BY created_at DESC, id DESC
             LIMIT $3
             """,
             user_id,
@@ -221,7 +221,7 @@ async def load_conversation_messages(
             SELECT role, content
             FROM butler.conversation_history
             WHERE user_id = $1 AND created_at > NOW() - INTERVAL '7 days'
-            ORDER BY created_at DESC
+            ORDER BY created_at DESC, id DESC
             LIMIT $2
             """,
             user_id,
@@ -288,6 +288,11 @@ def _build_system_prompt(
     parts.append("- Be concise in voice responses (1-2 sentences unless asked for detail)")
     parts.append("- Use remember_fact to store important information about the user")
     parts.append("- For home automation, confirm before executing destructive actions")
+    parts.append(
+        "- When performing multiple actions (downloads, searches, etc.), "
+        "report each item's status individually using a markdown list. "
+        "Never give a single generic success/failure for batch operations"
+    )
 
     if channel == "voice":
         parts.append(

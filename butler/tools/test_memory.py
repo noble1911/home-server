@@ -150,20 +150,19 @@ class TestRememberFactTool:
         assert "Wakes up at 7am" in result
 
     @pytest.mark.asyncio
-    async def test_creates_user_if_not_exists(self, mock_pool):
-        """Verify user is created if they don't exist."""
+    async def test_stores_fact_for_any_user(self, mock_pool):
+        """Verify fact is stored directly (user must already exist via FK)."""
         tool = RememberFactTool(mock_pool)
 
-        await tool.execute(user_id="new_user", fact="Test fact")
+        result = await tool.execute(user_id="new_user", fact="Test fact")
 
-        # First call should be the INSERT ... ON CONFLICT for user
+        # Should make exactly 1 DB call: insert the fact
         calls = mock_pool.pool.execute.call_args_list
-        assert len(calls) >= 2
+        assert len(calls) == 1
 
-        # Check first call is user upsert
-        first_call_sql = calls[0][0][0]
-        assert "butler.users" in first_call_sql
-        assert "ON CONFLICT" in first_call_sql
+        call_sql = calls[0][0][0]
+        assert "butler.user_facts" in call_sql
+        assert "Remembered" in result
 
 
 class TestRecallFactsTool:

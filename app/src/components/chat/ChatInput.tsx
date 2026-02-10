@@ -29,7 +29,7 @@ export default function ChatInput({
   const [pendingImage, setPendingImage] = useState<PendingImage | null>(null)
   const [imageError, setImageError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const { sendMessage, isStreaming, error } = useChatStream()
+  const { sendMessage, cancelStream, isStreaming, error } = useChatStream()
 
   // Voice button handlers
   const handleVoicePress = useCallback(() => {
@@ -188,26 +188,42 @@ export default function ChatInput({
           placeholder={
             pendingImage
               ? 'Ask about the image...'
-              : isStreaming
-                ? 'Waiting for response...'
-                : 'Type a message...'
+              : 'Type a message...'
           }
-          disabled={isStreaming}
-          className="input flex-1 disabled:opacity-50"
+          className="input flex-1"
         />
-        <button
-          type="submit"
-          disabled={(!message.trim() && !pendingImage) || isStreaming}
-          className="btn btn-primary px-4 disabled:opacity-50"
-          aria-label="Send message"
-        >
-          <SendIcon className="w-5 h-5" />
-        </button>
+        {isStreaming ? (
+          <button
+            type="button"
+            onClick={cancelStream}
+            className="btn px-4 bg-red-600 hover:bg-red-700 text-white"
+            aria-label="Stop response"
+          >
+            <StopIcon className="w-5 h-5" />
+          </button>
+        ) : (
+          <button
+            type="submit"
+            disabled={!message.trim() && !pendingImage}
+            className="btn btn-primary px-4 disabled:opacity-50"
+            aria-label="Send message"
+          >
+            <SendIcon className="w-5 h-5" />
+          </button>
+        )}
       </form>
       {(error || imageError) && (
         <p className="text-xs text-red-400 mt-1 px-1">{imageError || error}</p>
       )}
     </div>
+  )
+}
+
+function StopIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="currentColor" viewBox="0 0 24 24">
+      <rect x="6" y="6" width="12" height="12" rx="2" />
+    </svg>
   )
 }
 

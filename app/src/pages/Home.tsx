@@ -18,11 +18,13 @@ export default function Home() {
     isRecording,
     isLoadingHistory,
     hasMoreHistory,
+    historyLoaded,
     setMessages,
     clearMessages,
     prependMessages,
     setLoadingHistory,
     setHasMoreHistory,
+    setHistoryLoaded,
   } = useConversationStore()
   const {
     startListening,
@@ -39,12 +41,10 @@ export default function Home() {
   const butlerName = profile?.butlerName || 'Butler'
   const showWaveform = isRecording || voiceStatus === 'speaking'
   const scrollRef = useRef<HTMLDivElement>(null)
-  const initialLoadDone = useRef(false)
 
-  // Load conversation history on mount
+  // Load conversation history on mount (only once per session)
   useEffect(() => {
-    if (initialLoadDone.current) return
-    initialLoadDone.current = true
+    if (historyLoaded) return
 
     async function loadHistory() {
       setLoadingHistory(true)
@@ -66,11 +66,12 @@ export default function Home() {
         // History loading is non-critical; app still works without it
       } finally {
         setLoadingHistory(false)
+        setHistoryLoaded(true)
       }
     }
 
     loadHistory()
-  }, [setMessages, setLoadingHistory, setHasMoreHistory])
+  }, [historyLoaded, setMessages, setLoadingHistory, setHasMoreHistory, setHistoryLoaded])
 
   // Auto-scroll to bottom when messages change (including streaming updates)
   useEffect(() => {
