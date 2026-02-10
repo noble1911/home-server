@@ -21,6 +21,7 @@ Usage:
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 import aiohttp
@@ -31,8 +32,11 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_TIMEOUT = 15
 
-# Prowlarr category IDs for books
-_BOOK_CATEGORIES = [7000, 7020]  # Books, Books/Ebook
+# Words to strip from query on fallback retry (format-specific noise)
+_FORMAT_NOISE = re.compile(
+    r"\b(audiobook|ebook|e-book|epub|pdf|m4b|mp3|mobi|kindle)\b",
+    re.IGNORECASE,
+)
 
 
 class BookTool(Tool):
@@ -180,15 +184,10 @@ class BookTool(Tool):
         if not self.qbit_url:
             return "Error: QBITTORRENT_URL not configured."
 
-        # 1. Search Prowlarr
+        # 1. Search Prowlarr (unfiltered — public trackers don't use Newznab categories)
         session = await self._get_session()
         search_url = f"{self.prowlarr_url}/api/v1/search"
-        params: dict[str, Any] = {
-            "query": query,
-            "type": "book",
-            "limit": 20,
-            "categories": _BOOK_CATEGORIES,
-        }
+        params: dict[str, Any] = {"query": query, "limit": 20}
         headers = {"X-Api-Key": self.prowlarr_api_key}
 
         async with session.get(search_url, params=params, headers=headers) as resp:
@@ -199,13 +198,14 @@ class BookTool(Tool):
             results = await resp.json()
 
         if not results:
-            # Fall back to general search without book type filter
-            params.pop("type", None)
-            params.pop("categories", None)
-            params["query"] = f"{query} ebook"
-            async with session.get(search_url, params=params, headers=headers) as resp:
-                if resp.status == 200:
-                    results = await resp.json()
+            # Retry with format-noise words stripped (e.g. "Dune audiobook" → "Dune")
+            cleaned = _FORMAT_NOISE.sub("", query).strip()
+            cleaned = re.sub(r"\s{2,}", " ", cleaned)  # collapse double spaces
+            if cleaned and cleaned.lower() != query.lower():
+                params["query"] = cleaned
+                async with session.get(search_url, params=params, headers=headers) as resp:
+                    if resp.status == 200:
+                        results = await resp.json()
 
         if not results:
             return f"No torrents found for '{query}'. Try a different search term."
