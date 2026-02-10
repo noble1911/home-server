@@ -7,6 +7,7 @@ POST /api/auth/token         — Authenticated user gets a LiveKit room token
 
 from __future__ import annotations
 
+import json
 import uuid
 
 import jwt as pyjwt
@@ -21,7 +22,7 @@ from ..auth import (
     hash_token,
 )
 from ..config import settings
-from ..deps import get_current_user, get_db_pool
+from ..deps import DEFAULT_PERMISSIONS, get_current_user, get_db_pool
 from ..models import (
     AuthTokens,
     LiveKitTokenResponse,
@@ -81,7 +82,7 @@ async def redeem_invite(
     else:
         # --- NORMAL: Validate against DB invite_codes table ---
         invite = await db.fetchrow(
-            """SELECT code FROM butler.invite_codes
+            """SELECT code, permissions FROM butler.invite_codes
                WHERE code = $1 AND used_by IS NULL AND expires_at > NOW()""",
             code_upper,
         )
@@ -127,9 +128,16 @@ async def redeem_invite(
             if existing:
                 role = existing["role"]
             else:
+                # Apply permissions from the invite code (NULL = default)
+                raw_perms = invite["permissions"]
+                invite_perms = (
+                    json.loads(raw_perms) if isinstance(raw_perms, str) else raw_perms
+                ) if raw_perms is not None else list(DEFAULT_PERMISSIONS)
                 await db.execute(
-                    "INSERT INTO butler.users (id, name, role) VALUES ($1, $1, 'user')",
+                    "INSERT INTO butler.users (id, name, role, permissions) "
+                    "VALUES ($1, $1, 'user', $2::jsonb)",
                     user_id,
+                    json.dumps(invite_perms),
                 )
                 role = "user"
 

@@ -89,6 +89,7 @@ export interface InviteCode {
   usedAt: string | null
   isExpired: boolean
   isUsed: boolean
+  permissions: ToolPermission[]
 }
 
 export interface OAuthConnection {
@@ -113,6 +114,7 @@ export const SERVICE_DISPLAY_NAMES: Record<string, { label: string; description:
   nextcloud: { label: 'Nextcloud', description: 'File Sync & Storage' },
   immich: { label: 'Immich', description: 'Photo Management' },
   shelfarr: { label: 'Shelfarr', description: 'Book Search & Downloads' },
+  homeassistant: { label: 'Home Assistant', description: 'Smart Home Control' },
 }
 
 export interface AdminUser {

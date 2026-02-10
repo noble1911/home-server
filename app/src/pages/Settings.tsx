@@ -24,6 +24,7 @@ interface InviteCodeListResponse {
 interface CreateInviteCodeResponse {
   code: string
   expiresAt: string
+  permissions: string[]
 }
 
 interface AdminUserListResponse {
@@ -46,6 +47,9 @@ export default function Settings() {
   const [inviteCodes, setInviteCodes] = useState<InviteCode[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
   const [copiedCode, setCopiedCode] = useState<string | null>(null)
+  const [invitePermissions, setInvitePermissions] = useState<Set<ToolPermission>>(
+    new Set(['media', 'home'])
+  )
 
   // Permission management state (admin only)
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([])
@@ -148,10 +152,21 @@ export default function Settings() {
     }
   }
 
+  function toggleInvitePermission(perm: ToolPermission) {
+    setInvitePermissions(prev => {
+      const next = new Set(prev)
+      if (next.has(perm)) next.delete(perm)
+      else next.add(perm)
+      return next
+    })
+  }
+
   async function generateInviteCode() {
     setIsGenerating(true)
     try {
-      const data = await api.post<CreateInviteCodeResponse>('/admin/invite-codes')
+      const data = await api.post<CreateInviteCodeResponse>('/admin/invite-codes', {
+        permissions: Array.from(invitePermissions),
+      })
       // Re-fetch the full list to get complete status info
       await fetchInviteCodes()
       // Auto-copy the new code
@@ -317,6 +332,25 @@ export default function Settings() {
             <span className="text-butler-600 ml-2 text-xs normal-case">admin</span>
           </h2>
 
+          <div className="mb-4">
+            <p className="text-xs text-butler-500 mb-2">Permissions for new user:</p>
+            <div className="flex flex-wrap gap-2 mb-3">
+              {(Object.keys(PERMISSION_INFO) as ToolPermission[]).map(perm => (
+                <button
+                  key={perm}
+                  onClick={() => toggleInvitePermission(perm)}
+                  className={`px-2.5 py-1 rounded-full text-xs transition-colors ${
+                    invitePermissions.has(perm)
+                      ? 'bg-accent/20 text-accent border border-accent/40'
+                      : 'bg-butler-800 text-butler-500 border border-butler-700'
+                  }`}
+                >
+                  {PERMISSION_INFO[perm].label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <button
             onClick={generateInviteCode}
             disabled={isGenerating}
@@ -345,6 +379,13 @@ export default function Settings() {
                           ? 'Expired'
                           : `Expires ${new Date(code.expiresAt).toLocaleDateString()}`
                       }
+                    </div>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {code.permissions.map(p => (
+                        <span key={p} className="text-xs px-1.5 py-0.5 rounded bg-accent/10 text-accent">
+                          {PERMISSION_INFO[p as ToolPermission]?.label || p}
+                        </span>
+                      ))}
                     </div>
                   </div>
                   <div className="flex gap-2 shrink-0 ml-2">

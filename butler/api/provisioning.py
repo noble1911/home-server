@@ -1,8 +1,8 @@
 """Auto-provision user accounts on downstream apps.
 
 Called during onboarding to create per-user accounts on Jellyfin,
-Audiobookshelf, Nextcloud, and Immich using the credentials the user
-chose during the onboarding wizard.
+Audiobookshelf, Nextcloud, Immich, and Home Assistant using the
+credentials the user chose during the onboarding wizard.
 """
 
 from __future__ import annotations
@@ -26,9 +26,15 @@ _HTTP_TIMEOUT = aiohttp.ClientTimeout(total=15)
 # Permission-to-service mapping
 PERMISSION_SERVICE_MAP: dict[str, list[str]] = {
     "media": ["jellyfin", "audiobookshelf", "immich"],
+    "home": ["homeassistant"],
 }
 # Services everyone gets (regardless of permissions)
 UNIVERSAL_SERVICES: list[str] = ["nextcloud"]
+
+# NOTE: Shelfarr (books) and Seerr (media requests) are NOT auto-provisioned.
+# - Seerr: uses Jellyfin SSO — users log in with their Jellyfin credentials.
+# - Shelfarr: Rails app with no REST API. Possible via direct SQLite DB insert
+#   but fragile. See GitHub issue for tracking. Users create accounts manually.
 
 
 def _services_for_user(permissions: list[str]) -> list[str]:
@@ -52,6 +58,9 @@ def _service_is_configured(service: str) -> bool:
             and settings.nextcloud_admin_password
         ),
         "immich": bool(settings.immich_url and settings.immich_api_key),
+        "homeassistant": bool(
+            settings.home_assistant_url and settings.home_assistant_token
+        ),
     }
     return checks.get(service, False)
 
@@ -281,10 +290,56 @@ async def _provision_immich(username: str, password: str) -> str:
             return data.get("id", "")
 
 
+async def _provision_homeassistant(username: str, password: str) -> str:
+    """Create Home Assistant user via WebSocket API. Returns the HA user ID."""
+    # Convert HTTP URL to WebSocket URL
+    ws_url = settings.home_assistant_url.replace("https://", "wss://").replace(
+        "http://", "ws://"
+    )
+    ws_url = f"{ws_url}/api/websocket"
+
+    # Use a longer timeout for the WebSocket handshake + user creation
+    ws_timeout = aiohttp.ClientTimeout(total=30)
+
+    async with aiohttp.ClientSession(timeout=ws_timeout) as session:
+        async with session.ws_connect(ws_url) as ws:
+            # 1. Wait for auth_required
+            msg = await ws.receive_json()
+            if msg.get("type") != "auth_required":
+                raise RuntimeError(f"HA WebSocket unexpected: {msg.get('type')}")
+
+            # 2. Authenticate with long-lived access token
+            await ws.send_json({
+                "type": "auth",
+                "access_token": settings.home_assistant_token,
+            })
+            msg = await ws.receive_json()
+            if msg.get("type") != "auth_ok":
+                raise RuntimeError(f"HA WebSocket auth failed: {msg}")
+
+            # 3. Create user (non-admin, system-users group)
+            await ws.send_json({
+                "id": 1,
+                "type": "config/auth/create",
+                "name": username,
+                "username": username,
+                "password": password,
+                "group_ids": ["system-users"],
+                "local_only": False,
+            })
+            msg = await ws.receive_json()
+            if not msg.get("success"):
+                error = msg.get("error", {}).get("message", str(msg))
+                raise RuntimeError(f"HA user creation failed: {error}")
+
+            return msg.get("result", {}).get("user", {}).get("id", "")
+
+
 # Dispatch table
 _PROVISIONERS: dict[str, Callable[[str, str], Awaitable[str]]] = {
     "jellyfin": _provision_jellyfin,
     "audiobookshelf": _provision_audiobookshelf,
     "nextcloud": _provision_nextcloud,
     "immich": _provision_immich,
+    "homeassistant": _provision_homeassistant,
 }
