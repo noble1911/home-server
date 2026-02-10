@@ -12,6 +12,9 @@ RUN npm ci
 # Copy source code
 COPY . .
 
+# Accept build-time env vars for Vite service URLs
+ARG VITE_TUNNEL_DOMAIN
+
 # Build the app
 RUN npm run build
 

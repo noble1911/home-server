@@ -16,28 +16,28 @@ const SERVICE_NAME_MAP: Record<string, string> = {
   'seerr': 'seerr',
 }
 
-// Optional: set VITE_SERVICE_HOSTNAME for Cloudflare Tunnel/remote access,
-// or override individual services with VITE_<SERVICE>_URL.
-// e.g. VITE_SERVICE_HOSTNAME=home.yourdomain.com
-const HOSTNAME = import.meta.env.VITE_SERVICE_HOSTNAME || ''
+// Set VITE_TUNNEL_DOMAIN (e.g. "noblehaus.uk") for Cloudflare Tunnel access.
+// Each service resolves to https://{subdomain}.{domain}.
+// Individual VITE_<SERVICE>_URL overrides still take priority.
+const TUNNEL_DOMAIN = import.meta.env.VITE_TUNNEL_DOMAIN || ''
 
-function serviceUrl(envVar: string, port: number): string {
+function serviceUrl(envVar: string, port: number, tunnelSubdomain: string): string {
   const explicit = import.meta.env[envVar]
   if (explicit) return explicit
-  if (HOSTNAME) return `http://${HOSTNAME}:${port}`
+  if (TUNNEL_DOMAIN) return `https://${tunnelSubdomain}.${TUNNEL_DOMAIN}`
   // Fall back to current hostname — works on LAN without any config
   const host = typeof window !== 'undefined' ? window.location.hostname : 'localhost'
   return `http://${host}:${port}`
 }
 
 // Pre-compute service URLs so guide text can reference them
-const jellyfinUrl = serviceUrl('VITE_JELLYFIN_URL', 8096)
-const audiobookshelfUrl = serviceUrl('VITE_AUDIOBOOKSHELF_URL', 13378)
-const shelfarrUrl = serviceUrl('VITE_SHELFARR_URL', 5056)
-const immichUrl = serviceUrl('VITE_IMMICH_URL', 2283)
-const nextcloudUrl = serviceUrl('VITE_NEXTCLOUD_URL', 8080)
-const homeAssistantUrl = serviceUrl('VITE_HOMEASSISTANT_URL', 8123)
-const seerrUrl = serviceUrl('VITE_SEERR_URL', 5055)
+const jellyfinUrl = serviceUrl('VITE_JELLYFIN_URL', 8096, 'jellyfin')
+const audiobookshelfUrl = serviceUrl('VITE_AUDIOBOOKSHELF_URL', 13378, 'books')
+const shelfarrUrl = serviceUrl('VITE_SHELFARR_URL', 5056, 'shelfarr')
+const immichUrl = serviceUrl('VITE_IMMICH_URL', 2283, 'photos')
+const nextcloudUrl = serviceUrl('VITE_NEXTCLOUD_URL', 8080, 'files')
+const homeAssistantUrl = serviceUrl('VITE_HOMEASSISTANT_URL', 8123, 'ha')
+const seerrUrl = serviceUrl('VITE_SEERR_URL', 5055, 'requests')
 
 export const services: Service[] = [
   {
