@@ -53,6 +53,11 @@ class Settings(BaseSettings):
     radarr_url: str = ""
     radarr_api_key: str = ""
 
+    # Seerr (media request management)
+    seerr_url: str = ""
+    seerr_api_key: str = ""
+
+
     # Sonarr (TV series management)
     sonarr_url: str = ""
     sonarr_api_key: str = ""

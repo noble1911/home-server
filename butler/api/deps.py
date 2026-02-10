@@ -25,6 +25,7 @@ from tools import (
     MediaFilesTool,
     PhoneLocationTool,
     RadarrTool,
+    SeerrTool,
     RecallFactsTool,
     RememberFactTool,
     GetUserTool,
@@ -59,7 +60,7 @@ ALWAYS_ALLOWED_TOOLS: set[str] = {
 }
 
 PERMISSION_TOOL_MAP: dict[str, list[str]] = {
-    "media": ["radarr", "books", "sonarr", "immich", "jellyfin", "media_files"],
+    "media": ["radarr", "seerr", "books", "sonarr", "immich", "jellyfin", "media_files"],
     "home": ["home_assistant", "list_ha_entities"],
     "location": ["phone_location"],
     "calendar": ["google_calendar"],
@@ -120,6 +121,13 @@ async def init_resources() -> None:
         _tools["radarr"] = RadarrTool(
             base_url=settings.radarr_url,
             api_key=settings.radarr_api_key,
+        )
+
+    # Only register Seerr tool if configured
+    if settings.seerr_url:
+        _tools["seerr"] = SeerrTool(
+            base_url=settings.seerr_url,
+            api_key=settings.seerr_api_key,
         )
 
     # Books tool (Open Library + Prowlarr + qBittorrent)

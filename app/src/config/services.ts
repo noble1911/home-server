@@ -13,6 +13,7 @@ const SERVICE_NAME_MAP: Record<string, string> = {
   'immich-server': 'immich',
   'nextcloud': 'nextcloud',
   'homeassistant': 'home-assistant',
+  'seerr': 'seerr',
 }
 
 // Optional: set VITE_SERVICE_HOSTNAME for Cloudflare Tunnel/remote access
@@ -33,6 +34,7 @@ const shelfarrUrl = serviceUrl('VITE_SHELFARR_URL', 5056, 'http://shelfarr.local
 const immichUrl = serviceUrl('VITE_IMMICH_URL', 2283, 'http://photos.local')
 const nextcloudUrl = serviceUrl('VITE_NEXTCLOUD_URL', 80, 'http://files.local')
 const homeAssistantUrl = serviceUrl('VITE_HOMEASSISTANT_URL', 8123, 'http://ha.local')
+const seerrUrl = serviceUrl('VITE_SEERR_URL', 5055, 'http://requests.local')
 
 export const services: Service[] = [
   {
@@ -59,6 +61,29 @@ export const services: Service[] = [
       tips: [
         'Use the mobile app for the best experience — it supports offline downloads and background audio',
         'To request new movies or shows, just ask Butler in the chat',
+      ],
+    },
+  },
+  {
+    id: 'seerr',
+    name: 'Seerr',
+    description: 'Media Requests',
+    icon: '🎬',
+    url: seerrUrl,
+    category: 'media',
+    guide: {
+      whatItDoes: 'Request movies and TV shows for the household. Approved requests are sent to Radarr and Sonarr automatically.',
+      steps: [
+        'Open Seerr in your browser or on your phone',
+        'Search for a movie or TV show you want to watch',
+        'Click "Request" and choose the quality/seasons you want',
+        'Your request will be approved automatically or queued for admin review',
+        'Once approved, the media downloads and appears in Jellyfin',
+      ],
+      tips: [
+        'You can also ask Butler to request media — just say "request the new Batman movie"',
+        'Check the request list to see the status of your pending requests',
+        'Already-available titles are marked so you can watch them right away in Jellyfin',
       ],
     },
   },

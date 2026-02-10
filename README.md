@@ -123,6 +123,7 @@ Decide which services you want accessible remotely. Example mapping:
 | `files.yourdomain.com` | Nextcloud | 8080 |
 | `ha.yourdomain.com` | Home Assistant | 8123 |
 | `shelfarr.yourdomain.com` | Shelfarr | 5056 |
+| `requests.yourdomain.com` | Seerr | 5055 |
 
 You'll configure these routes in the Cloudflare dashboard after `setup.sh` has deployed the services.
 
@@ -233,7 +234,7 @@ cd ~/home-server && ./scripts/change-drive.sh
 | 4 | `05-orbstack.sh` | OrbStack (Docker) |
 | 5 | `06-external-drive.sh` | External drive directory structure |
 | 6 | `07-download-stack.sh` | qBittorrent + Prowlarr |
-| 7 | `08-media-stack.sh` | Jellyfin + Radarr + Sonarr + Bazarr |
+| 7 | `08-media-stack.sh` | Jellyfin + Radarr + Sonarr + Bazarr + Seerr |
 | 8 | `09-books-stack.sh` | Audiobookshelf + Shelfarr |
 | 9 | `10-photos-files.sh` | Immich + Nextcloud |
 | 10 | `11-smart-home.sh` | Home Assistant + Cloudflare Tunnel |
@@ -275,6 +276,7 @@ Now that services are running, go back to the Cloudflare dashboard and add route
 | `files` | `http://nextcloud:80` | Nextcloud |
 | `ha` | `http://homeassistant:8123` | Home Assistant |
 | `shelfarr` | `http://shelfarr:5056` | Shelfarr |
+| `requests` | `http://seerr:5055` | Seerr |
 
 > **Important:** Use Docker container names (not `localhost`) because `cloudflared` runs inside Docker where `localhost` refers to the container itself, not the host machine.
 
@@ -299,8 +301,9 @@ Butler uses **invite codes** for registration. The first person to log in become
 | **Prowlarr** | `http://<server-ip>:9696` | Auto-configured with public indexers — optionally add private indexers ([guide](docs/prowlarr-indexers.md)) |
 | **qBittorrent** | `http://<server-ip>:8081` | Auto-configured — check container logs for temp password if needed |
 | **Bazarr** | `http://<server-ip>:6767` | Auto-configured — connected to Radarr + Sonarr |
+| **Seerr** | `http://<server-ip>:5055` | Complete setup wizard — sign in with Jellyfin, connect Radarr + Sonarr |
 
-> Radarr, Sonarr, Prowlarr, and qBittorrent are admin-only. Household members interact with media through Jellyfin.
+> Radarr, Sonarr, Prowlarr, and qBittorrent are admin-only. Household members request media through Seerr and watch via Jellyfin.
 
 ### 4.4 Set Up Books & Audio
 
@@ -412,6 +415,7 @@ docker compose down && docker compose up -d
 | [Radarr](https://radarr.video/) | Movie automation | 7878 |
 | [Sonarr](https://sonarr.tv/) | TV series automation | 8989 |
 | [Bazarr](https://www.bazarr.media/) | Subtitle automation | 6767 |
+| [Seerr](https://github.com/seerr-team/seerr) | Media request management | 5055 |
 | [Prowlarr](https://prowlarr.com/) | Indexer manager | 9696 |
 | [qBittorrent](https://www.qbittorrent.org/) | Torrent client | 8081 |
 

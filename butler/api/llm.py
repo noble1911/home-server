@@ -86,7 +86,7 @@ def _build_tool_definitions(tools: dict[str, Tool]) -> list[dict]:
 ROUTING_CORE_TOOLS: set[str] = {
     "remember_fact", "recall_facts", "get_user",
     "weather", "display_in_chat",
-    "radarr", "books", "sonarr",
+    "radarr", "seerr", "books", "sonarr",
 }
 
 # Only enable routing when there are this many non-core tools.
