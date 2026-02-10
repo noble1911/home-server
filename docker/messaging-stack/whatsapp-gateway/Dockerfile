@@ -10,7 +10,7 @@ ENV PUPPETEER_SKIP_DOWNLOAD=true
 
 WORKDIR /app
 COPY package.json package-lock.json* ./
-RUN npm ci --production
+RUN npm install --omit=dev
 COPY index.js .
 
 EXPOSE 3000
