@@ -5,8 +5,6 @@ Run with: pytest butler/api/routes/test_webhooks.py -v
 These tests use mocked responses — no real database, WhatsApp, or HA required.
 """
 
-import json
-
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -152,7 +150,7 @@ class TestStoreEvent:
         await _store_event(mock_pool, event)
 
         call_args = mock_pool.pool.fetchrow.call_args[0]
-        stored_attrs = json.loads(call_args[5])
+        stored_attrs = call_args[5]
         assert stored_attrs["brightness"] == 128
 
 

@@ -216,13 +216,15 @@ class TestAddBook:
 
     @pytest.mark.asyncio
     async def test_add_success(self, tool):
+        # Pre-populate cache (add_book requires a prior search_book)
+        tool._last_search_results = {
+            b["foreignBookId"]: b for b in SAMPLE_BOOK_LOOKUP
+        }
+
         with patch("tools.readarr.aiohttp.ClientSession") as mock_cls:
             mock_session = mock_cls.return_value
 
-            # Sequence: lookup → qualityprofile → metadataprofile → rootfolder → add
-            lookup_resp = AsyncMock(status=200)
-            lookup_resp.json = AsyncMock(return_value=SAMPLE_BOOK_LOOKUP)
-
+            # Sequence: qualityprofile → metadataprofile → rootfolder → add
             profile_resp = AsyncMock(status=200)
             profile_resp.json = AsyncMock(return_value=SAMPLE_QUALITY_PROFILES)
 
@@ -236,7 +238,6 @@ class TestAddBook:
             add_resp.json = AsyncMock(return_value=SAMPLE_ADD_RESPONSE)
 
             mock_session.get.return_value.__aenter__.side_effect = [
-                lookup_resp,
                 profile_resp,
                 metadata_resp,
                 folder_resp,
@@ -258,11 +259,13 @@ class TestAddBook:
 
     @pytest.mark.asyncio
     async def test_add_already_exists(self, tool):
+        # Pre-populate cache (add_book requires a prior search_book)
+        tool._last_search_results = {
+            b["foreignBookId"]: b for b in SAMPLE_BOOK_LOOKUP
+        }
+
         with patch("tools.readarr.aiohttp.ClientSession") as mock_cls:
             mock_session = mock_cls.return_value
-
-            lookup_resp = AsyncMock(status=200)
-            lookup_resp.json = AsyncMock(return_value=SAMPLE_BOOK_LOOKUP)
 
             profile_resp = AsyncMock(status=200)
             profile_resp.json = AsyncMock(return_value=SAMPLE_QUALITY_PROFILES)
@@ -279,7 +282,6 @@ class TestAddBook:
             )
 
             mock_session.get.return_value.__aenter__.side_effect = [
-                lookup_resp,
                 profile_resp,
                 metadata_resp,
                 folder_resp,
