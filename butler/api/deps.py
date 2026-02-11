@@ -42,6 +42,7 @@ from tools import (
 
 from tools.alerting import NotificationDispatcher
 
+from .abs_metadata import start_abs_metadata_sync, stop_abs_metadata_sync
 from .alert_dispatch import start_alert_dispatch, stop_alert_dispatch
 from .push import create_push_channel, create_whatsapp_channel
 from .scheduler import TaskScheduler, seed_default_schedules
@@ -266,12 +267,19 @@ async def init_resources() -> None:
 
     start_ratelimit_cleanup(rate_limit_store)
 
+    # Background ABS metadata sync (auto-match new books)
+    if settings.audiobookshelf_url and settings.audiobookshelf_admin_token:
+        start_abs_metadata_sync(
+            settings.audiobookshelf_url, settings.audiobookshelf_admin_token
+        )
+
 
 async def cleanup_resources() -> None:
     """Release resources on shutdown."""
     global _db_pool, _tools, _scheduler
     if _scheduler:
         await _scheduler.stop()
+    await stop_abs_metadata_sync()
     await stop_alert_dispatch()
     await stop_ratelimit_cleanup()
     await stop_cleanup()
