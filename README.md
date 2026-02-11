@@ -122,7 +122,7 @@ Decide which services you want accessible remotely. Example mapping:
 | `books.yourdomain.com` | Audiobookshelf | 13378 |
 | `files.yourdomain.com` | Nextcloud | 8080 |
 | `ha.yourdomain.com` | Home Assistant | 8123 |
-| `shelfarr.yourdomain.com` | Shelfarr | 5056 |
+| `lazylibrarian.yourdomain.com` | LazyLibrarian | 5299 |
 | `requests.yourdomain.com` | Seerr | 5055 |
 
 You'll configure these routes in the Cloudflare dashboard after `setup.sh` has deployed the services.
@@ -235,7 +235,7 @@ cd ~/home-server && ./scripts/change-drive.sh
 | 5 | `06-external-drive.sh` | External drive directory structure |
 | 6 | `07-download-stack.sh` | qBittorrent + Prowlarr |
 | 7 | `08-media-stack.sh` | Jellyfin + Radarr + Sonarr + Bazarr + Seerr |
-| 8 | `09-books-stack.sh` | Audiobookshelf + Shelfarr |
+| 8 | `09-books-stack.sh` | Audiobookshelf + LazyLibrarian |
 | 9 | `10-photos-files.sh` | Immich + Nextcloud |
 | 10 | `11-smart-home.sh` | Home Assistant + Cloudflare Tunnel |
 | 11 | `12-voice-stack.sh` | LiveKit + Kokoro TTS |
@@ -275,7 +275,7 @@ Now that services are running, go back to the Cloudflare dashboard and add route
 | `books` | `http://audiobookshelf:80` | Audiobookshelf |
 | `files` | `http://nextcloud:80` | Nextcloud |
 | `ha` | `http://homeassistant:8123` | Home Assistant |
-| `shelfarr` | `http://shelfarr:80` | Shelfarr |
+| `lazylibrarian` | `http://lazylibrarian:5299` | LazyLibrarian |
 | `requests` | `http://seerr:5055` | Seerr |
 
 > **Important:** Use Docker container names (not `localhost`) because `cloudflared` runs inside Docker where `localhost` refers to the container itself, not the host machine.
@@ -321,7 +321,7 @@ Butler uses **invite codes** for registration. The first person to log in become
 | Service | URL | First-Time Setup |
 |---------|-----|-----------------|
 | **Audiobookshelf** | `http://<server-ip>:13378` | Auto-configured — create accounts for household members |
-| **Shelfarr** | `http://<server-ip>:5056` | Configure Prowlarr + qBittorrent + ABS connections |
+| **LazyLibrarian** | `http://<server-ip>:5299` | Configure Prowlarr + qBittorrent connections |
 
 ### 4.5 Set Up Photos & Files
 
@@ -435,7 +435,7 @@ docker compose down && docker compose up -d
 | Component | Purpose | Port |
 |-----------|---------|------|
 | [Audiobookshelf](https://www.audiobookshelf.org/) | Ebook + audiobook library | 13378 |
-| [Shelfarr](https://github.com/Pedro-Revez-Silva/shelfarr) | Book search + download management | 5056 |
+| [LazyLibrarian](https://lazylibrarian.gitlab.io/) | Book search + download management | 5299 |
 
 ### Photos & Files
 

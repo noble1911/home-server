@@ -36,7 +36,7 @@ CONFIG_VOLUMES=(
     qbittorrent-config
     homeassistant-config
     nextcloud-data
-    shelfarr-data
+    lazylibrarian-config
 )
 
 # Logging helper — writes to both stdout and log file

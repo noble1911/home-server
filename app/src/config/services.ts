@@ -9,7 +9,7 @@ import type { ServiceStatus } from '../services/api'
 const SERVICE_NAME_MAP: Record<string, string> = {
   'jellyfin': 'jellyfin',
   'audiobookshelf': 'audiobookshelf',
-  'shelfarr': 'shelfarr',
+  'lazylibrarian': 'lazylibrarian',
   'immich-server': 'immich',
   'nextcloud': 'nextcloud',
   'homeassistant': 'home-assistant',
@@ -33,7 +33,7 @@ function serviceUrl(envVar: string, port: number, tunnelSubdomain: string): stri
 // Pre-compute service URLs so guide text can reference them
 const jellyfinUrl = serviceUrl('VITE_JELLYFIN_URL', 8096, 'jellyfin')
 const audiobookshelfUrl = serviceUrl('VITE_AUDIOBOOKSHELF_URL', 13378, 'books')
-const shelfarrUrl = serviceUrl('VITE_SHELFARR_URL', 5056, 'shelfarr')
+const lazyLibrarianUrl = serviceUrl('VITE_LAZYLIBRARIAN_URL', 5299, 'lazylibrarian')
 const immichUrl = serviceUrl('VITE_IMMICH_URL', 2283, 'photos')
 const nextcloudUrl = serviceUrl('VITE_NEXTCLOUD_URL', 8080, 'files')
 const homeAssistantUrl = serviceUrl('VITE_HOMEASSISTANT_URL', 8123, 'ha')
@@ -119,24 +119,25 @@ export const services: Service[] = [
     },
   },
   {
-    id: 'shelfarr',
-    name: 'Shelfarr',
+    id: 'lazylibrarian',
+    name: 'LazyLibrarian',
     description: 'Book Search & Downloads',
     icon: '📚',
-    url: shelfarrUrl,
+    url: lazyLibrarianUrl,
     category: 'books',
     guide: {
-      whatItDoes: 'Search for books, manage downloads, and automatically import them into Audiobookshelf.',
+      whatItDoes: 'Search for books and audiobooks, manage downloads, and automatically import them into Audiobookshelf.',
       steps: [
-        `Open Shelfarr in your browser: ${shelfarrUrl}`,
+        `Open LazyLibrarian in your browser: ${lazyLibrarianUrl}`,
         'Search for a book by title or author',
-        'Select a result and Shelfarr will download it via qBittorrent',
-        'Once downloaded, Shelfarr organizes the file and imports it into Audiobookshelf automatically',
+        'Select a result and LazyLibrarian will download it via qBittorrent',
+        'Once downloaded, LazyLibrarian organizes the file and moves it to the library folder',
+        'Audiobookshelf picks up the new files automatically',
       ],
       tips: [
         'You can also ask Butler to find and download books for you via chat or voice',
-        'Ebooks appear in Audiobookshelf after import — read them in the browser or mobile app',
-        'Shelfarr connects to Prowlarr for indexers, so make sure your indexers are configured',
+        'LazyLibrarian supports GoodReads, Google Books, and Open Library for metadata',
+        'Prowlarr syncs indexers to LazyLibrarian automatically — no manual indexer setup needed',
       ],
     },
   },
