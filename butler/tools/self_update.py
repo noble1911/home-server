@@ -36,9 +36,8 @@ class SelfUpdateTool(Tool):
     @property
     def description(self) -> str:
         return (
-            "Check for home server updates from GitHub and optionally apply them. "
-            "Use 'check' to see if updates are available, 'update' to pull and "
-            "rebuild changed stacks."
+            "Deploy and update the home server by pulling latest changes from GitHub and rebuilding affected Docker stacks. "
+            "Use 'check' to see if updates are available, 'update' to pull and deploy."
         )
 
     @property

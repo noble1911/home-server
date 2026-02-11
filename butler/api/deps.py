@@ -373,12 +373,22 @@ async def get_user_tools(
     import json as _json
 
     db = db_pool.pool
-    row = await db.fetchval(
-        "SELECT permissions FROM butler.users WHERE id = $1", user_id
+    row = await db.fetchrow(
+        "SELECT permissions, role FROM butler.users WHERE id = $1", user_id
     )
-    user_perms: list[str] = (
-        _json.loads(row) if isinstance(row, str) else row
-    ) if row is not None else DEFAULT_PERMISSIONS
+    if row is not None:
+        raw = row["permissions"]
+        user_perms: list[str] = (
+            _json.loads(raw) if isinstance(raw, str) else raw
+        ) if raw is not None else DEFAULT_PERMISSIONS
+        user_role: str | None = row["role"]
+    else:
+        user_perms = DEFAULT_PERMISSIONS
+        user_role = None
+
+    # Admin role grants all permission groups automatically
+    if user_role == "admin":
+        user_perms = list(PERMISSION_TOOL_MAP.keys())
 
     # Build the set of allowed tool names
     allowed: set[str] = set(ALWAYS_ALLOWED_TOOLS)
