@@ -17,14 +17,40 @@ CREDENTIALS_FILE="$HOME/.homeserver-credentials"
 # ─────────────────────────────────────────────
 
 # Source the credentials file if it exists.
+# Also writes DRIVE_PATH into docker/.env so 'docker compose up -d' works
+# without needing the shell export.
 # Returns 0 if loaded, 1 if not found.
 load_credentials() {
     if [[ -f "$CREDENTIALS_FILE" ]]; then
         # shellcheck disable=SC1090
         source "$CREDENTIALS_FILE"
+        # Ensure docker/.env exists for docker compose
+        _sync_docker_env
         return 0
     fi
     return 1
+}
+
+# Write DRIVE_PATH to docker/.env and symlink into each stack.
+# This ensures 'docker compose up -d' works without a shell export.
+_sync_docker_env() {
+    local repo_dir
+    repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+    local docker_dir="$repo_dir/docker"
+    local env_file="$docker_dir/.env"
+
+    [[ -d "$docker_dir" ]] || return 0
+    [[ -n "$DRIVE_PATH" ]] || return 0
+
+    # Only write if missing or stale
+    if [[ ! -f "$env_file" ]] || ! grep -q "^DRIVE_PATH=${DRIVE_PATH}$" "$env_file" 2>/dev/null; then
+        printf 'DRIVE_PATH=%s\n' "$DRIVE_PATH" > "$env_file"
+    fi
+
+    # Symlink into stacks that use bind mounts
+    for stack in books-stack download-stack media-stack photos-files-stack; do
+        [[ -d "$docker_dir/$stack" ]] && ln -sf ../.env "$docker_dir/$stack/.env" 2>/dev/null
+    done
 }
 
 # Generate a random hex API key (16 bytes = 32 hex chars).

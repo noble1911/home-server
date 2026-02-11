@@ -198,6 +198,20 @@ if ! grep -q "^DRIVE_PATH=" "$CREDENTIALS_FILE" 2>/dev/null; then
     echo -e "  ${GREEN}✓${NC} DRIVE_PATH saved to credentials file"
 fi
 
+# Create shared docker/.env so 'docker compose up -d' always works
+# (even without the DRIVE_PATH export from setup scripts)
+_write_docker_env() {
+    local env_file="$1/docker/.env"
+    if [[ -d "$1/docker" ]]; then
+        printf 'DRIVE_PATH=%s\n' "$DRIVE_PATH" > "$env_file"
+        # Symlink into each stack that uses bind mounts
+        for stack in books-stack download-stack media-stack photos-files-stack; do
+            ln -sf ../.env "$1/docker/$stack/.env" 2>/dev/null
+        done
+        echo -e "  ${GREEN}✓${NC} DRIVE_PATH written to docker/.env"
+    fi
+}
+
 # Clone repo — scripts 07+ need sibling files (docker-compose, configs, lib/)
 REPO_DIR="$HOME/home-server"
 echo -e "\n${BLUE}==>${NC} Cloning repo for local scripts..."
@@ -209,6 +223,9 @@ else
     echo -e "  ${GREEN}✓${NC} Repo cloned to ${REPO_DIR}"
 fi
 SCRIPTS_DIR="$REPO_DIR/scripts"
+
+# Write shared docker/.env for DRIVE_PATH (so manual 'docker compose up' works)
+_write_docker_env "$REPO_DIR"
 
 # Phase 2: Download Infrastructure (local scripts from cloned repo)
 echo -e "\n${GREEN}Phase 2: Download Infrastructure${NC}"
