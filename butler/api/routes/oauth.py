@@ -64,6 +64,9 @@ async def google_authorize(
         redirect_uri = f"{origin}/api/oauth/google/callback"
         frontend_url = origin
 
+    effective_uri = redirect_uri or settings.google_redirect_uri
+    logger.info("OAuth authorize: redirect_uri=%s (origin=%s)", effective_uri, origin)
+
     state = create_oauth_state(user_id, redirect_uri=redirect_uri, frontend_url=frontend_url)
     authorize_url = build_google_authorize_url(state, redirect_uri=redirect_uri)
     return OAuthAuthorizeResponse(authorizeUrl=authorize_url)

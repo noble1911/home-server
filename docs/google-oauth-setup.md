@@ -43,8 +43,13 @@ This guide walks you through creating Google OAuth credentials so Butler can acc
 3. Choose **Web application** as the application type
 4. Name it `Butler Web`
 5. Under **Authorized redirect URIs**, add:
-   - `http://localhost:8000/api/oauth/google/callback` (for local development)
-   - `https://YOUR-TUNNEL-DOMAIN/api/oauth/google/callback` (for production)
+   - `http://localhost:3000/api/oauth/google/callback` (for local access)
+   - `https://YOUR-TUNNEL-DOMAIN/api/oauth/google/callback` (for Cloudflare Tunnel access)
+   > **Note:** The redirect URI uses port 3000 (the PWA/nginx port), not 8000 (the API port).
+   > Nginx proxies `/api/*` to the Butler API automatically.
+   > Google only allows HTTP redirect URIs for `localhost` — LAN IP access
+   > (e.g. `http://192.168.1.22:3000`) won't work for OAuth. Use the Cloudflare
+   > Tunnel URL or localhost instead.
 6. Click **Create**
 7. Copy the **Client ID** and **Client Secret**
 

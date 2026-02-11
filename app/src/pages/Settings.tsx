@@ -250,9 +250,20 @@ export default function Settings() {
   }
 
   async function connectGoogle() {
+    // Google only allows HTTPS redirect URIs (or http://localhost).
+    // LAN IPs like http://192.168.1.22 will be rejected with redirect_uri_mismatch.
+    const loc = window.location
+    if (loc.protocol === 'http:' && loc.hostname !== 'localhost' && loc.hostname !== '127.0.0.1') {
+      setOauthMessage({
+        type: 'error',
+        text: 'Google OAuth requires HTTPS. Open Butler via your Cloudflare Tunnel URL or localhost instead.',
+      })
+      return
+    }
+
     try {
       // Pass our origin so the backend derives the correct redirect URLs
-      // (works for LAN, localhost, and Cloudflare Tunnel access)
+      // (works for localhost and Cloudflare Tunnel access)
       const origin = encodeURIComponent(window.location.origin)
       const data = await api.get<AuthorizeResponse>(`/oauth/google/authorize?origin=${origin}`)
       window.location.href = data.authorizeUrl
