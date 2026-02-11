@@ -5,6 +5,7 @@ GET    /api/admin/invite-codes                  — List all codes and their sta
 DELETE /api/admin/invite-codes/{code}           — Revoke an unused code
 GET    /api/admin/users                         — List all users with permissions
 PUT    /api/admin/users/{user_id}/permissions   — Update a user's tool permissions
+POST   /api/admin/users/{user_id}/reprovision   — Re-provision service accounts
 DELETE /api/admin/users/{user_id}               — Delete a user + their service accounts
 """
 
@@ -21,7 +22,8 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from tools import DatabasePool
 
 from ..deps import ALL_PERMISSION_GROUPS, DEFAULT_PERMISSIONS, get_admin_user, get_db_pool
-from ..provisioning import deprovision_user_accounts
+from ..crypto import decrypt_password
+from ..provisioning import deprovision_user_accounts, provision_user_accounts
 
 logger = logging.getLogger(__name__)
 from ..models import (
@@ -203,6 +205,35 @@ async def update_user_permissions(
     if result == "UPDATE 0":
         raise HTTPException(404, "User not found")
     return {"status": "ok", "permissions": req.permissions}
+
+
+@router.post("/users/{user_id}/reprovision")
+async def admin_reprovision_user(
+    user_id: str,
+    admin_id: str = Depends(get_admin_user),
+    pool: DatabasePool = Depends(get_db_pool),
+):
+    """Re-run service provisioning for a user using their stored credentials. Admin only."""
+    db = pool.pool
+    row = await db.fetchrow(
+        "SELECT service_username, service_password_encrypted, permissions FROM butler.users WHERE id = $1",
+        user_id,
+    )
+    if not row:
+        raise HTTPException(404, "User not found")
+    if not row["service_username"] or not row["service_password_encrypted"]:
+        raise HTTPException(400, "User has no stored service credentials")
+
+    password = decrypt_password(row["service_password_encrypted"])
+    raw_perms = row["permissions"]
+    permissions = (
+        json.loads(raw_perms) if isinstance(raw_perms, str) else raw_perms
+    ) if raw_perms is not None else list(DEFAULT_PERMISSIONS)
+
+    results = await provision_user_accounts(
+        user_id, row["service_username"], password, permissions, pool
+    )
+    return {"status": "ok", "serviceAccounts": results}
 
 
 @router.delete("/users/{user_id}", status_code=204)
