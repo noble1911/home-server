@@ -55,6 +55,9 @@ export default function Settings() {
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([])
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
   const [permSaving, setPermSaving] = useState(false)
+  const [showRemoveUserConfirm, setShowRemoveUserConfirm] = useState(false)
+  const [isRemovingUser, setIsRemovingUser] = useState(false)
+  const [removeUserError, setRemoveUserError] = useState<string | null>(null)
 
   // Service credentials state
   const [serviceCredentials, setServiceCredentials] = useState<ServiceCredential[]>([])
@@ -298,6 +301,23 @@ export default function Settings() {
       )
     } finally {
       setPermSaving(false)
+    }
+  }
+
+  async function removeUser(userId: string) {
+    setIsRemovingUser(true)
+    setRemoveUserError(null)
+    try {
+      await api.delete(`/admin/users/${userId}`)
+      setAdminUsers(prev => prev.filter(u => u.id !== userId))
+      setSelectedUserId(null)
+      setShowRemoveUserConfirm(false)
+      // Refresh invite codes too (user may have been tied to one)
+      await fetchInviteCodes()
+    } catch (err) {
+      setRemoveUserError(err instanceof Error ? err.message : 'Failed to remove user')
+    } finally {
+      setIsRemovingUser(false)
     }
   }
 
@@ -831,6 +851,20 @@ export default function Settings() {
                       </button>
                     )
                   })}
+
+                  {selectedUser.role !== 'admin' && (
+                    <div className="pt-3 mt-3 border-t border-butler-700">
+                      {removeUserError && (
+                        <div className="text-xs text-red-400 mb-2">{removeUserError}</div>
+                      )}
+                      <button
+                        onClick={() => setShowRemoveUserConfirm(true)}
+                        className="w-full btn bg-red-900/50 text-red-300 hover:bg-red-900 hover:text-red-200 text-sm"
+                      >
+                        Remove User
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </>
@@ -1134,6 +1168,17 @@ export default function Settings() {
         onConfirm={handleDeleteAccount}
         onCancel={() => setShowDeleteAccountConfirm(false)}
       />
+
+      {selectedUser && (
+        <ConfirmDialog
+          open={showRemoveUserConfirm}
+          title={`Remove ${selectedUser.name}`}
+          description={`This will permanently delete ${selectedUser.name}'s account, conversation history, facts, and revoke their service accounts (Jellyfin, Audiobookshelf, etc.). This cannot be undone.`}
+          confirmLabel={isRemovingUser ? 'Removing...' : `Remove ${selectedUser.name}`}
+          onConfirm={() => removeUser(selectedUser.id)}
+          onCancel={() => { setShowRemoveUserConfirm(false); setRemoveUserError(null) }}
+        />
+      )}
     </div>
   )
 }
