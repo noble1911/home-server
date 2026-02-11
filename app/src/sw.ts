@@ -4,6 +4,15 @@ import { cleanupOutdatedCaches, precacheAndRoute } from 'workbox-precaching'
 
 declare let self: ServiceWorkerGlobalScope
 
+// Activate new service worker immediately (don't wait for old tabs to close)
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting()
+})
+self.skipWaiting()
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim())
+})
+
 // Workbox injects the precache manifest here during build
 precacheAndRoute(self.__WB_MANIFEST)
 cleanupOutdatedCaches()
