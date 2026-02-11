@@ -21,26 +21,26 @@ services:
       retries: 3
       start_period: 30s
 
-  shelfarr:
-    image: ghcr.io/pedro-revez-silva/shelfarr:latest
-    container_name: shelfarr
+  lazylibrarian:
+    image: lscr.io/linuxserver/lazylibrarian:latest
+    container_name: lazylibrarian
     environment:
-      - SOLID_QUEUE_IN_PUMA=1
       - PUID=501
       - PGID=20
       - TZ=Europe/London
+      - DOCKER_MODS=linuxserver/mods:universal-calibre|linuxserver/mods:lazylibrarian-ffmpeg
     volumes:
-      - shelfarr-data:/rails/storage
+      - lazylibrarian-config:/config
       - ${DRIVE_PATH:-/Volumes/HomeServer}/Books/Audiobooks:/audiobooks
-      - ${DRIVE_PATH:-/Volumes/HomeServer}/Books/eBooks:/ebooks
+      - ${DRIVE_PATH:-/Volumes/HomeServer}/Books/eBooks:/books
       - ${DRIVE_PATH:-/Volumes/HomeServer}/Downloads:/downloads
     ports:
-      - "5056:80"
+      - "5299:5299"
     networks:
       - homeserver
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80/up"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:5299/home"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -55,5 +55,5 @@ volumes:
     name: audiobookshelf-config
   audiobookshelf-metadata:
     name: audiobookshelf-metadata
-  shelfarr-data:
-    name: shelfarr-data
+  lazylibrarian-config:
+    name: lazylibrarian-config

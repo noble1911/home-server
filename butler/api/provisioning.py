@@ -31,10 +31,9 @@ PERMISSION_SERVICE_MAP: dict[str, list[str]] = {
 # Services everyone gets (regardless of permissions)
 UNIVERSAL_SERVICES: list[str] = ["nextcloud"]
 
-# NOTE: Shelfarr (books) and Seerr (media requests) are NOT auto-provisioned.
+# NOTE: LazyLibrarian (books) and Seerr (media requests) are NOT auto-provisioned.
 # - Seerr: uses Jellyfin SSO — users log in with their Jellyfin credentials.
-# - Shelfarr: Rails app with no REST API. Possible via direct SQLite DB insert
-#   but fragile. See GitHub issue for tracking. Users create accounts manually.
+# - LazyLibrarian: no multi-user support. Household shares the single instance.
 
 
 def _services_for_user(permissions: list[str]) -> list[str]:

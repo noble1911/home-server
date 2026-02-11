@@ -14,7 +14,7 @@ interface ServiceDetailProps {
 const CREDENTIAL_KEY_MAP: Record<string, string> = {
   'jellyfin': 'jellyfin',
   'audiobookshelf': 'audiobookshelf',
-  'shelfarr': 'shelfarr',
+  'lazylibrarian': 'lazylibrarian',
   'immich': 'immich',
   'nextcloud': 'nextcloud',
 }

@@ -77,8 +77,8 @@ DEFAULT_SERVICES: dict[str, dict[str, Any]] = {
         "url": "http://audiobookshelf:80/healthcheck",
         "stack": "books",
     },
-    "shelfarr": {
-        "url": "http://shelfarr:80/up",
+    "lazylibrarian": {
+        "url": "http://lazylibrarian:5299/home",
         "stack": "books",
     },
     # Photos & files stack

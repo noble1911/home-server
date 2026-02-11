@@ -41,7 +41,7 @@ launchctl list | grep homeserver.backup
 | PostgreSQL (Immich + Nextcloud) | `pg_dumpall` | Daily | Yes |
 | Jellyfin config + DB | Volume tarball | Daily | Yes |
 | Radarr, Sonarr, Bazarr configs | Volume tarballs | Daily | Yes |
-| Audiobookshelf, Shelfarr | Volume tarballs | Daily | Yes |
+| Audiobookshelf, LazyLibrarian | Volume tarballs | Daily | Yes |
 | Prowlarr, qBittorrent configs | Volume tarballs | Daily | Yes |
 | Home Assistant config | Volume tarball | Daily | Yes |
 | Nextcloud app data | Volume tarball | Daily | Yes |

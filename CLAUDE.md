@@ -103,7 +103,7 @@ The Mac Mini is set up and all Docker stacks are deployed via OrbStack. Active w
 |-------|----------|--------|
 | **media-stack** | Jellyfin, Radarr, Sonarr, Bazarr, Seerr | Running |
 | **download-stack** | qBittorrent, Prowlarr | Running |
-| **books-stack** | Audiobookshelf, Shelfarr | Running |
+| **books-stack** | Audiobookshelf, LazyLibrarian | Running |
 | **photos-files-stack** | Immich, PostgreSQL, Redis, Nextcloud | Running |
 | **smart-home-stack** | Home Assistant, Cloudflare Tunnel | Running |
 | **voice-stack** | LiveKit, Kokoro TTS, LiveKit Agent | Running |
@@ -134,7 +134,7 @@ home-server/
 │   ├── livekit-agent/     # LiveKit Agents worker (STT → LLM → TTS)
 │   └── docker-compose.yml # Butler API container
 ├── docker/                # Docker Compose stacks
-│   ├── books-stack/       # Audiobookshelf, Shelfarr
+│   ├── books-stack/       # Audiobookshelf, LazyLibrarian
 │   ├── download-stack/    # qBittorrent, Prowlarr
 │   ├── media-stack/       # Jellyfin, Radarr, Sonarr, Bazarr, Seerr
 │   ├── messaging-stack/   # WhatsApp gateway
