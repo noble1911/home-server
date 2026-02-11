@@ -55,11 +55,9 @@ Add the credentials to your `butler/.env` file:
 ```bash
 GOOGLE_CLIENT_ID=123456789-abcdef.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=GOCSPX-your-secret-here
-GOOGLE_REDIRECT_URI=http://localhost:8000/api/oauth/google/callback
-OAUTH_FRONTEND_URL=http://localhost:5173
 ```
 
-For production, update `GOOGLE_REDIRECT_URI` and `OAUTH_FRONTEND_URL` to your Cloudflare Tunnel hostname.
+The redirect URI is derived automatically from how you access the PWA (LAN, localhost, or Cloudflare Tunnel), so `GOOGLE_REDIRECT_URI` and `OAUTH_FRONTEND_URL` don't need to be set. The defaults work as fallbacks if needed.
 
 ## 6. Restart Butler
 

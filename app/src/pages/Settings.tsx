@@ -199,7 +199,10 @@ export default function Settings() {
 
   async function connectGoogle() {
     try {
-      const data = await api.get<AuthorizeResponse>('/oauth/google/authorize')
+      // Pass our origin so the backend derives the correct redirect URLs
+      // (works for LAN, localhost, and Cloudflare Tunnel access)
+      const origin = encodeURIComponent(window.location.origin)
+      const data = await api.get<AuthorizeResponse>(`/oauth/google/authorize?origin=${origin}`)
       window.location.href = data.authorizeUrl
     } catch {
       setOauthMessage({ type: 'error', text: 'Failed to start Google connection. Is OAuth configured?' })

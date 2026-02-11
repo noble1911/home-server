@@ -39,30 +39,43 @@ _STATE_TTL_MINUTES = 10
 # --- State parameter (CSRF protection) ---
 
 
-def create_oauth_state(user_id: str) -> str:
+def create_oauth_state(
+    user_id: str,
+    redirect_uri: str | None = None,
+    frontend_url: str | None = None,
+) -> str:
     """Create a signed JWT state parameter encoding the user_id.
 
     The state is short-lived (10 minutes) and includes a random nonce
     to prevent replay attacks. Signed with the existing jwt_secret.
+
+    Optionally embeds redirect_uri and frontend_url so the callback
+    can use the correct URLs regardless of how the user accessed the PWA
+    (LAN vs Cloudflare Tunnel).
     """
     now = datetime.now(timezone.utc)
+    payload: dict = {
+        "sub": user_id,
+        "nonce": secrets.token_hex(16),
+        "iat": now,
+        "exp": now + timedelta(minutes=_STATE_TTL_MINUTES),
+        "type": "oauth_state",
+    }
+    if redirect_uri:
+        payload["redirect_uri"] = redirect_uri
+    if frontend_url:
+        payload["frontend_url"] = frontend_url
     return jwt.encode(
-        {
-            "sub": user_id,
-            "nonce": secrets.token_hex(16),
-            "iat": now,
-            "exp": now + timedelta(minutes=_STATE_TTL_MINUTES),
-            "type": "oauth_state",
-        },
+        payload,
         settings.jwt_secret,
         algorithm=settings.jwt_algorithm,
     )
 
 
-def verify_oauth_state(state: str) -> str:
+def verify_oauth_state(state: str) -> dict:
     """Decode and validate the OAuth state JWT.
 
-    Returns the user_id if valid.
+    Returns a dict with 'user_id' and optional 'redirect_uri'/'frontend_url'.
 
     Raises:
         jwt.InvalidTokenError: If state is invalid, expired, or wrong type.
@@ -72,21 +85,28 @@ def verify_oauth_state(state: str) -> str:
     )
     if payload.get("type") != "oauth_state":
         raise jwt.InvalidTokenError("Not an OAuth state token")
-    return payload["sub"]
+    return {
+        "user_id": payload["sub"],
+        "redirect_uri": payload.get("redirect_uri"),
+        "frontend_url": payload.get("frontend_url"),
+    }
 
 
 # --- Google OAuth helpers ---
 
 
-def build_google_authorize_url(state: str) -> str:
+def build_google_authorize_url(state: str, redirect_uri: str | None = None) -> str:
     """Build the Google OAuth consent URL.
 
     Uses access_type=offline to get a refresh_token, and prompt=consent
     to ensure the consent screen always appears (guarantees refresh_token).
+
+    If redirect_uri is provided, it overrides the configured default —
+    this allows the OAuth flow to work via Cloudflare Tunnel or LAN.
     """
     params = {
         "client_id": settings.google_client_id,
-        "redirect_uri": settings.google_redirect_uri,
+        "redirect_uri": redirect_uri or settings.google_redirect_uri,
         "response_type": "code",
         "scope": GOOGLE_SCOPES,
         "state": state,
@@ -96,8 +116,11 @@ def build_google_authorize_url(state: str) -> str:
     return f"{GOOGLE_AUTH_URL}?{urlencode(params)}"
 
 
-async def exchange_google_code(code: str) -> dict:
+async def exchange_google_code(code: str, redirect_uri: str | None = None) -> dict:
     """Exchange an authorization code for access and refresh tokens.
+
+    The redirect_uri MUST match the one used in the authorize request —
+    Google validates this. If not provided, falls back to the configured default.
 
     Returns the raw token response dict from Google:
         {access_token, refresh_token, expires_in, token_type, scope}
@@ -109,7 +132,7 @@ async def exchange_google_code(code: str) -> dict:
                 "code": code,
                 "client_id": settings.google_client_id,
                 "client_secret": settings.google_client_secret,
-                "redirect_uri": settings.google_redirect_uri,
+                "redirect_uri": redirect_uri or settings.google_redirect_uri,
                 "grant_type": "authorization_code",
             },
         ) as resp:
