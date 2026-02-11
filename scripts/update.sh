@@ -67,38 +67,49 @@ fi
 CHANGED_FILES=$(git diff --name-only HEAD..origin/main 2>/dev/null)
 
 # Map changed files to their docker-compose stacks
-declare -A STACKS
-STACKS=(
-    ["docker/media-stack"]="docker/media-stack/docker-compose.yml"
-    ["docker/download-stack"]="docker/download-stack/docker-compose.yml"
-    ["docker/books-stack"]="docker/books-stack/docker-compose.yml"
-    ["docker/photos-files-stack"]="docker/photos-files-stack/docker-compose.yml"
-    ["docker/smart-home-stack"]="docker/smart-home-stack/docker-compose.yml"
-    ["docker/voice-stack"]="docker/voice-stack/docker-compose.yml"
-    ["docker/messaging-stack"]="docker/messaging-stack/docker-compose.yml"
-    ["butler"]="butler/docker-compose.yml"
-    ["app"]="app/docker-compose.yml"
+# (parallel arrays for bash 3 compatibility — macOS ships with bash 3.2)
+STACK_DIRS=(
+    "docker/media-stack"
+    "docker/download-stack"
+    "docker/books-stack"
+    "docker/photos-files-stack"
+    "docker/smart-home-stack"
+    "docker/voice-stack"
+    "docker/messaging-stack"
+    "butler"
+    "app"
+)
+STACK_FILES=(
+    "docker/media-stack/docker-compose.yml"
+    "docker/download-stack/docker-compose.yml"
+    "docker/books-stack/docker-compose.yml"
+    "docker/photos-files-stack/docker-compose.yml"
+    "docker/smart-home-stack/docker-compose.yml"
+    "docker/voice-stack/docker-compose.yml"
+    "docker/messaging-stack/docker-compose.yml"
+    "butler/docker-compose.yml"
+    "app/docker-compose.yml"
 )
 
 REBUILD_STACKS=()
 
-if [[ "$FORCE" == "true" ]]; then
-    for stack_dir in "${!STACKS[@]}"; do
-        compose_file="${STACKS[$stack_dir]}"
+i=0
+while [[ $i -lt ${#STACK_DIRS[@]} ]]; do
+    stack_dir="${STACK_DIRS[$i]}"
+    compose_file="${STACK_FILES[$i]}"
+    if [[ "$FORCE" == "true" ]]; then
         if [[ -f "$compose_file" ]]; then
             REBUILD_STACKS+=("$compose_file")
         fi
-    done
-else
-    for stack_dir in "${!STACKS[@]}"; do
+    else
         if echo "$CHANGED_FILES" | grep -q "^${stack_dir}/"; then
-            compose_file="${STACKS[$stack_dir]}"
             if [[ -f "$compose_file" ]]; then
                 REBUILD_STACKS+=("$compose_file")
             fi
         fi
-    done
-fi
+    fi
+    i=$((i + 1))
+done
 
 # Also rebuild butler if scripts/lib changed (shared helpers)
 if echo "$CHANGED_FILES" | grep -q "^scripts/lib/"; then
