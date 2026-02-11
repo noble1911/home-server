@@ -79,8 +79,8 @@ class MediaFilesTool(Tool):
         return (
             "Manage media files on the home server's external drive. "
             "Can list directories, search by filename, get detailed file info "
-            "(including video resolution/codec via ffprobe), rename files, "
-            "delete files/folders, and scan for video quality.\n\n"
+            "(including video resolution/codec via ffprobe), rename, move, copy, "
+            "create directories, delete files/folders, and scan for video quality.\n\n"
             "Allowed directories: Media/ (Movies, TV, Anime, Music), "
             "Books/ (eBooks, Audiobooks), Downloads/ (Complete, Incomplete).\n\n"
             "Naming conventions:\n"
@@ -99,13 +99,17 @@ class MediaFilesTool(Tool):
                     "type": "string",
                     "enum": [
                         "list", "search", "info",
-                        "rename", "delete", "scan_quality",
+                        "rename", "move", "copy", "mkdir",
+                        "delete", "scan_quality",
                     ],
                     "description": (
                         "list: List directory contents (path, depth). "
                         "search: Find files by glob pattern (pattern, path). "
                         "info: Detailed file metadata inc. ffprobe for video (path). "
                         "rename: Rename a file or directory (path, new_name). "
+                        "move: Move a file or directory to a new location (path, destination). "
+                        "copy: Copy a file or directory to a new location (path, destination). "
+                        "mkdir: Create a new directory (path). "
                         "delete: Delete a file or directory (path, recursive). "
                         "scan_quality: Batch video quality scan (path, max_resolution)."
                     ),
@@ -128,6 +132,15 @@ class MediaFilesTool(Tool):
                 "new_name": {
                     "type": "string",
                     "description": "New filename for rename (name only, no path separators).",
+                },
+                "destination": {
+                    "type": "string",
+                    "description": (
+                        "Destination path for move/copy. Can be a directory "
+                        "(file keeps its name) or a full path with new filename, "
+                        "e.g. 'Media/Movies/Inception (2010)' or "
+                        "'Media/TV/Show Name/Season 01/episode.mkv'."
+                    ),
                 },
                 "recursive": {
                     "type": "boolean",
@@ -165,6 +178,18 @@ class MediaFilesTool(Tool):
                     kwargs.get("path", ""),
                     kwargs.get("new_name", ""),
                 )
+            elif action == "move":
+                return await self._move(
+                    kwargs.get("path", ""),
+                    kwargs.get("destination", ""),
+                )
+            elif action == "copy":
+                return await self._copy(
+                    kwargs.get("path", ""),
+                    kwargs.get("destination", ""),
+                )
+            elif action == "mkdir":
+                return await self._mkdir(kwargs.get("path", ""))
             elif action == "delete":
                 return await self._delete(
                     kwargs.get("path", ""),
@@ -392,6 +417,74 @@ class MediaFilesTool(Tool):
 
         old_name = safe_path.name
         return f"Renamed: {old_name} -> {new_name}"
+
+    async def _move(self, path: str, destination: str) -> str:
+        """Move a file or directory to a new location."""
+        if not destination:
+            return "Error: 'destination' is required for move."
+
+        safe_src = self._resolve_safe(path)
+        if not safe_src.exists():
+            return f"Error: '{path}' does not exist."
+
+        safe_dest = self._resolve_safe(destination)
+
+        # If destination is an existing directory, move source into it
+        if safe_dest.is_dir():
+            safe_dest = safe_dest / safe_src.name
+
+        if safe_dest.exists():
+            return f"Error: destination '{destination}/{safe_src.name}' already exists."
+
+        # Ensure parent directory exists
+        safe_dest.parent.mkdir(parents=True, exist_ok=True)
+
+        shutil.move(str(safe_src), str(safe_dest))
+
+        dest_rel = safe_dest.relative_to(self._root.resolve())
+        return f"Moved: {path} -> {dest_rel}"
+
+    async def _copy(self, path: str, destination: str) -> str:
+        """Copy a file or directory to a new location."""
+        if not destination:
+            return "Error: 'destination' is required for copy."
+
+        safe_src = self._resolve_safe(path)
+        if not safe_src.exists():
+            return f"Error: '{path}' does not exist."
+
+        safe_dest = self._resolve_safe(destination)
+
+        # If destination is an existing directory, copy source into it
+        if safe_dest.is_dir():
+            safe_dest = safe_dest / safe_src.name
+
+        if safe_dest.exists():
+            return f"Error: destination '{destination}/{safe_src.name}' already exists."
+
+        # Ensure parent directory exists
+        safe_dest.parent.mkdir(parents=True, exist_ok=True)
+
+        if safe_src.is_dir():
+            shutil.copytree(str(safe_src), str(safe_dest))
+            file_count = sum(1 for _ in safe_dest.rglob("*") if _.is_file())
+            dest_rel = safe_dest.relative_to(self._root.resolve())
+            return f"Copied directory: {path} -> {dest_rel} ({file_count} files)"
+        else:
+            shutil.copy2(str(safe_src), str(safe_dest))
+            dest_rel = safe_dest.relative_to(self._root.resolve())
+            size = _format_bytes(safe_dest.stat().st_size)
+            return f"Copied: {path} -> {dest_rel} ({size})"
+
+    async def _mkdir(self, path: str) -> str:
+        """Create a new directory (and parents if needed)."""
+        safe_path = self._resolve_safe(path)
+
+        if safe_path.exists():
+            return f"Error: '{path}' already exists."
+
+        safe_path.mkdir(parents=True, exist_ok=True)
+        return f"Created directory: {path}"
 
     async def _delete(self, path: str, recursive: bool) -> str:
         """Delete a file or directory."""

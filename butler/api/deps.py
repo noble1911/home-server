@@ -16,7 +16,9 @@ from tools import (
     AlertStateManager,
     BookTool,
     DatabasePool,
+    DisplayInChatTool,
     EmbeddingService,
+    GetConversationsTool,
     GmailTool,
     GoogleCalendarTool,
     HomeAssistantTool,
@@ -35,6 +37,7 @@ from tools import (
     SonarrTool,
     StorageMonitorTool,
     Tool,
+    UpdateSoulTool,
     WeatherTool,
     SelfUpdateTool,
     WhatsAppTool,
@@ -58,6 +61,7 @@ from .ratelimit import start_ratelimit_cleanup, stop_ratelimit_cleanup
 
 ALWAYS_ALLOWED_TOOLS: set[str] = {
     "remember_fact", "recall_facts", "get_user",
+    "get_conversations", "update_soul", "display_in_chat",
     "weather", "server_health", "storage_monitor",
 }
 
@@ -121,6 +125,9 @@ async def init_resources() -> None:
         "remember_fact": RememberFactTool(_db_pool, _embedding_service),
         "recall_facts": RecallFactsTool(_db_pool, _embedding_service),
         "get_user": GetUserTool(_db_pool),
+        "get_conversations": GetConversationsTool(_db_pool),
+        "update_soul": UpdateSoulTool(_db_pool),
+        "display_in_chat": DisplayInChatTool(),
     }
 
     # Only register HA tools if configured
