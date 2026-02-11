@@ -119,8 +119,8 @@ class Settings(BaseSettings):
     # Google OAuth (for Calendar, Gmail, etc.)
     google_client_id: str = ""
     google_client_secret: str = ""
-    google_redirect_uri: str = "http://localhost:8000/api/oauth/google/callback"
-    oauth_frontend_url: str = "http://localhost:5173"
+    google_redirect_uri: str = "http://localhost:3000/api/oauth/google/callback"
+    oauth_frontend_url: str = "http://localhost:3000"
 
     # WhatsApp Gateway (outbound notifications)
     whatsapp_gateway_url: str = ""
