@@ -41,17 +41,31 @@ router = APIRouter()
 @router.get("/google/authorize", response_model=OAuthAuthorizeResponse)
 async def google_authorize(
     user_id: str = Depends(get_current_user),
+    origin: str = Query(default=None),
 ):
     """Start the Google OAuth flow.
 
     Returns a URL that the PWA should redirect the browser to.
     The URL points to Google's consent screen.
+
+    The optional `origin` parameter (e.g. "https://butler.noblehaus.uk")
+    lets the flow work from any access point (LAN, Cloudflare Tunnel).
+    When provided, the redirect_uri and frontend URL are derived from it
+    instead of the hardcoded env var defaults.
     """
     if not settings.google_client_id:
         raise HTTPException(503, "Google OAuth is not configured")
 
-    state = create_oauth_state(user_id)
-    authorize_url = build_google_authorize_url(state)
+    # Derive URLs from the PWA's origin when available
+    redirect_uri = None
+    frontend_url = None
+    if origin:
+        origin = origin.rstrip("/")
+        redirect_uri = f"{origin}/api/oauth/google/callback"
+        frontend_url = origin
+
+    state = create_oauth_state(user_id, redirect_uri=redirect_uri, frontend_url=frontend_url)
+    authorize_url = build_google_authorize_url(state, redirect_uri=redirect_uri)
     return OAuthAuthorizeResponse(authorizeUrl=authorize_url)
 
 
@@ -81,17 +95,22 @@ async def google_callback(
         params = urlencode({"oauth": "google", "status": "error", "message": "Missing code or state"})
         return _redirect_html(f"{frontend_url}/settings?{params}")
 
-    # Verify state JWT to get user_id
+    # Verify state JWT to get user_id and dynamic URLs
     try:
-        user_id = verify_oauth_state(state)
+        state_data = verify_oauth_state(state)
+        user_id = state_data["user_id"]
+        # Use URLs from state if available (set when PWA passed its origin)
+        redirect_uri = state_data.get("redirect_uri")
+        if state_data.get("frontend_url"):
+            frontend_url = state_data["frontend_url"].rstrip("/")
     except pyjwt.InvalidTokenError as e:
         logger.warning("Invalid OAuth state: %s", e)
         params = urlencode({"oauth": "google", "status": "error", "message": "Invalid or expired state"})
         return _redirect_html(f"{frontend_url}/settings?{params}")
 
-    # Exchange authorization code for tokens
+    # Exchange authorization code for tokens (redirect_uri must match authorize request)
     try:
-        token_data = await exchange_google_code(code)
+        token_data = await exchange_google_code(code, redirect_uri=redirect_uri)
     except RuntimeError as e:
         logger.error("Google code exchange failed: %s", e)
         params = urlencode({"oauth": "google", "status": "error", "message": "Token exchange failed"})
