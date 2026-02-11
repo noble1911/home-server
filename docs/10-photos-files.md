@@ -181,6 +181,18 @@ Common issues:
 - Disk space on external drive
 - Permissions on Photos folder
 
+### Nextcloud "Access through untrusted domain"
+
+If you see this error when accessing Nextcloud via Cloudflare Tunnel (e.g. `files.yourdomain.com`), add your domain to trusted_domains:
+
+```bash
+docker exec -u www-data nextcloud php occ config:system:set trusted_domains 5 --value="files.yourdomain.com"
+docker exec -u www-data nextcloud php occ config:system:set overwriteprotocol --value="https"
+docker exec -u www-data nextcloud php occ config:system:set overwrite.cli.url --value="https://files.yourdomain.com"
+```
+
+Or set `TUNNEL_DOMAIN=yourdomain.com` (or `NEXTCLOUD_TRUSTED_DOMAIN=files.yourdomain.com`) before re-running `scripts/10-photos-files.sh` to configure this automatically.
+
 ### Nextcloud performance
 
 For large file counts:
