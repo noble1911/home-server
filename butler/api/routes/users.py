@@ -38,7 +38,12 @@ from ..models import (
     UserProfile,
 )
 from ..oauth import revoke_google_token
-from ..provisioning import provision_user_accounts
+from ..crypto import encrypt_password
+from ..provisioning import (
+    deprovision_user_accounts,
+    provision_user_accounts,
+    update_service_passwords,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -256,6 +261,12 @@ async def complete_onboarding(
     # Auto-provision service accounts if credentials were provided
     service_accounts: list[dict] = []
     if req.serviceUsername and req.servicePassword:
+        # Store service credentials on user record for re-provisioning
+        await db.execute(
+            "UPDATE butler.users SET service_username = $2, service_password_encrypted = $3 WHERE id = $1",
+            user_id, req.serviceUsername, encrypt_password(req.servicePassword),
+        )
+
         # Get user permissions (default to ["media", "home"] for new users)
         raw_perms = await db.fetchval(
             "SELECT permissions FROM butler.users WHERE id = $1", user_id
@@ -313,6 +324,49 @@ async def get_service_credentials(
         credentials.append(cred)
 
     return {"credentials": credentials}
+
+
+@router.post("/user/reprovision")
+async def reprovision_services(
+    user_id: str = Depends(get_current_user),
+    pool: DatabasePool = Depends(get_db_pool),
+):
+    """Re-run provisioning for failed services using stored credentials."""
+    db = pool.pool
+    row = await db.fetchrow(
+        "SELECT service_username, service_password_encrypted, permissions FROM butler.users WHERE id = $1",
+        user_id,
+    )
+    if not row or not row["service_username"] or not row["service_password_encrypted"]:
+        raise HTTPException(400, "No stored service credentials — complete onboarding first")
+
+    password = decrypt_password(row["service_password_encrypted"])
+    raw_perms = row["permissions"]
+    permissions = (
+        json.loads(raw_perms) if isinstance(raw_perms, str) else raw_perms
+    ) if raw_perms is not None else ["media", "home"]
+
+    results = await provision_user_accounts(
+        user_id, row["service_username"], password, permissions, pool
+    )
+    return {"status": "ok", "serviceAccounts": results}
+
+
+@router.put("/user/service-password")
+async def change_service_password(
+    req: dict,
+    user_id: str = Depends(get_current_user),
+    pool: DatabasePool = Depends(get_db_pool),
+):
+    """Change password across all provisioned service accounts."""
+    new_password = req.get("newPassword")
+    if not new_password or len(new_password) < 6:
+        raise HTTPException(400, "Password must be at least 6 characters")
+
+    results = await update_service_passwords(user_id, new_password, pool)
+    if not results:
+        raise HTTPException(400, "No active service accounts to update")
+    return {"status": "ok", "results": results}
 
 
 @router.post("/user/facts", response_model=UserFact, status_code=201)
@@ -381,12 +435,19 @@ async def delete_account(
     """Permanently delete the authenticated user's account and all data.
 
     Order of operations:
-    1. Revoke OAuth tokens at external providers (best-effort)
-    2. Delete user row (CASCADE removes all child records)
+    1. Delete service accounts on downstream apps (best-effort)
+    2. Revoke OAuth tokens at external providers (best-effort)
+    3. Delete user row (CASCADE removes all child records)
     """
     db = pool.pool
 
-    # 1. Best-effort revoke OAuth tokens at provider before cascade deletes them
+    # 1. Best-effort delete service accounts on downstream apps
+    try:
+        await deprovision_user_accounts(user_id, pool)
+    except Exception:
+        logger.warning("Service deprovisioning failed during account deletion for user=%s", user_id)
+
+    # 2. Best-effort revoke OAuth tokens at provider before cascade deletes them
     oauth_rows = await db.fetch(
         "SELECT provider, access_token, refresh_token FROM butler.oauth_tokens WHERE user_id = $1",
         user_id,

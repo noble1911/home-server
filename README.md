@@ -299,8 +299,22 @@ Butler uses **invite codes** for registration. The first person to log in become
 
 1. Open `http://<server-ip>:3000`
 2. Enter your admin invite code (default: `BUTLER-001`, or what you chose during setup)
-3. Complete onboarding (set your name, preferences)
+3. Complete onboarding (set your name, preferences, and optionally choose a service username/password)
 4. To add household members: **Settings → Generate Invite Code** → share the 6-character code
+
+**Invite code permissions:** When generating an invite code, toggle which Butler capabilities the new user gets:
+
+| Permission | Controls |
+|------------|----------|
+| Media | Jellyfin, Audiobookshelf, Immich tools |
+| Smart Home | Home Assistant tools |
+| Location | Location-based tools |
+| Calendar | Calendar management |
+| Email | Email tools |
+| Automation | Scheduling & automation |
+| Communication | WhatsApp tools |
+
+**Auto-provisioning:** During onboarding, if the user provides a service username and password, Butler automatically creates accounts on Jellyfin, Audiobookshelf, Nextcloud, Immich, and Home Assistant based on the invite code's permissions. Failed services can be retried from Settings. The shared password can also be changed across all services at once from Settings.
 
 ### 4.3 Set Up Media Services
 
@@ -479,6 +493,13 @@ For photos and documents, cloud backup is **optional** — see [HOMESERVER_PLAN.
 
 ## Updating
 
+**One-time prerequisite:** Log in to GHCR so Docker can pull the pre-built Butler PWA image:
+
+```bash
+# Create a GitHub PAT with read:packages scope at https://github.com/settings/tokens
+echo "<YOUR_PAT>" | docker login ghcr.io -u <YOUR_GITHUB_USERNAME> --password-stdin
+```
+
 Pull the latest code and rebuild only the stacks that changed:
 
 ```bash
@@ -490,7 +511,9 @@ bash ~/home-server/scripts/update.sh
 | `--check` | Show available updates without applying them |
 | `--force` | Rebuild all stacks, even if unchanged |
 
-The script compares local and remote commits, identifies which Docker Compose stacks were affected, pulls the changes, and rebuilds only those stacks. It's safe to run at any time — if nothing changed, it exits immediately.
+The script compares local and remote commits, identifies which Docker Compose stacks were affected, pulls the changes, and rebuilds only those stacks. The Butler PWA uses a pre-built image from GHCR (pushed by CI on each merge to main), while all other stacks rebuild locally. It's safe to run at any time — if nothing changed, it exits immediately.
+
+**CI build variable:** The GitHub Actions workflow requires a repository variable `VITE_TUNNEL_DOMAIN` set to your Cloudflare Tunnel domain (e.g. `yourdomain.com`). Set it at **Settings → Secrets and variables → Actions → Variables**.
 
 To migrate data to a different drive (e.g. from internal SSD to an external drive):
 
