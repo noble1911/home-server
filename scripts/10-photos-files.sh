@@ -96,9 +96,8 @@ if echo "$NC_STATUS" | grep -q '"installed":true' || [[ -n "$NEXTCLOUD_ADMIN_USE
     docker exec -u www-data nextcloud php occ config:system:set trusted_domains 1 --value="nextcloud" 2>/dev/null
     docker exec -u www-data nextcloud php occ config:system:set trusted_domains 2 --value="localhost:8080" 2>/dev/null
 
-    # Add LAN IP if available
-    LAN_IP=$(ipconfig getifaddr en0 2>/dev/null || true)
-    if [[ -n "$LAN_IP" ]]; then
+    # Add LAN IP if available (set LAN_IP env var, e.g. 192.168.1.22)
+    if [[ -n "${LAN_IP:-}" ]]; then
         docker exec -u www-data nextcloud php occ config:system:set trusted_domains 3 --value="$LAN_IP" 2>/dev/null
         docker exec -u www-data nextcloud php occ config:system:set trusted_domains 4 --value="${LAN_IP}:8080" 2>/dev/null
     fi
