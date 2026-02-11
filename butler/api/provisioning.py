@@ -84,6 +84,10 @@ async def provision_user_accounts(
     for service in target_services:
         if not _service_is_configured(service):
             logger.info("Skipping %s provisioning (not configured)", service)
+            results.append(
+                {"service": service, "username": username,
+                 "status": "skipped", "error": "Not configured on this server"}
+            )
             continue
 
         # Idempotency check — only skip if already active
