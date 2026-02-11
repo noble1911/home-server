@@ -86,14 +86,38 @@ elif [[ -n "$NEXTCLOUD_ADMIN_USER" ]] && [[ -n "$NEXTCLOUD_ADMIN_PASS" ]]; then
         2>/dev/null \
         && echo -e "  ${GREEN}✓${NC} Nextcloud installed with admin account" \
         || echo -e "  ${YELLOW}⚠${NC} Nextcloud install may have failed — check http://localhost:8080"
+else
+    echo -e "  ${YELLOW}⚠${NC} No Nextcloud credentials — configure manually at http://localhost:8080"
+fi
 
-    # Set trusted domains (localhost + container name + common LAN access)
+# Configure trusted domains (runs on every deploy to pick up changes)
+if echo "$NC_STATUS" | grep -q '"installed":true' || [[ -n "$NEXTCLOUD_ADMIN_USER" ]]; then
     docker exec -u www-data nextcloud php occ config:system:set trusted_domains 0 --value="localhost" 2>/dev/null
     docker exec -u www-data nextcloud php occ config:system:set trusted_domains 1 --value="nextcloud" 2>/dev/null
     docker exec -u www-data nextcloud php occ config:system:set trusted_domains 2 --value="localhost:8080" 2>/dev/null
-    echo -e "  ${GREEN}✓${NC} Nextcloud trusted domains configured"
-else
-    echo -e "  ${YELLOW}⚠${NC} No Nextcloud credentials — configure manually at http://localhost:8080"
+
+    # Add LAN IP if available
+    LAN_IP=$(ipconfig getifaddr en0 2>/dev/null || true)
+    if [[ -n "$LAN_IP" ]]; then
+        docker exec -u www-data nextcloud php occ config:system:set trusted_domains 3 --value="$LAN_IP" 2>/dev/null
+        docker exec -u www-data nextcloud php occ config:system:set trusted_domains 4 --value="${LAN_IP}:8080" 2>/dev/null
+    fi
+
+    # Add Cloudflare Tunnel domain (e.g. files.noblehaus.uk)
+    NEXTCLOUD_DOMAIN="${NEXTCLOUD_TRUSTED_DOMAIN:-}"
+    if [[ -z "$NEXTCLOUD_DOMAIN" ]] && [[ -n "${TUNNEL_DOMAIN:-}" ]]; then
+        NEXTCLOUD_DOMAIN="files.${TUNNEL_DOMAIN}"
+    fi
+    if [[ -n "$NEXTCLOUD_DOMAIN" ]]; then
+        docker exec -u www-data nextcloud php occ config:system:set trusted_domains 5 --value="$NEXTCLOUD_DOMAIN" 2>/dev/null
+        # Reverse proxy settings for Cloudflare Tunnel
+        docker exec -u www-data nextcloud php occ config:system:set overwriteprotocol --value="https" 2>/dev/null
+        docker exec -u www-data nextcloud php occ config:system:set overwrite.cli.url --value="https://${NEXTCLOUD_DOMAIN}" 2>/dev/null
+        echo -e "  ${GREEN}✓${NC} Nextcloud trusted domains configured (including ${NEXTCLOUD_DOMAIN})"
+    else
+        echo -e "  ${GREEN}✓${NC} Nextcloud trusted domains configured (local only)"
+        echo -e "  ${YELLOW}⚠${NC} Set TUNNEL_DOMAIN or NEXTCLOUD_TRUSTED_DOMAIN for remote access"
+    fi
 fi
 
 echo ""
