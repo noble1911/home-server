@@ -134,9 +134,17 @@ fi
 if [[ ${#REBUILD_STACKS[@]} -gt 0 ]]; then
     echo ""
     for compose_file in "${REBUILD_STACKS[@]}"; do
-        echo -e "${BLUE}==>${NC} Rebuilding $(dirname "$compose_file")..."
-        docker compose -f "$compose_file" up -d --build --remove-orphans
-        echo -e "  ${GREEN}✓${NC} $(dirname "$compose_file") updated"
+        stack_name=$(dirname "$compose_file")
+        echo -e "${BLUE}==>${NC} Updating ${stack_name}..."
+        if [[ "$compose_file" == "app/docker-compose.yml" ]]; then
+            # Butler PWA: pull pre-built image from GHCR (built by CI)
+            docker compose -f "$compose_file" pull
+            docker compose -f "$compose_file" up -d --remove-orphans
+        else
+            # All other stacks: rebuild locally
+            docker compose -f "$compose_file" up -d --build --remove-orphans
+        fi
+        echo -e "  ${GREEN}✓${NC} ${stack_name} updated"
     done
 fi
 

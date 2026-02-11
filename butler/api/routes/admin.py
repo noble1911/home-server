@@ -5,11 +5,13 @@ GET    /api/admin/invite-codes                  — List all codes and their sta
 DELETE /api/admin/invite-codes/{code}           — Revoke an unused code
 GET    /api/admin/users                         — List all users with permissions
 PUT    /api/admin/users/{user_id}/permissions   — Update a user's tool permissions
+DELETE /api/admin/users/{user_id}               — Delete a user + their service accounts
 """
 
 from __future__ import annotations
 
 import json
+import logging
 import secrets
 import string
 from datetime import datetime, timedelta, timezone
@@ -19,6 +21,9 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from tools import DatabasePool
 
 from ..deps import ALL_PERMISSION_GROUPS, DEFAULT_PERMISSIONS, get_admin_user, get_db_pool
+from ..provisioning import deprovision_user_accounts
+
+logger = logging.getLogger(__name__)
 from ..models import (
     AdminUserInfo,
     AdminUserListResponse,
@@ -94,8 +99,12 @@ async def list_invite_codes(
     """List all invite codes with their status. Admin only."""
     db = pool.pool
     rows = await db.fetch(
-        """SELECT code, created_by, used_by, expires_at, created_at, used_at, permissions
-           FROM butler.invite_codes ORDER BY created_at DESC"""
+        """SELECT ic.code, ic.created_by, ic.used_by, ic.expires_at,
+                  ic.created_at, ic.used_at, ic.permissions,
+                  u.name AS used_by_name
+           FROM butler.invite_codes ic
+           LEFT JOIN butler.users u ON ic.used_by = u.id
+           ORDER BY ic.created_at DESC"""
     )
     now = datetime.now(timezone.utc)
     codes = []
@@ -104,11 +113,16 @@ async def list_invite_codes(
         perms = (
             json.loads(raw) if isinstance(raw, str) else raw
         ) if raw is not None else list(DEFAULT_PERMISSIONS)
+        # Show actual display name if user has onboarded, otherwise fall back to ID
+        used_by_display = None
+        if r["used_by"] is not None:
+            name = r["used_by_name"]
+            used_by_display = name if name and name != r["used_by"] else r["used_by"]
         codes.append(
             InviteCodeInfo(
                 code=r["code"],
                 createdBy=r["created_by"],
-                usedBy=r["used_by"],
+                usedBy=used_by_display,
                 expiresAt=r["expires_at"].isoformat(),
                 createdAt=r["created_at"].isoformat(),
                 usedAt=r["used_at"].isoformat() if r["used_at"] else None,
@@ -189,3 +203,33 @@ async def update_user_permissions(
     if result == "UPDATE 0":
         raise HTTPException(404, "User not found")
     return {"status": "ok", "permissions": req.permissions}
+
+
+@router.delete("/users/{user_id}", status_code=204)
+async def admin_delete_user(
+    user_id: str,
+    admin_id: str = Depends(get_admin_user),
+    pool: DatabasePool = Depends(get_db_pool),
+):
+    """Delete a user and their service accounts. Admin only."""
+    if user_id == admin_id:
+        raise HTTPException(400, "Cannot delete your own account from the admin panel")
+
+    db = pool.pool
+    exists = await db.fetchval(
+        "SELECT 1 FROM butler.users WHERE id = $1", user_id
+    )
+    if not exists:
+        raise HTTPException(404, "User not found")
+
+    # Best-effort deprovision service accounts on downstream apps
+    try:
+        await deprovision_user_accounts(user_id, pool)
+    except Exception:
+        logger.warning(
+            "Service deprovisioning failed during admin deletion for user=%s", user_id
+        )
+
+    # CASCADE handles all child tables (facts, credentials, tokens, etc.)
+    await db.execute("DELETE FROM butler.users WHERE id = $1", user_id)
+    return Response(status_code=204)

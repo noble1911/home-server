@@ -60,6 +60,14 @@ export default function Settings() {
   const [serviceCredentials, setServiceCredentials] = useState<ServiceCredential[]>([])
   const [credentialsLoading, setCredentialsLoading] = useState(true)
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set())
+  const [isReprovisioning, setIsReprovisioning] = useState(false)
+  const [reprovisionError, setReprovisionError] = useState<string | null>(null)
+
+  // Service password change state
+  const [newServicePassword, setNewServicePassword] = useState('')
+  const [confirmServicePassword, setConfirmServicePassword] = useState('')
+  const [passwordChangeLoading, setPasswordChangeLoading] = useState(false)
+  const [passwordChangeResults, setPasswordChangeResults] = useState<{ service: string; status: string; error?: string }[] | null>(null)
 
   // WhatsApp notification state
   const [phoneInput, setPhoneInput] = useState(profile?.phone || '')
@@ -141,6 +149,44 @@ export default function Settings() {
       else next.add(service)
       return next
     })
+  }
+
+  async function retryProvisioning() {
+    setIsReprovisioning(true)
+    setReprovisionError(null)
+    try {
+      await api.post('/user/reprovision')
+      await fetchServiceCredentials()
+    } catch (err) {
+      setReprovisionError(err instanceof Error ? err.message : 'Re-provisioning failed')
+    } finally {
+      setIsReprovisioning(false)
+    }
+  }
+
+  async function changeServicePassword() {
+    if (newServicePassword !== confirmServicePassword) return
+    if (newServicePassword.length < 6) return
+    setPasswordChangeLoading(true)
+    setPasswordChangeResults(null)
+    try {
+      const data = await api.put<{ results: { service: string; status: string; error?: string }[] }>(
+        '/user/service-password',
+        { newPassword: newServicePassword }
+      )
+      setPasswordChangeResults(data.results)
+      setNewServicePassword('')
+      setConfirmServicePassword('')
+      await fetchServiceCredentials()
+    } catch (err) {
+      setPasswordChangeResults([{
+        service: 'all',
+        status: 'failed',
+        error: err instanceof Error ? err.message : 'Password change failed',
+      }])
+    } finally {
+      setPasswordChangeLoading(false)
+    }
   }
 
   async function fetchInviteCodes() {
@@ -374,7 +420,7 @@ export default function Settings() {
                     <span className="font-mono text-butler-100 text-sm">{code.code}</span>
                     <div className="text-xs text-butler-500 mt-0.5">
                       {code.isUsed
-                        ? `Used${code.usedBy ? ` by ${code.usedBy.replace('invite_', '')}` : ''}`
+                        ? `Used${code.usedBy ? ` by ${code.usedBy}` : ''}`
                         : code.isExpired
                           ? 'Expired'
                           : `Expires ${new Date(code.expiresAt).toLocaleDateString()}`
@@ -630,6 +676,70 @@ export default function Settings() {
                 </div>
               )
             })}
+          </div>
+
+          {/* Retry failed services */}
+          {serviceCredentials.some(c => c.status === 'failed') && (
+            <div className="mt-4">
+              {reprovisionError && (
+                <div className="text-xs text-red-400 mb-2">{reprovisionError}</div>
+              )}
+              <button
+                onClick={retryProvisioning}
+                disabled={isReprovisioning}
+                className="w-full btn bg-accent/20 text-accent hover:bg-accent/30 text-sm disabled:opacity-50"
+              >
+                {isReprovisioning ? 'Retrying...' : 'Retry Failed Services'}
+              </button>
+            </div>
+          )}
+
+          {/* Change service password */}
+          <div className="mt-4 pt-4 border-t border-butler-700">
+            <p className="text-sm font-medium text-butler-300 mb-2">Change Service Password</p>
+            <p className="text-xs text-butler-500 mb-3">
+              Updates your password across all active services at once.
+            </p>
+            <div className="space-y-2">
+              <input
+                type="password"
+                value={newServicePassword}
+                onChange={(e) => setNewServicePassword(e.target.value)}
+                placeholder="New password (min 6 chars)"
+                className="input w-full text-sm"
+              />
+              <input
+                type="password"
+                value={confirmServicePassword}
+                onChange={(e) => setConfirmServicePassword(e.target.value)}
+                placeholder="Confirm password"
+                className="input w-full text-sm"
+              />
+              {newServicePassword && confirmServicePassword && newServicePassword !== confirmServicePassword && (
+                <p className="text-xs text-red-400">Passwords do not match</p>
+              )}
+              <button
+                onClick={changeServicePassword}
+                disabled={
+                  passwordChangeLoading ||
+                  !newServicePassword ||
+                  newServicePassword.length < 6 ||
+                  newServicePassword !== confirmServicePassword
+                }
+                className="w-full btn bg-butler-700 text-butler-300 hover:bg-butler-600 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {passwordChangeLoading ? 'Updating...' : 'Update Password'}
+              </button>
+            </div>
+            {passwordChangeResults && (
+              <div className="mt-2 space-y-1">
+                {passwordChangeResults.map(r => (
+                  <div key={r.service} className={`text-xs ${r.status === 'updated' ? 'text-green-400' : r.status === 'skipped' ? 'text-butler-500' : 'text-red-400'}`}>
+                    {SERVICE_DISPLAY_NAMES[r.service]?.label || r.service}: {r.status}{r.error ? ` — ${r.error}` : ''}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </section>
       )}

@@ -4,6 +4,7 @@
 
 services:
   butler-app:
+    image: ghcr.io/noble1911/home-server/butler-app:latest
     build:
       context: .
       dockerfile: Dockerfile
