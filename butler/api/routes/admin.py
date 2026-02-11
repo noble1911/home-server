@@ -103,7 +103,8 @@ async def list_invite_codes(
     rows = await db.fetch(
         """SELECT ic.code, ic.created_by, ic.used_by, ic.expires_at,
                   ic.created_at, ic.used_at, ic.permissions,
-                  u.name AS used_by_name
+                  u.name AS used_by_name,
+                  u.permissions AS user_permissions
            FROM butler.invite_codes ic
            LEFT JOIN butler.users u ON ic.used_by = u.id
            ORDER BY ic.created_at DESC"""
@@ -111,7 +112,9 @@ async def list_invite_codes(
     now = datetime.now(timezone.utc)
     codes = []
     for r in rows:
-        raw = r["permissions"]
+        # For used codes: show the user's CURRENT permissions (single source of truth)
+        # For unused codes: show the code's own permissions (what will be granted)
+        raw = r["user_permissions"] if r["used_by"] is not None else r["permissions"]
         perms = (
             json.loads(raw) if isinstance(raw, str) else raw
         ) if raw is not None else list(DEFAULT_PERMISSIONS)
