@@ -55,6 +55,12 @@ export default function Settings() {
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([])
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
   const [permSaving, setPermSaving] = useState(false)
+  const [showRemoveUserConfirm, setShowRemoveUserConfirm] = useState(false)
+  const [isRemovingUser, setIsRemovingUser] = useState(false)
+  const [removeUserError, setRemoveUserError] = useState<string | null>(null)
+  const [adminReprovisioning, setAdminReprovisioning] = useState(false)
+  const [adminReprovisionError, setAdminReprovisionError] = useState<string | null>(null)
+  const [adminReprovisionSuccess, setAdminReprovisionSuccess] = useState(false)
 
   // Service credentials state
   const [serviceCredentials, setServiceCredentials] = useState<ServiceCredential[]>([])
@@ -301,6 +307,38 @@ export default function Settings() {
     }
   }
 
+  async function adminReprovision(userId: string) {
+    setAdminReprovisioning(true)
+    setAdminReprovisionError(null)
+    setAdminReprovisionSuccess(false)
+    try {
+      await api.post(`/admin/users/${userId}/reprovision`)
+      setAdminReprovisionSuccess(true)
+      setTimeout(() => setAdminReprovisionSuccess(false), 3000)
+    } catch (err) {
+      setAdminReprovisionError(err instanceof Error ? err.message : 'Re-provisioning failed')
+    } finally {
+      setAdminReprovisioning(false)
+    }
+  }
+
+  async function removeUser(userId: string) {
+    setIsRemovingUser(true)
+    setRemoveUserError(null)
+    try {
+      await api.delete(`/admin/users/${userId}`)
+      setAdminUsers(prev => prev.filter(u => u.id !== userId))
+      setSelectedUserId(null)
+      setShowRemoveUserConfirm(false)
+      // Refresh invite codes too (user may have been tied to one)
+      await fetchInviteCodes()
+    } catch (err) {
+      setRemoveUserError(err instanceof Error ? err.message : 'Failed to remove user')
+    } finally {
+      setIsRemovingUser(false)
+    }
+  }
+
   async function handleClearFacts() {
     setIsDeleting(true)
     setDeleteError(null)
@@ -368,6 +406,56 @@ export default function Settings() {
             <div>
               <label className="block text-sm text-butler-300 mb-1">Role</label>
               <div className="text-accent text-sm">Admin</div>
+            </div>
+          )}
+
+          {/* Change service password */}
+          {!credentialsLoading && serviceCredentials.length > 0 && (
+            <div className="pt-4 border-t border-butler-700">
+              <label className="block text-sm text-butler-300 mb-1">Service Password</label>
+              <p className="text-xs text-butler-500 mb-3">
+                Change your password across Jellyfin, Audiobookshelf, Nextcloud, and other services.
+              </p>
+              <div className="space-y-2">
+                <input
+                  type="password"
+                  value={newServicePassword}
+                  onChange={(e) => setNewServicePassword(e.target.value)}
+                  placeholder="New password (min 6 chars)"
+                  className="input w-full text-sm"
+                />
+                <input
+                  type="password"
+                  value={confirmServicePassword}
+                  onChange={(e) => setConfirmServicePassword(e.target.value)}
+                  placeholder="Confirm password"
+                  className="input w-full text-sm"
+                />
+                {newServicePassword && confirmServicePassword && newServicePassword !== confirmServicePassword && (
+                  <p className="text-xs text-red-400">Passwords do not match</p>
+                )}
+                <button
+                  onClick={changeServicePassword}
+                  disabled={
+                    passwordChangeLoading ||
+                    !newServicePassword ||
+                    newServicePassword.length < 6 ||
+                    newServicePassword !== confirmServicePassword
+                  }
+                  className="w-full btn bg-butler-700 text-butler-300 hover:bg-butler-600 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {passwordChangeLoading ? 'Updating...' : 'Change Password'}
+                </button>
+              </div>
+              {passwordChangeResults && (
+                <div className="mt-2 space-y-1">
+                  {passwordChangeResults.map(r => (
+                    <div key={r.service} className={`text-xs ${r.status === 'updated' ? 'text-green-400' : r.status === 'skipped' ? 'text-butler-500' : 'text-red-400'}`}>
+                      {SERVICE_DISPLAY_NAMES[r.service]?.label || r.service}: {r.status}{r.error ? ` — ${r.error}` : ''}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -697,53 +785,6 @@ export default function Settings() {
             </div>
           )}
 
-          {/* Change service password */}
-          <div className="mt-4 pt-4 border-t border-butler-700">
-            <p className="text-sm font-medium text-butler-300 mb-2">Change Service Password</p>
-            <p className="text-xs text-butler-500 mb-3">
-              Updates your password across all active services at once.
-            </p>
-            <div className="space-y-2">
-              <input
-                type="password"
-                value={newServicePassword}
-                onChange={(e) => setNewServicePassword(e.target.value)}
-                placeholder="New password (min 6 chars)"
-                className="input w-full text-sm"
-              />
-              <input
-                type="password"
-                value={confirmServicePassword}
-                onChange={(e) => setConfirmServicePassword(e.target.value)}
-                placeholder="Confirm password"
-                className="input w-full text-sm"
-              />
-              {newServicePassword && confirmServicePassword && newServicePassword !== confirmServicePassword && (
-                <p className="text-xs text-red-400">Passwords do not match</p>
-              )}
-              <button
-                onClick={changeServicePassword}
-                disabled={
-                  passwordChangeLoading ||
-                  !newServicePassword ||
-                  newServicePassword.length < 6 ||
-                  newServicePassword !== confirmServicePassword
-                }
-                className="w-full btn bg-butler-700 text-butler-300 hover:bg-butler-600 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {passwordChangeLoading ? 'Updating...' : 'Update Password'}
-              </button>
-            </div>
-            {passwordChangeResults && (
-              <div className="mt-2 space-y-1">
-                {passwordChangeResults.map(r => (
-                  <div key={r.service} className={`text-xs ${r.status === 'updated' ? 'text-green-400' : r.status === 'skipped' ? 'text-butler-500' : 'text-red-400'}`}>
-                    {SERVICE_DISPLAY_NAMES[r.service]?.label || r.service}: {r.status}{r.error ? ` — ${r.error}` : ''}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
         </section>
       )}
 
@@ -831,6 +872,33 @@ export default function Settings() {
                       </button>
                     )
                   })}
+
+                  {selectedUser.role !== 'admin' && (
+                    <div className="pt-3 mt-3 border-t border-butler-700 space-y-2">
+                      {adminReprovisionError && (
+                        <div className="text-xs text-red-400">{adminReprovisionError}</div>
+                      )}
+                      {adminReprovisionSuccess && (
+                        <div className="text-xs text-green-400">Services re-provisioned successfully</div>
+                      )}
+                      <button
+                        onClick={() => adminReprovision(selectedUser.id)}
+                        disabled={adminReprovisioning}
+                        className="w-full btn bg-accent/20 text-accent hover:bg-accent/30 text-sm disabled:opacity-50"
+                      >
+                        {adminReprovisioning ? 'Provisioning...' : 'Reprovision Services'}
+                      </button>
+                      {removeUserError && (
+                        <div className="text-xs text-red-400">{removeUserError}</div>
+                      )}
+                      <button
+                        onClick={() => setShowRemoveUserConfirm(true)}
+                        className="w-full btn bg-red-900/50 text-red-300 hover:bg-red-900 hover:text-red-200 text-sm"
+                      >
+                        Remove User
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </>
@@ -1134,6 +1202,17 @@ export default function Settings() {
         onConfirm={handleDeleteAccount}
         onCancel={() => setShowDeleteAccountConfirm(false)}
       />
+
+      {selectedUser && (
+        <ConfirmDialog
+          open={showRemoveUserConfirm}
+          title={`Remove ${selectedUser.name}`}
+          description={`This will permanently delete ${selectedUser.name}'s account, conversation history, facts, and revoke their service accounts (Jellyfin, Audiobookshelf, etc.). This cannot be undone.`}
+          confirmLabel={isRemovingUser ? 'Removing...' : `Remove ${selectedUser.name}`}
+          onConfirm={() => removeUser(selectedUser.id)}
+          onCancel={() => { setShowRemoveUserConfirm(false); setRemoveUserError(null) }}
+        />
+      )}
     </div>
   )
 }
