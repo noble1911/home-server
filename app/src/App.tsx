@@ -8,6 +8,7 @@ import Services from './pages/Services'
 import Downloads from './pages/Downloads'
 import Dashboard from './pages/Dashboard'
 import Settings from './pages/Settings'
+import Tutorial from './pages/Tutorial'
 import Login from './pages/Login'
 import Onboarding from './pages/Onboarding'
 
@@ -57,6 +58,7 @@ function AppContent() {
         <Route path="/services" element={<Services />} />
         <Route path="/downloads" element={<Downloads />} />
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/tutorial" element={<Tutorial />} />
         <Route path="/settings" element={<Settings />} />
       </Route>
 
