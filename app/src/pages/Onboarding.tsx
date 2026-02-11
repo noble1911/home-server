@@ -84,9 +84,9 @@ export default function Onboarding() {
       // Fetch the complete profile
       await fetchProfile()
 
-      // If service accounts were provisioned and some failed, show results
+      // If service accounts had issues (failed or skipped), show results
       const accounts = response.serviceAccounts || []
-      const hasFailed = accounts.some(a => a.status === 'failed')
+      const hasFailed = accounts.some(a => a.status === 'failed' || a.status === 'skipped')
       if (hasFailed) {
         setProvisioningResults(accounts)
         setIsSubmitting(false)
@@ -383,16 +383,28 @@ export default function Onboarding() {
               {provisioningResults.map(result => {
                 const info = SERVICE_DISPLAY_NAMES[result.service] || { label: result.service, description: '' }
                 const ok = result.status === 'active'
+                const skipped = result.status === 'skipped'
                 return (
-                  <div key={result.service} className="flex items-center justify-between p-3 bg-butler-800 rounded-lg">
-                    <div>
-                      <div className="text-sm text-butler-100">{info.label}</div>
-                      <div className="text-xs text-butler-500">{info.description}</div>
+                  <div key={result.service} className={`p-3 rounded-lg ${
+                    ok ? 'bg-butler-800'
+                      : skipped ? 'bg-butler-800 border border-butler-600'
+                      : 'bg-red-900/20 border border-red-900/40'
+                  }`}>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-sm text-butler-100">{info.label}</div>
+                        <div className="text-xs text-butler-500">{info.description}</div>
+                      </div>
+                      {ok ? (
+                        <span className="text-xs text-green-400">Created</span>
+                      ) : skipped ? (
+                        <span className="text-xs text-yellow-400">Skipped</span>
+                      ) : (
+                        <span className="text-xs text-red-400">Failed</span>
+                      )}
                     </div>
-                    {ok ? (
-                      <span className="text-xs text-green-400">Created</span>
-                    ) : (
-                      <span className="text-xs text-red-400">Failed</span>
+                    {!ok && result.error && (
+                      <p className={`text-xs mt-1.5 ${skipped ? 'text-yellow-400/80' : 'text-red-400/80'}`}>{result.error}</p>
                     )}
                   </div>
                 )

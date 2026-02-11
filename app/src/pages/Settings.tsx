@@ -332,17 +332,17 @@ export default function Settings() {
             <span className="text-butler-600 ml-2 text-xs normal-case">admin</span>
           </h2>
 
-          <div className="mb-4">
-            <p className="text-xs text-butler-500 mb-2">Permissions for new user:</p>
-            <div className="flex flex-wrap gap-2 mb-3">
+          <div className="mb-4 p-3 bg-butler-900 rounded-lg">
+            <p className="text-sm font-medium text-butler-300 mb-2">Permissions for new user</p>
+            <div className="flex flex-wrap gap-2">
               {(Object.keys(PERMISSION_INFO) as ToolPermission[]).map(perm => (
                 <button
                   key={perm}
                   onClick={() => toggleInvitePermission(perm)}
-                  className={`px-2.5 py-1 rounded-full text-xs transition-colors ${
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                     invitePermissions.has(perm)
                       ? 'bg-accent/20 text-accent border border-accent/40'
-                      : 'bg-butler-800 text-butler-500 border border-butler-700'
+                      : 'bg-butler-800 text-butler-400 border border-butler-600'
                   }`}
                 >
                   {PERMISSION_INFO[perm].label}
