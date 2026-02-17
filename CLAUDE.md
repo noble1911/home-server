@@ -89,7 +89,7 @@ gh issue edit <number> --add-assignee @me  # Claim an issue
 **Owner:** Ron (GitHub: noble1911)
 **Hardware:** Mac Mini M4 (24GB RAM, 512GB SSD) + external USB drive
 **Status:** Live and running — all stacks deployed, actively maintained
-**SSH Access:** `ssh 192.168.1.22`
+**SSH Access:** `ssh 192.168.1.117`
 
 ## Current Progress
 
@@ -191,7 +191,7 @@ home-server/
 | Embeddings | nomic-embed-text (768-dim) | Local, fast, good quality |
 | Task tracking | GitHub Issues | Avoids merge conflicts with parallel agents |
 | Remote access | Cloudflare Tunnel | No port forwarding, works on any device |
-| SSH | Available at 192.168.1.22 | Local network access for management |
+| SSH | Available at 192.168.1.117 | Local network access for management |
 | Book management | BookTool (Open Library + Prowlarr) | Replaced Readarr — simpler, more reliable |
 | Tool routing | 2-phase (categorise → route) | 80-95% API cost reduction |
 
@@ -223,7 +223,7 @@ home-server/
 - Ron prefers modular, DRY code - scripts should be reusable
 - Keep README minimal - detailed docs go in docs/
 - Always commit and push after making changes
-- **Server is live** at `192.168.1.22` — SSH available for remote management
+- **Server is live** at `192.168.1.117` — SSH available for remote management
 - **Memory/personalization is important** - Butler should know users
 - **Always check `gh issue list` first** before starting work
 - **Claim issues with `gh issue edit --add-assignee @me`** to avoid conflicts
