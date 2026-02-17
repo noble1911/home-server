@@ -231,6 +231,119 @@ class TestScheduleTaskTool:
         assert "task_id" in result.lower()
 
 
+    @pytest.mark.asyncio
+    async def test_create_reminder_with_channel(self, tool, mock_pool):
+        """Create a reminder with explicit WhatsApp channel."""
+        mock_pool.pool.fetchrow = AsyncMock(return_value={"id": 10})
+
+        result = await tool.execute(
+            action="create",
+            user_id="ron",
+            name="WhatsApp reminder",
+            action_type="reminder",
+            message="Hello via WhatsApp",
+            channel="whatsapp",
+        )
+
+        assert "Created task" in result
+        call_args = mock_pool.pool.fetchrow.call_args
+        action_json = json.loads(call_args[0][4])
+        assert action_json["channel"] == "whatsapp"
+
+    @pytest.mark.asyncio
+    async def test_create_reminder_default_channel(self, tool, mock_pool):
+        """Create a reminder without channel — should omit it from JSONB."""
+        mock_pool.pool.fetchrow = AsyncMock(return_value={"id": 11})
+
+        result = await tool.execute(
+            action="create",
+            user_id="ron",
+            name="Push reminder",
+            action_type="reminder",
+            message="Hello via push",
+        )
+
+        assert "Created task" in result
+        call_args = mock_pool.pool.fetchrow.call_args
+        action_json = json.loads(call_args[0][4])
+        assert "channel" not in action_json
+
+    @pytest.mark.asyncio
+    async def test_create_check_with_channel_both(self, tool, mock_pool):
+        """Create a check with channel='both'."""
+        mock_pool.pool.fetchrow = AsyncMock(return_value={"id": 12})
+
+        result = await tool.execute(
+            action="create",
+            user_id="ron",
+            name="Dual check",
+            cron_expression="0 9 * * *",
+            action_type="check",
+            tool="server_health",
+            channel="both",
+        )
+
+        assert "Created task" in result
+        call_args = mock_pool.pool.fetchrow.call_args
+        action_json = json.loads(call_args[0][4])
+        assert action_json["channel"] == "both"
+
+    @pytest.mark.asyncio
+    async def test_create_automation_ignores_channel(self, tool, mock_pool):
+        """Automation tasks should not include channel in JSONB."""
+        mock_pool.pool.fetchrow = AsyncMock(return_value={"id": 13})
+
+        await tool.execute(
+            action="create",
+            user_id="ron",
+            name="Auto task",
+            action_type="automation",
+            tool="home_assistant",
+            channel="whatsapp",  # should be ignored
+        )
+
+        call_args = mock_pool.pool.fetchrow.call_args
+        action_json = json.loads(call_args[0][4])
+        assert "channel" not in action_json
+
+    @pytest.mark.asyncio
+    async def test_list_shows_channel(self, tool, mock_pool):
+        """List output includes channel info."""
+        mock_pool.pool.fetch = AsyncMock(
+            return_value=[
+                {
+                    "id": 1,
+                    "name": "Push reminder",
+                    "cron_expression": "0 9 * * *",
+                    "action": {"type": "reminder"},
+                    "enabled": True,
+                    "last_run": None,
+                    "next_run": datetime(2025, 2, 10, 9, 0, tzinfo=timezone.utc),
+                },
+                {
+                    "id": 2,
+                    "name": "WA reminder",
+                    "cron_expression": "0 9 * * *",
+                    "action": {"type": "reminder", "channel": "whatsapp"},
+                    "enabled": True,
+                    "last_run": None,
+                    "next_run": datetime(2025, 2, 10, 9, 0, tzinfo=timezone.utc),
+                },
+            ]
+        )
+
+        result = await tool.execute(action="list", user_id="ron")
+
+        assert "via push" in result
+        assert "via whatsapp" in result
+
+    def test_channel_in_schema(self, tool):
+        """Verify channel parameter exists in tool schema."""
+        props = tool.parameters["properties"]
+        assert "channel" in props
+        assert props["channel"]["enum"] == ["push", "whatsapp", "both"]
+
+
 class TestComputeNextRun:
     """Tests for cron next_run computation."""
 

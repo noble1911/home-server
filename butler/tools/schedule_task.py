@@ -63,7 +63,7 @@ class ScheduleTaskTool(DatabaseTool):
                     "enum": ["reminder", "automation", "check"],
                     "description": (
                         "Task type (required for 'create'). "
-                        "reminder: send WhatsApp message. "
+                        "reminder: send notification (push by default). "
                         "automation: execute a tool. "
                         "check: run health check and notify on threshold."
                     ),
@@ -88,6 +88,17 @@ class ScheduleTaskTool(DatabaseTool):
                     "type": "string",
                     "enum": ["warning", "critical", "always"],
                     "description": "When to notify for check type (default: warning).",
+                },
+                "channel": {
+                    "type": "string",
+                    "enum": ["push", "whatsapp", "both"],
+                    "description": (
+                        "Notification channel (for reminder/check). "
+                        "'push' (default): browser push notification, "
+                        "falls back to WhatsApp if no subscriptions. "
+                        "'whatsapp': WhatsApp only. "
+                        "'both': send via both channels."
+                    ),
                 },
                 "task_id": {
                     "type": "integer",
@@ -137,6 +148,12 @@ class ScheduleTaskTool(DatabaseTool):
             task_action["tool"] = kwargs["tool"]
             task_action["params"] = kwargs.get("params", {})
             task_action["notifyOn"] = kwargs.get("notify_on", "warning")
+
+        # Add notification channel (reminder/check only)
+        if action_type in ("reminder", "check"):
+            channel = kwargs.get("channel")
+            if channel:
+                task_action["channel"] = channel
 
         # Compute next_run
         now = datetime.now(timezone.utc)
@@ -188,8 +205,10 @@ class ScheduleTaskTool(DatabaseTool):
             action = json.loads(r["action"]) if isinstance(r["action"], str) else r["action"]
             schedule = r["cron_expression"] or "one-time"
             next_run = r["next_run"].strftime("%Y-%m-%d %H:%M UTC") if r["next_run"] else "none"
+            channel = action.get("channel", "push")
             lines.append(
-                f"- [{r['id']}] {r['name']} ({action.get('type')}, {schedule}, {status}, next: {next_run})"
+                f"- [{r['id']}] {r['name']} ({action.get('type')}, {schedule}, {status}, "
+                f"via {channel}, next: {next_run})"
             )
 
         return f"Scheduled tasks ({len(rows)}):\n" + "\n".join(lines)
