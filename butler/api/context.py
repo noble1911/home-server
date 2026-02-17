@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class UserContext:
-    system_prompt: str
+    system_prompt: list[dict]
     user_name: str
     butler_name: str
     history: list[dict] = field(default_factory=list)
@@ -66,7 +66,7 @@ async def load_user_context(
     )
     if not user:
         return UserContext(
-            system_prompt=_build_system_prompt("User", {}, []),
+            system_prompt=_build_system_blocks("User", {}, []),
             user_name="User",
             butler_name="Butler",
         )
@@ -86,7 +86,7 @@ async def load_user_context(
     )
 
     return UserContext(
-        system_prompt=_build_system_prompt(user_name, soul, facts, channel=channel),
+        system_prompt=_build_system_blocks(user_name, soul, facts, channel=channel),
         user_name=user_name,
         butler_name=butler_name,
         history=history,
@@ -243,25 +243,66 @@ async def load_conversation_messages(
     return messages
 
 
-def _build_system_prompt(
+def _build_rules_text(channel: str | None = None) -> str:
+    """Build the static RULES section of the system prompt.
+
+    This content is identical across all users and requests (for a given
+    channel), making it an excellent candidate for prompt caching.
+    """
+    parts = [
+        "RULES:",
+        "- Be concise in voice responses (1-2 sentences unless asked for detail)",
+        "- Use remember_fact to store important information about the user",
+        "- For home automation, confirm before executing destructive actions",
+        (
+            "- When performing multiple actions (downloads, searches, etc.), "
+            "report each item's status individually using a markdown list. "
+            "Never give a single generic success/failure for batch operations"
+        ),
+    ]
+
+    if channel == "voice":
+        parts.append(
+            "- When a response benefits from visual formatting (tables, images, "
+            "lists, links), use display_in_chat to show rich content in the chat "
+            "while providing a brief spoken summary"
+        )
+
+    return "\n".join(parts)
+
+
+def _build_system_blocks(
     user_name: str,
     soul: dict,
     facts: list,
     *,
     channel: str | None = None,
-) -> str:
-    """Compose system prompt from personality and known facts.
+) -> list[dict]:
+    """Compose system prompt as content blocks for prompt caching.
 
-    Conversation history is no longer included here — it's passed as actual
-    messages in the Claude API messages array for proper multi-turn context.
+    Returns a list of Anthropic content blocks. Static content (RULES) is
+    placed first with cache_control so it can be cached across requests.
+    Dynamic content (personality, facts) comes after and changes per user/request.
+
+    Conversation history is passed as actual messages in the Claude API
+    messages array for proper multi-turn context.
     """
+    blocks: list[dict] = []
+
+    # Block 1: Static rules — cached across all users and requests.
+    blocks.append({
+        "type": "text",
+        "text": _build_rules_text(channel),
+        "cache_control": {"type": "ephemeral"},
+    })
+
+    # Block 2: Per-user dynamic content (personality + facts).
     butler_name = soul.get("butler_name", "Butler")
     parts = [
         f"You are {butler_name}, a helpful AI assistant. "
         f"You are speaking with {user_name}."
     ]
 
-    # Personality
     if soul:
         personality_items = []
         if p := soul.get("personality"):
@@ -276,29 +317,12 @@ def _build_system_prompt(
             parts.append("\nPERSONALITY:")
             parts.extend(personality_items)
 
-    # Known facts
     if facts:
         parts.append(f"\nWHAT YOU KNOW ABOUT {user_name.upper()}:")
         for row in facts:
             category = row["category"] or "general"
             parts.append(f"- [{category}] {row['fact']}")
 
-    # Behavioral rules
-    parts.append("\nRULES:")
-    parts.append("- Be concise in voice responses (1-2 sentences unless asked for detail)")
-    parts.append("- Use remember_fact to store important information about the user")
-    parts.append("- For home automation, confirm before executing destructive actions")
-    parts.append(
-        "- When performing multiple actions (downloads, searches, etc.), "
-        "report each item's status individually using a markdown list. "
-        "Never give a single generic success/failure for batch operations"
-    )
+    blocks.append({"type": "text", "text": "\n".join(parts)})
 
-    if channel == "voice":
-        parts.append(
-            "- When a response benefits from visual formatting (tables, images, "
-            "lists, links), use display_in_chat to show rich content in the chat "
-            "while providing a brief spoken summary"
-        )
-
-    return "\n".join(parts)
+    return blocks

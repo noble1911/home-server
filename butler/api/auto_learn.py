@@ -12,13 +12,12 @@ from __future__ import annotations
 import json
 import logging
 
-import anthropic
-
 from tools import DatabasePool
 from tools.embeddings import EmbeddingService
 from tools.memory import RememberFactTool
 
 from .config import settings
+from .llm import _get_client
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +104,7 @@ async def _call_extraction_model(
     assistant_response: str,
 ) -> list[dict]:
     """Call Haiku to extract facts from a conversation turn."""
-    client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
+    client = _get_client()
 
     prompt = _EXTRACTION_PROMPT.format(
         user_message=user_message,
