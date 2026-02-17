@@ -272,6 +272,7 @@ class TaskAction(BaseModel):
     params: dict | None = None
     category: str | None = None
     notifyOn: str | None = None  # "warning" | "critical" | "always"
+    channel: str | None = None  # "push" | "whatsapp" | "both" (default: push)
 
 
 class CreateTaskRequest(BaseModel):

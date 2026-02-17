@@ -130,16 +130,12 @@ class TaskScheduler:
         )
 
     async def _send_reminder(self, action: dict, user_id: str) -> None:
-        """Send a WhatsApp reminder message."""
-        whatsapp = self._tools.get("whatsapp")
-        if not whatsapp:
-            logger.warning("WhatsApp tool not configured — skipping reminder")
-            return
-
-        await whatsapp.execute(
-            action="send_message",
+        """Send a reminder notification via the configured channel."""
+        await self._notify_user(
             user_id=user_id,
+            title="Butler Reminder",
             message=action.get("message", "Reminder"),
+            channel=action.get("channel"),
             category=action.get("category", "general"),
         )
 
@@ -173,16 +169,78 @@ class TaskScheduler:
         )
 
         if should_notify:
+            await self._notify_user(
+                user_id=user_id,
+                title="Butler Alert",
+                message=f"Health check alert: {result[:500]}",
+                channel=action.get("channel"),
+                category=action.get("category", "general"),
+            )
+
+    # ------------------------------------------------------------------
+    # Notification delivery
+    # ------------------------------------------------------------------
+
+    async def _notify_user(
+        self,
+        user_id: str,
+        title: str,
+        message: str,
+        channel: str | None,
+        category: str = "general",
+    ) -> None:
+        """Send a notification via the configured channel.
+
+        Channel routing:
+          - "push" (default): Web Push → falls back to WhatsApp if no subscriptions.
+          - "whatsapp": WhatsApp only.
+          - "both": Push + WhatsApp.
+        """
+        from .push import send_push_to_user  # lazy: pywebpush is Docker-only
+
+        effective = channel or "push"
+        push_sent = 0
+
+        if effective in ("push", "both"):
+            push_sent = await send_push_to_user(
+                pool=self._db_pool,
+                user_id=user_id,
+                title=title,
+                body=message,
+                url="/",
+                category=category,
+            )
+            if push_sent > 0:
+                logger.info(
+                    "Push sent to %d device(s) for user %s", push_sent, user_id,
+                )
+
+        send_whatsapp = (
+            effective == "whatsapp"
+            or effective == "both"
+            or (effective == "push" and push_sent == 0)  # fallback
+        )
+
+        if send_whatsapp:
             whatsapp = self._tools.get("whatsapp")
             if whatsapp:
+                if effective == "push" and push_sent == 0:
+                    logger.info(
+                        "No push subscriptions for user %s — falling back to WhatsApp",
+                        user_id,
+                    )
                 await whatsapp.execute(
                     action="send_message",
                     user_id=user_id,
-                    message=f"Health check alert: {result[:500]}",
-                    category="general",
+                    message=message,
+                    category=category,
                 )
-            else:
-                logger.warning("Check triggered notification but WhatsApp not configured")
+            elif effective != "both":
+                logger.warning(
+                    "No notification channel available for user %s: %s",
+                    user_id,
+                    message[:100],
+                )
 
 
 async def seed_default_schedules(db_pool: DatabasePool) -> None:
