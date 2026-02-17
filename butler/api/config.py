@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     # Claude API
     anthropic_api_key: str = ""
     anthropic_model: str = "claude-sonnet-4-20250514"
+    routing_model: str = "claude-haiku-4-5-20251001"
     max_tokens: int = 4096
     max_history_messages: int = 20
 

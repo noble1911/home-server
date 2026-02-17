@@ -11,13 +11,18 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from .context import (
     UserContext,
-    _build_system_prompt,
+    _build_system_blocks,
     _load_facts,
     _hybrid_fact_search,
     load_user_context,
     load_conversation_messages,
 )
 from .llm import _build_messages
+
+
+def _blocks_text(blocks: list[dict]) -> str:
+    """Join all text blocks into a single string for assertion convenience."""
+    return "\n".join(b["text"] for b in blocks if b.get("type") == "text")
 
 
 @pytest.fixture
@@ -33,29 +38,41 @@ def _make_history_row(role, content, minutes_ago=0):
     return {"role": role, "content": content}
 
 
-class TestBuildSystemPrompt:
-    """Tests for _build_system_prompt (personality + facts only, no history)."""
+class TestBuildSystemBlocks:
+    """Tests for _build_system_blocks (personality + facts only, no history)."""
 
     def test_basic_prompt_structure(self):
         """System prompt contains role and user name."""
-        prompt = _build_system_prompt("Ron", {}, [])
+        blocks = _build_system_blocks("Ron", {}, [])
+        text = _blocks_text(blocks)
 
-        assert "Butler" in prompt
-        assert "Ron" in prompt
+        assert "Butler" in text
+        assert "Ron" in text
+
+    def test_returns_list_of_blocks(self):
+        """System prompt is a list of content blocks with cache_control."""
+        blocks = _build_system_blocks("Ron", {}, [])
+
+        assert isinstance(blocks, list)
+        assert len(blocks) >= 2
+        # First block (RULES) should have cache_control
+        assert blocks[0]["cache_control"] == {"type": "ephemeral"}
+        # Last block (dynamic content) should NOT have cache_control
+        assert "cache_control" not in blocks[-1]
 
     def test_no_history_in_prompt(self):
         """System prompt no longer contains conversation history."""
-        prompt = _build_system_prompt("Ron", {}, [])
+        text = _blocks_text(_build_system_blocks("Ron", {}, []))
 
-        assert "RECENT CONTEXT" not in prompt
+        assert "RECENT CONTEXT" not in text
 
     def test_personality_included(self):
         """Soul config personality fields appear in prompt."""
         soul = {"personality": "friendly", "humor": "dry wit"}
-        prompt = _build_system_prompt("Ron", soul, [])
+        text = _blocks_text(_build_system_blocks("Ron", soul, []))
 
-        assert "friendly" in prompt
-        assert "dry wit" in prompt
+        assert "friendly" in text
+        assert "dry wit" in text
 
     def test_facts_included(self):
         """Known facts appear in prompt."""
@@ -63,25 +80,25 @@ class TestBuildSystemPrompt:
             {"fact": "Loves Italian food", "category": "preference"},
             {"fact": "Has a cat named Luna", "category": "other"},
         ]
-        prompt = _build_system_prompt("Ron", {}, facts)
+        text = _blocks_text(_build_system_blocks("Ron", {}, facts))
 
-        assert "Loves Italian food" in prompt
-        assert "Has a cat named Luna" in prompt
-        assert "[preference]" in prompt
+        assert "Loves Italian food" in text
+        assert "Has a cat named Luna" in text
+        assert "[preference]" in text
 
     def test_rules_included(self):
         """Behavioral rules appear in prompt."""
-        prompt = _build_system_prompt("Ron", {}, [])
+        text = _blocks_text(_build_system_blocks("Ron", {}, []))
 
-        assert "RULES:" in prompt
-        assert "remember_fact" in prompt
+        assert "RULES:" in text
+        assert "remember_fact" in text
 
     def test_custom_butler_name(self):
         """Soul config can override butler name."""
         soul = {"butler_name": "Jarvis"}
-        prompt = _build_system_prompt("Ron", soul, [])
+        text = _blocks_text(_build_system_blocks("Ron", soul, []))
 
-        assert "Jarvis" in prompt
+        assert "Jarvis" in text
 
 
 class TestLoadConversationMessages:
@@ -160,7 +177,7 @@ class TestLoadUserContext:
         assert isinstance(ctx, UserContext)
         assert ctx.user_name == "User"
         assert ctx.butler_name == "Butler"
-        assert "Butler" in ctx.system_prompt
+        assert "Butler" in _blocks_text(ctx.system_prompt)
         assert ctx.history == []
 
     @pytest.mark.asyncio
@@ -204,7 +221,7 @@ class TestLoadUserContext:
             ctx = await load_user_context(mock_pool, "user1")
 
         # History content should NOT be in system prompt (it's in messages now)
-        assert "What's the temp?" not in ctx.system_prompt
+        assert "What's the temp?" not in _blocks_text(ctx.system_prompt)
 
 
 class TestLoadFacts:

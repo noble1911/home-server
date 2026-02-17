@@ -145,10 +145,10 @@ class _ToolRouter:
     def __init__(
         self,
         all_tools: dict[str, Tool],
-        system_prompt: str,
+        system_blocks: list[dict],
     ) -> None:
         self._all_tools = all_tools
-        self._base_system_prompt = system_prompt
+        self._base_blocks = system_blocks
 
         # Decide which tools the user has that are core vs on-demand
         core_names = ROUTING_CORE_TOOLS & set(all_tools)
@@ -171,8 +171,16 @@ class _ToolRouter:
             self._active_tools = all_tools
 
     @property
+    def model(self) -> str:
+        """Model to use for the current phase."""
+        if self._phase == "routing":
+            return settings.routing_model
+        return settings.anthropic_model
+
+    @property
     def tool_definitions(self) -> list[dict]:
         """Tool schemas for the current API round."""
+        defs: list[dict]
         if self._phase == "routing":
             defs = [tool_to_anthropic_schema(t) for t in self._core_tools.values()]
             defs.append(_REQUEST_TOOLS_SCHEMA)
@@ -182,15 +190,26 @@ class _ToolRouter:
                     "name": "web_search",
                     "max_uses": settings.web_search_max_uses,
                 })
-            return defs
-        return _build_tool_definitions(self._active_tools)
+        else:
+            defs = _build_tool_definitions(self._active_tools)
+
+        # Mark the last tool definition for caching — Anthropic caches all
+        # tool schemas up to and including the one with cache_control.
+        if defs:
+            defs[-1] = {**defs[-1], "cache_control": {"type": "ephemeral"}}
+
+        return defs
 
     @property
-    def system_prompt(self) -> str:
-        """System prompt — includes the tool catalog during routing phase."""
+    def system_blocks(self) -> list[dict]:
+        """System prompt blocks — includes the tool catalog during routing."""
         if self._phase == "routing":
-            return self._base_system_prompt + "\n\n" + self._catalog
-        return self._base_system_prompt
+            return self._base_blocks + [{
+                "type": "text",
+                "text": self._catalog,
+                "cache_control": {"type": "ephemeral"},
+            }]
+        return self._base_blocks
 
     @property
     def active_tools(self) -> dict[str, Tool]:
@@ -335,7 +354,7 @@ async def _execute_tool_blocks(
 # ── Main API functions ──────────────────────────────────────────────
 
 async def chat_with_tools(
-    system_prompt: str,
+    system_prompt: list[dict],
     user_message: str,
     tools: dict[str, Tool],
     max_tool_rounds: int = 5,
@@ -359,7 +378,7 @@ async def chat_with_tools(
     Phase 2 loads the selected schemas.
 
     Args:
-        system_prompt: Personalized system prompt from context.py
+        system_prompt: System prompt content blocks from context.py
         user_message: User's text message or voice transcript
         tools: Dict of tool_name -> Tool instance
         max_tool_rounds: Safety limit on tool use iterations
@@ -374,9 +393,9 @@ async def chat_with_tools(
 
     for round_num in range(max_tool_rounds):
         response = await client.messages.create(
-            model=settings.anthropic_model,
+            model=router.model,
             max_tokens=settings.max_tokens,
-            system=router.system_prompt,
+            system=router.system_blocks,
             tools=router.tool_definitions,
             messages=messages,
         )
@@ -422,7 +441,7 @@ async def chat_with_tools(
 
 
 async def stream_chat_with_tools(
-    system_prompt: str,
+    system_prompt: list[dict],
     user_message: str,
     tools: dict[str, Tool],
     max_tool_rounds: int = 5,
@@ -444,7 +463,7 @@ async def stream_chat_with_tools(
     the next round streams the result ("The lights are now on").
 
     Args:
-        system_prompt: Personalized system prompt from context.py
+        system_prompt: System prompt content blocks from context.py
         user_message: User's text message or voice transcript
         tools: Dict of tool_name -> Tool instance
         max_tool_rounds: Safety limit on tool use iterations
@@ -459,9 +478,9 @@ async def stream_chat_with_tools(
 
     for round_num in range(max_tool_rounds):
         async with client.messages.stream(
-            model=settings.anthropic_model,
+            model=router.model,
             max_tokens=settings.max_tokens,
-            system=router.system_prompt,
+            system=router.system_blocks,
             tools=router.tool_definitions,
             messages=messages,
         ) as stream:
@@ -533,7 +552,7 @@ async def stream_chat_with_tools(
 
 
 async def stream_chat_with_events(
-    system_prompt: str,
+    system_prompt: list[dict],
     user_message: str,
     tools: dict[str, Tool],
     max_tool_rounds: int = 5,
@@ -563,9 +582,9 @@ async def stream_chat_with_events(
         web_search_active = False
 
         async with client.messages.stream(
-            model=settings.anthropic_model,
+            model=router.model,
             max_tokens=settings.max_tokens,
-            system=router.system_prompt,
+            system=router.system_blocks,
             tools=router.tool_definitions,
             messages=messages,
         ) as stream:
