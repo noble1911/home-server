@@ -45,8 +45,8 @@ export default function Onboarding() {
     ? 'Lowercase letters, numbers, and underscores only (3-20 chars)'
     : null
 
-  const passwordError = servicePassword && servicePassword.length < 6
-    ? 'Password must be at least 6 characters'
+  const passwordError = servicePassword && servicePassword.length < 10
+    ? 'Password must be at least 10 characters'
     : null
 
   const confirmError = confirmPassword && confirmPassword !== servicePassword
@@ -56,7 +56,7 @@ export default function Onboarding() {
   const credentialsValid =
     serviceUsername.length >= 3 &&
     !usernameError &&
-    servicePassword.length >= 6 &&
+    servicePassword.length >= 10 &&
     servicePassword === confirmPassword
 
   const handleComplete = async () => {
@@ -322,7 +322,7 @@ export default function Onboarding() {
                   type="password"
                   value={servicePassword}
                   onChange={(e) => setServicePassword(e.target.value)}
-                  placeholder="At least 6 characters"
+                  placeholder="At least 10 characters"
                   className="input"
                   autoComplete="new-password"
                 />

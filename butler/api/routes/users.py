@@ -368,7 +368,7 @@ async def change_service_password(
     """Change password across all provisioned service accounts."""
     new_password = req.get("newPassword")
     if not new_password or len(new_password) < 6:
-        raise HTTPException(400, "Password must be at least 6 characters")
+        raise HTTPException(400, "Password must be at least 10 characters")
 
     results = await update_service_passwords(user_id, new_password, pool)
     if not results:

@@ -153,7 +153,7 @@ class OnboardingRequest(BaseModel):
     soul: SoulConfig
     email: str | None = None
     serviceUsername: str | None = Field(None, pattern=r'^[a-z0-9_]{3,20}$')
-    servicePassword: str | None = Field(None, min_length=6)
+    servicePassword: str | None = Field(None, min_length=10)
 
     @model_validator(mode='after')
     def check_credentials_pair(self):
