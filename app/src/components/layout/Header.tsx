@@ -27,7 +27,12 @@ export default function Header() {
         </div>
 
         <div className="flex items-center gap-3">
-          {!isOnline && (
+          {isOnline ? (
+            <span className="flex items-center gap-1.5 text-xs text-green-400">
+              <span className="w-2 h-2 rounded-full bg-green-500" />
+              <span className="hidden sm:inline">Online</span>
+            </span>
+          ) : (
             <span className="flex items-center gap-1.5 text-xs text-yellow-400">
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 5.636a9 9 0 11-12.728 0M12 9v4m0 4h.01" />
