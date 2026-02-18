@@ -71,7 +71,7 @@ async def _get_profile(user_id: str, pool: DatabasePool) -> UserProfile:
     db = pool.pool
 
     user = await db.fetchrow(
-        "SELECT id, name, soul, role, permissions, phone, notification_prefs, created_at "
+        "SELECT id, name, email, soul, role, permissions, phone, notification_prefs, created_at "
         "FROM butler.users WHERE id = $1",
         user_id,
     )
@@ -96,6 +96,7 @@ async def _get_profile(user_id: str, pool: DatabasePool) -> UserProfile:
     return UserProfile(
         id=user["id"],
         name=user["name"],
+        email=user["email"],
         phone=user["phone"],
         butlerName=soul.get("butler_name", "Butler"),
         role=user["role"],
@@ -142,6 +143,10 @@ async def update_profile(
     if req.name:
         await db.execute(
             "UPDATE butler.users SET name = $2 WHERE id = $1", user_id, req.name
+        )
+    if req.email is not None:
+        await db.execute(
+            "UPDATE butler.users SET email = $2 WHERE id = $1", user_id, req.email or None
         )
     return await _get_profile(user_id, pool)
 
@@ -251,11 +256,12 @@ async def complete_onboarding(
 
     await db.execute(
         """
-        UPDATE butler.users SET name = $2, soul = $3::jsonb WHERE id = $1
+        UPDATE butler.users SET name = $2, soul = $3::jsonb, email = $4 WHERE id = $1
         """,
         user_id,
         req.name,
         soul_dict,
+        req.email or None,
     )
 
     # Auto-provision service accounts if credentials were provided
@@ -277,7 +283,8 @@ async def complete_onboarding(
 
         try:
             service_accounts = await provision_user_accounts(
-                user_id, req.serviceUsername, req.servicePassword, permissions, pool
+                user_id, req.serviceUsername, req.servicePassword, permissions, pool,
+                email=req.email or None,
             )
         except Exception:
             logger.exception("Service provisioning failed for user %s", user_id)

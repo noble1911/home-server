@@ -13,6 +13,7 @@ interface OnboardingData {
   name: string
   butlerName: string
   soul: SoulConfig
+  email?: string
   serviceUsername?: string
   servicePassword?: string
 }
@@ -30,6 +31,7 @@ export default function Onboarding() {
   const [butlerNameInput, setButlerNameInput] = useState('Jarvis')
   const [personality, setPersonality] = useState<SoulConfig['personality']>('balanced')
   const [selectedVoice, setSelectedVoice] = useState(DEFAULT_VOICE)
+  const [email, setEmail] = useState('')
   const [serviceUsername, setServiceUsername] = useState('')
   const [servicePassword, setServicePassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -73,7 +75,10 @@ export default function Onboarding() {
         },
       }
 
-      // Include service credentials if provided
+      // Include email and service credentials if provided
+      if (email.trim()) {
+        data.email = email.trim()
+      }
       if (credentialsValid) {
         data.serviceUsername = serviceUsername
         data.servicePassword = servicePassword
@@ -274,6 +279,21 @@ export default function Onboarding() {
             </p>
 
             <div className="space-y-4 mb-6">
+              <div>
+                <label htmlFor="email" className="block text-sm text-butler-300 mb-1">
+                  Email <span className="text-butler-500">(optional — used for photo library access)</span>
+                </label>
+                <input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  className="input"
+                  autoComplete="email"
+                />
+              </div>
+
               <div>
                 <label htmlFor="service-username" className="block text-sm text-butler-300 mb-1">
                   Username

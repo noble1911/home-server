@@ -151,6 +151,7 @@ class OnboardingRequest(BaseModel):
     name: str
     butlerName: str
     soul: SoulConfig
+    email: str | None = None
     serviceUsername: str | None = Field(None, pattern=r'^[a-z0-9_]{3,20}$')
     servicePassword: str | None = Field(None, min_length=6)
 

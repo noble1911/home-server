@@ -70,6 +70,8 @@ async def provision_user_accounts(
     password: str,
     permissions: list[str],
     pool: DatabasePool,
+    *,
+    email: str | None = None,
 ) -> list[dict]:
     """Create accounts on all permitted & configured services.
 
@@ -101,7 +103,10 @@ async def provision_user_accounts(
 
         try:
             provisioner = _PROVISIONERS[service]
-            external_id = await provisioner(username, password)
+            if service == "immich":
+                external_id = await provisioner(username, password, email=email)
+            else:
+                external_id = await provisioner(username, password)
             await db.execute(
                 """INSERT INTO butler.service_credentials
                    (user_id, service, username, password_encrypted, external_id, status, error_message)
@@ -273,13 +278,13 @@ async def _provision_nextcloud(username: str, password: str) -> str:
             return username
 
 
-async def _provision_immich(username: str, password: str) -> str:
+async def _provision_immich(username: str, password: str, *, email: str | None = None) -> str:
     """Create Immich user. Returns the Immich user ID."""
     async with aiohttp.ClientSession(timeout=_HTTP_TIMEOUT) as session:
         headers = {"x-api-key": settings.immich_api_key}
 
-        # Immich requires an email for user creation
-        email = f"{username}@homeserver.local"
+        # Use the user's real email if provided, otherwise generate a local one
+        email = email or f"{username}@homeserver.local"
 
         async with session.post(
             f"{settings.immich_url}/api/admin/users",
