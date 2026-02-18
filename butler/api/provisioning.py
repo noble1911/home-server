@@ -1,14 +1,19 @@
 """Auto-provision user accounts on downstream apps.
 
 Called during onboarding to create per-user accounts on Jellyfin,
-Audiobookshelf, Nextcloud, Immich, and Home Assistant using the
-credentials the user chose during the onboarding wizard.
+Audiobookshelf, Nextcloud, Immich, Home Assistant, and LazyLibrarian
+using the credentials the user chose during the onboarding wizard.
 """
 
 from __future__ import annotations
 
+import asyncio
 import base64
+import hashlib
 import logging
+import secrets
+import sqlite3
+import string
 from typing import Callable, Awaitable
 
 import aiohttp
@@ -25,15 +30,16 @@ _HTTP_TIMEOUT = aiohttp.ClientTimeout(total=15)
 
 # Permission-to-service mapping
 PERMISSION_SERVICE_MAP: dict[str, list[str]] = {
-    "media": ["jellyfin", "audiobookshelf", "immich"],
+    "media": ["jellyfin", "audiobookshelf", "immich", "lazylibrarian"],
     "home": ["homeassistant"],
 }
 # Services everyone gets (regardless of permissions)
 UNIVERSAL_SERVICES: list[str] = ["nextcloud"]
 
-# NOTE: LazyLibrarian (books) and Seerr (media requests) are NOT auto-provisioned.
+# NOTE: Seerr (media requests) is NOT auto-provisioned.
 # - Seerr: uses Jellyfin SSO — users log in with their Jellyfin credentials.
-# - LazyLibrarian: no multi-user support. Household shares the single instance.
+# LazyLibrarian IS provisioned via direct SQLite write (it has no user management API).
+# Requires the lazylibrarian-config volume to be mounted into butler.
 
 
 def _services_for_user(permissions: list[str]) -> list[str]:
@@ -60,6 +66,7 @@ def _service_is_configured(service: str) -> bool:
         "homeassistant": bool(
             settings.home_assistant_url and settings.home_assistant_token
         ),
+        "lazylibrarian": bool(settings.lazylibrarian_db_path),
     }
     return checks.get(service, False)
 
@@ -345,6 +352,41 @@ async def _provision_homeassistant(username: str, password: str) -> str:
             return msg.get("result", {}).get("user", {}).get("id", "")
 
 
+_LL_ID_ALPHABET = string.ascii_letters + string.digits
+
+
+async def _provision_lazylibrarian(username: str, password: str) -> str:
+    """Create LazyLibrarian user via direct SQLite write. Returns the UserID.
+
+    LazyLibrarian has no user management API. We write directly to its SQLite
+    database, which is mounted into butler via the lazylibrarian-config volume.
+    Password is MD5-hashed (LazyLibrarian's own scheme).
+    """
+    db_path = settings.lazylibrarian_db_path
+    password_hash = hashlib.md5(password.encode()).hexdigest()
+    user_id = "".join(secrets.choice(_LL_ID_ALPHABET) for _ in range(10))
+
+    def _write() -> str:
+        conn = sqlite3.connect(db_path, timeout=10)
+        try:
+            existing = conn.execute(
+                "SELECT UserID FROM users WHERE UserName = ?", (username,)
+            ).fetchone()
+            if existing:
+                return existing[0]
+            conn.execute(
+                "INSERT INTO users (UserID, UserName, Password, Email, Name, Perms) "
+                "VALUES (?, ?, ?, ?, ?, 0)",
+                (user_id, username, password_hash, "", username),
+            )
+            conn.commit()
+            return user_id
+        finally:
+            conn.close()
+
+    return await asyncio.get_running_loop().run_in_executor(None, _write)
+
+
 # Dispatch table
 _PROVISIONERS: dict[str, Callable[[str, str], Awaitable[str]]] = {
     "jellyfin": _provision_jellyfin,
@@ -352,6 +394,7 @@ _PROVISIONERS: dict[str, Callable[[str, str], Awaitable[str]]] = {
     "nextcloud": _provision_nextcloud,
     "immich": _provision_immich,
     "homeassistant": _provision_homeassistant,
+    "lazylibrarian": _provision_lazylibrarian,
 }
 
 
@@ -469,12 +512,27 @@ async def _deprovision_homeassistant(external_id: str, _username: str) -> None:
                 raise RuntimeError(f"HA user deletion failed: {error}")
 
 
+async def _deprovision_lazylibrarian(external_id: str, _username: str) -> None:
+    db_path = settings.lazylibrarian_db_path
+
+    def _delete() -> None:
+        conn = sqlite3.connect(db_path, timeout=10)
+        try:
+            conn.execute("DELETE FROM users WHERE UserID = ?", (external_id,))
+            conn.commit()
+        finally:
+            conn.close()
+
+    await asyncio.get_running_loop().run_in_executor(None, _delete)
+
+
 _DEPROVISIONERS: dict[str, Callable[[str, str], Awaitable[None]]] = {
     "jellyfin": _deprovision_jellyfin,
     "audiobookshelf": _deprovision_audiobookshelf,
     "nextcloud": _deprovision_nextcloud,
     "immich": _deprovision_immich,
     "homeassistant": _deprovision_homeassistant,
+    "lazylibrarian": _deprovision_lazylibrarian,
 }
 
 
@@ -583,10 +641,29 @@ async def _change_password_immich(external_id: str, _username: str, new_password
                 raise RuntimeError(f"Immich password change failed: HTTP {resp.status}")
 
 
+async def _change_password_lazylibrarian(external_id: str, _username: str, new_password: str) -> None:
+    db_path = settings.lazylibrarian_db_path
+    password_hash = hashlib.md5(new_password.encode()).hexdigest()
+
+    def _update() -> None:
+        conn = sqlite3.connect(db_path, timeout=10)
+        try:
+            conn.execute(
+                "UPDATE users SET Password = ? WHERE UserID = ?",
+                (password_hash, external_id),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+    await asyncio.get_running_loop().run_in_executor(None, _update)
+
+
 _PASSWORD_CHANGERS: dict[str, Callable[[str, str, str], Awaitable[None]]] = {
     "jellyfin": _change_password_jellyfin,
     "audiobookshelf": _change_password_audiobookshelf,
     "nextcloud": _change_password_nextcloud,
     "immich": _change_password_immich,
+    "lazylibrarian": _change_password_lazylibrarian,
     # Home Assistant: no admin API to change another user's password
 }
