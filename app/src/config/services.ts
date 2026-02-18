@@ -9,7 +9,7 @@ import type { ServiceStatus } from '../services/api'
 const SERVICE_NAME_MAP: Record<string, string> = {
   'jellyfin': 'jellyfin',
   'audiobookshelf': 'audiobookshelf',
-  'lazylibrarian': 'lazylibrarian',
+  'lazylibrarian': 'lazylibrarian', // kept for health status display only
   'immich-server': 'immich',
   'nextcloud': 'nextcloud',
   'homeassistant': 'home-assistant',
