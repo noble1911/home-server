@@ -265,7 +265,7 @@ export default function Tutorial() {
   const navigate = useNavigate()
 
   return (
-    <div className="p-4 space-y-6 pb-24 md:pb-6">
+    <div className="flex-1 overflow-y-auto p-4 space-y-6 pb-24 md:pb-6">
       {/* Header */}
       <div>
         <h1 className="text-xl font-bold text-butler-100">What Butler Can Do</h1>
