@@ -78,7 +78,7 @@ PERMISSION_TOOL_MAP: dict[str, list[str]] = {
 
 ALL_PERMISSION_GROUPS: list[str] = sorted(PERMISSION_TOOL_MAP.keys())
 
-DEFAULT_PERMISSIONS: list[str] = ["media", "home"]
+DEFAULT_PERMISSIONS: list[str] = ["media", "location", "calendar", "email", "automation", "communication"]
 
 # Module-level state, set during lifespan startup
 _db_pool: DatabasePool | None = None
