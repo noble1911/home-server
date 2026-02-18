@@ -80,7 +80,7 @@ export default function Downloads() {
 
   if (loadState === 'loading') {
     return (
-      <div className="p-4 space-y-6">
+      <div className="flex-1 overflow-y-auto p-4 space-y-6">
         <Header />
         <LoadingSkeleton />
       </div>
@@ -89,7 +89,7 @@ export default function Downloads() {
 
   if (loadState === 'error' && !data) {
     return (
-      <div className="p-4 space-y-6">
+      <div className="flex-1 overflow-y-auto p-4 space-y-6">
         <Header />
         <ErrorBanner message={errorMsg} onRetry={() => fetchAll(true)} />
       </div>
@@ -100,7 +100,7 @@ export default function Downloads() {
   const summary = data?.summary
 
   return (
-    <div className="p-4 space-y-6">
+    <div className="flex-1 overflow-y-auto p-4 space-y-6">
       <Header />
 
       {errorMsg && <ErrorBanner message={errorMsg} onRetry={() => fetchAll(true)} />}

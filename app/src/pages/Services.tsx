@@ -44,7 +44,7 @@ export default function Services() {
   const categories = [...new Set(services.map(s => s.category))] as ServiceCategory[]
 
   return (
-    <div className="p-4 space-y-6">
+    <div className="flex-1 overflow-y-auto p-4 space-y-6">
       <div>
         <h1 className="text-xl font-bold text-butler-100">Services</h1>
         <p className="text-sm text-butler-400">Tap a service to learn how to connect, or use the link icon to open it directly</p>

@@ -48,7 +48,7 @@ export default function Dashboard() {
 
   if (loadState === 'loading') {
     return (
-      <div className="p-4 space-y-6">
+      <div className="flex-1 overflow-y-auto p-4 space-y-6">
         <div>
           <h1 className="text-xl font-bold text-butler-100">Dashboard</h1>
           <p className="text-sm text-butler-400">Server status and monitoring</p>
@@ -60,7 +60,7 @@ export default function Dashboard() {
 
   if (loadState === 'error' && !health) {
     return (
-      <div className="p-4 space-y-6">
+      <div className="flex-1 overflow-y-auto p-4 space-y-6">
         <div>
           <h1 className="text-xl font-bold text-butler-100">Dashboard</h1>
           <p className="text-sm text-butler-400">Server status and monitoring</p>
@@ -71,7 +71,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="p-4 space-y-6">
+    <div className="flex-1 overflow-y-auto p-4 space-y-6">
       <div>
         <h1 className="text-xl font-bold text-butler-100">Dashboard</h1>
         <p className="text-sm text-butler-400">Server status and monitoring</p>

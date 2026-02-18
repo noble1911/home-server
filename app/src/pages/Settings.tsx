@@ -386,14 +386,14 @@ export default function Settings() {
 
   if (!profile) {
     return (
-      <div className="p-4 flex items-center justify-center min-h-[50vh]">
+      <div className="flex-1 p-4 flex items-center justify-center min-h-[50vh]">
         <div className="text-butler-400">Loading profile...</div>
       </div>
     )
   }
 
   return (
-    <div className="p-4 space-y-6">
+    <div className="flex-1 overflow-y-auto p-4 space-y-6">
       <div>
         <h1 className="text-xl font-bold text-butler-100">Settings</h1>
         <p className="text-sm text-butler-400">Customize your Butler experience</p>

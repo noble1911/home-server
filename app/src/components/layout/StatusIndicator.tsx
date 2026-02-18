@@ -12,6 +12,10 @@ const statusConfig: Record<ConnectionStatus, { color: string; label: string }> =
 }
 
 export default function StatusIndicator({ status }: StatusIndicatorProps) {
+  // Don't show indicator in default disconnected state — it's not useful
+  // and "Offline" is misleading (text chat still works without voice)
+  if (status === 'disconnected') return null
+
   const config = statusConfig[status]
 
   return (

@@ -291,7 +291,7 @@ Now that services are running, go back to the Cloudflare dashboard and add route
 
    This bakes `https://{subdomain}.yourdomain.com` URLs into the app for each service (e.g. `https://jellyfin.yourdomain.com`). You can also override individual services — see `app/.env.example` for details.
 
-> **Note:** On LAN (without `VITE_TUNNEL_DOMAIN`), service URLs auto-detect from the browser hostname (e.g. `http://192.168.1.22:8096`), so no configuration is needed for local access.
+> **Note:** On LAN (without `VITE_TUNNEL_DOMAIN`), service URLs auto-detect from the browser hostname (e.g. `http://192.168.1.117:8096`), so no configuration is needed for local access.
 
 ### 4.2 Set Up Butler (AI Assistant)
 
