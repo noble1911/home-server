@@ -240,7 +240,7 @@ async def _provision_audiobookshelf(username: str, password: str) -> str:
 
         async with session.post(
             f"{settings.audiobookshelf_url}/api/users",
-            json={"username": username, "password": password, "type": "user"},
+            json={"username": username, "password": password, "type": "user", "isActive": True},
             headers=headers,
         ) as resp:
             if resp.status not in (200, 201):
@@ -279,9 +279,13 @@ async def _provision_nextcloud(username: str, password: str) -> str:
             data = await resp.json()
             meta = data.get("ocs", {}).get("meta", {})
             if meta.get("statuscode") not in (100, 200):
-                raise RuntimeError(
-                    f"Nextcloud OCS error: {meta.get('message', 'Unknown')}"
-                )
+                msg = meta.get("message", "Unknown")
+                if "compromised" in msg.lower() or "hibp" in msg.lower() or "breach" in msg.lower():
+                    raise RuntimeError(
+                        "Password rejected by Nextcloud: it appears in a known data breach. "
+                        "Please choose a different password."
+                    )
+                raise RuntimeError(f"Nextcloud OCS error: {msg}")
             return username
 
 
