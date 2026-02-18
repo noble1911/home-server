@@ -110,4 +110,7 @@ async def entrypoint(ctx: agents.JobContext) -> None:
 
 
 if __name__ == "__main__":
-    cli.run_app(agents.WorkerOptions(entrypoint_fnc=entrypoint))
+    cli.run_app(agents.WorkerOptions(
+        entrypoint_fnc=entrypoint,
+        num_idle_processes=1,  # Reduce idle workers — 4+ idle processes cause unresponsive warnings
+    ))
