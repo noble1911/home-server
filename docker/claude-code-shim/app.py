@@ -60,7 +60,7 @@ async def run_claude(request: web.Request) -> web.StreamResponse:
     logger.info("Running claude --print for %d-char message", len(message))
 
     proc = await asyncio.create_subprocess_exec(
-        CLAUDE_BIN, "--print", message,
+        CLAUDE_BIN, "--print", "--dangerously-skip-permissions", message,
         cwd=str(WORK_DIR),
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.STDOUT,

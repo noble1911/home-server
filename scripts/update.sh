@@ -111,6 +111,12 @@ while [[ $i -lt ${#STACK_DIRS[@]} ]]; do
     i=$((i + 1))
 done
 
+# Detect if the Claude Code shim needs restarting (runs on host, not Docker)
+SHIM_CHANGED=false
+if [[ "$FORCE" == "true" ]] || echo "$CHANGED_FILES" | grep -q "^docker/claude-code-shim/"; then
+    SHIM_CHANGED=true
+fi
+
 # Also rebuild butler if scripts/lib changed (shared helpers)
 if echo "$CHANGED_FILES" | grep -q "^scripts/lib/"; then
     echo -e "  ${YELLOW}⚠${NC} Shared helpers changed — review scripts manually"
@@ -124,6 +130,10 @@ else
     for f in "${REBUILD_STACKS[@]}"; do
         echo "    - $f"
     done
+fi
+
+if [[ "$SHIM_CHANGED" == "true" ]]; then
+    echo -e "  ${BLUE}==>${NC} Claude Code shim will be restarted"
 fi
 
 if [[ "$CHECK_ONLY" == "true" ]]; then
@@ -157,6 +167,18 @@ if [[ ${#REBUILD_STACKS[@]} -gt 0 ]]; then
         fi
         echo -e "  ${GREEN}✓${NC} ${stack_name} updated"
     done
+fi
+
+# Restart Claude Code shim if its files changed (host-side launchd service)
+if [[ "$SHIM_CHANGED" == "true" ]]; then
+    SHIM_LABEL="uk.noblehaus.claude-code-shim"
+    echo ""
+    echo -e "${BLUE}==>${NC} Restarting Claude Code shim..."
+    if launchctl kickstart -k "gui/$(id -u)/${SHIM_LABEL}" 2>/dev/null; then
+        echo -e "  ${GREEN}✓${NC} Claude Code shim restarted"
+    else
+        echo -e "  ${YELLOW}⚠${NC} Could not restart shim — try: launchctl kickstart -k gui/\$(id -u)/${SHIM_LABEL}"
+    fi
 fi
 
 echo ""
