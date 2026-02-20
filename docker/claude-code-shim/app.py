@@ -33,6 +33,14 @@ if not Path(CLAUDE_BIN).exists():
     import shutil
     CLAUDE_BIN = shutil.which("claude") or CLAUDE_BIN
 
+# When launched via launchd the environment has a minimal PATH that doesn't
+# include Homebrew. Patch it so the `claude` Node.js script can find `node`.
+_HOMEBREW_BIN = "/opt/homebrew/bin"
+_HOMEBREW_SBIN = "/opt/homebrew/sbin"
+_current_path = os.environ.get("PATH", "/usr/bin:/bin:/usr/sbin:/sbin")
+if _HOMEBREW_BIN not in _current_path:
+    os.environ["PATH"] = f"{_HOMEBREW_BIN}:{_HOMEBREW_SBIN}:{_current_path}"
+
 
 async def run_claude(request: web.Request) -> web.StreamResponse:
     body = await request.json()
