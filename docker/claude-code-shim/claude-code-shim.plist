@@ -7,7 +7,7 @@
 
     <key>ProgramArguments</key>
     <array>
-        <string>/opt/homebrew/bin/python3</string>
+        <string>/Users/ron/home-server/docker/claude-code-shim/.venv/bin/python3</string>
         <string>/Users/ron/home-server/docker/claude-code-shim/app.py</string>
     </array>
 

@@ -336,11 +336,12 @@ ssh ron@192.168.1.117
 # Log in with your Claude account
 claude login
 
-# Install aiohttp for the shim
-/opt/homebrew/bin/pip3 install aiohttp
+# Create a venv for the shim (avoids "externally managed" pip error on macOS)
+python3 -m venv ~/home-server/docker/claude-code-shim/.venv
+~/home-server/docker/claude-code-shim/.venv/bin/pip install aiohttp
 
 # Start the shim (runs on port 7100, stays in foreground)
-python3 ~/home-server/docker/claude-code-shim/app.py
+~/home-server/docker/claude-code-shim/.venv/bin/python3 ~/home-server/docker/claude-code-shim/app.py
 ```
 
 **To start the shim automatically on boot:**
