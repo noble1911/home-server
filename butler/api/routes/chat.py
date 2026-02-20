@@ -286,6 +286,36 @@ async def claude_code_stream(
     if user_role != "admin" and "claude_code" not in user_perms:
         raise HTTPException(403, "claude_code permission required")
 
+    # Fetch recent claude_code conversation for context continuity.
+    # The last 10 messages (~5 exchanges) gives Claude Code enough history
+    # to understand the ongoing conversation without blowing up the prompt.
+    recent_rows = await db.fetch(
+        """
+        SELECT role, content FROM (
+            SELECT id, role, content, created_at
+            FROM butler.conversation_history
+            WHERE user_id = $1 AND source = 'claude_code'
+            ORDER BY created_at DESC, id DESC
+            LIMIT 10
+        ) sub ORDER BY created_at ASC, id ASC
+        """,
+        user_id,
+    )
+
+    # Build a contextualised message that includes recent conversation history
+    if recent_rows:
+        history_lines = []
+        for r in recent_rows:
+            label = "User" if r["role"] == "user" else "Assistant"
+            history_lines.append(f"{label}: {r['content']}")
+        context_block = "\n".join(history_lines)
+        contextualised_message = (
+            f"<conversation_history>\n{context_block}\n</conversation_history>\n\n"
+            f"Current message: {req.message}"
+        )
+    else:
+        contextualised_message = req.message
+
     # Save user message immediately
     await db.execute(
         """
@@ -309,7 +339,7 @@ async def claude_code_stream(
                 try:
                     async with session.post(
                         f"{settings.claude_code_shim_url}/run",
-                        json={"message": req.message},
+                        json={"message": contextualised_message},
                     ) as resp:
                         if resp.status != 200:
                             err_msg = "Claude Code shim returned an error. Check that it is running on the host."
