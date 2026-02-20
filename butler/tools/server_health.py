@@ -117,6 +117,11 @@ DEFAULT_SERVICES: dict[str, dict[str, Any]] = {
         "url": "http://localhost:8000/health",
         "stack": "butler",
     },
+    # Claude Code shim — host-side service, reachable via Docker bridge
+    "claude-code-shim": {
+        "url": "http://host.docker.internal:7100/health",
+        "stack": "butler",
+    },
 }
 
 
