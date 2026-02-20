@@ -321,34 +321,28 @@ Butler uses **invite codes** for registration. The first person to log in become
 
 Claude Code mode adds a terminal icon toggle to the Butler chat. When active, messages go to Claude Code CLI running on the Mac Mini instead of the Claude API — useful for complex agentic tasks like editing files, running scripts, or multi-step server changes. It uses your Claude Max/Pro subscription, not API tokens.
 
-**Prerequisites on the Mac Mini:**
+**If you ran `setup.sh`:** It will prompt you to set this up automatically at the end of Phase 8 (Butler). Just answer `y` when asked and then run `claude login` when prompted.
+
+**Manual setup (if you skipped it during setup.sh):**
 
 ```bash
-# SSH in
-ssh ron@192.168.1.117
-
-# Install Node.js
+# Install Node.js and Claude Code CLI
 /opt/homebrew/bin/brew install node
-
-# Install Claude Code CLI
 /opt/homebrew/bin/npm install -g @anthropic-ai/claude-code
 
-# Log in with your Claude account
+# Log in with your Claude account (opens browser)
 claude login
 
-# Create a venv for the shim (avoids "externally managed" pip error on macOS)
+# Create a venv for the shim (avoids macOS "externally managed" pip error)
 python3 -m venv ~/home-server/docker/claude-code-shim/.venv
 ~/home-server/docker/claude-code-shim/.venv/bin/pip install aiohttp
 
-# Start the shim (runs on port 7100, stays in foreground)
-~/home-server/docker/claude-code-shim/.venv/bin/python3 ~/home-server/docker/claude-code-shim/app.py
-```
-
-**To start the shim automatically on boot:**
-
-```bash
+# Register as a launchd service (auto-starts on boot, restarts on crash)
 cp ~/home-server/docker/claude-code-shim/claude-code-shim.plist ~/Library/LaunchAgents/
 launchctl load ~/Library/LaunchAgents/claude-code-shim.plist
+
+# Verify it's running
+curl http://localhost:7100/health
 ```
 
 Once the shim is running, the **Claude Code toggle button** (terminal icon) appears in Butler chat for admin users. Grant access to other users via **Settings → Admin → user permissions → Claude Code**.

@@ -529,3 +529,101 @@ echo "     - Edit butler/.env and docker/voice-stack/.env"
 echo "     - Get a free key at: https://console.groq.com/keys"
 echo ""
 echo "See docs/VOICE_ARCHITECTURE.md for the full voice integration plan."
+
+# ──────────────────────────────────────────────────
+# Claude Code shim (optional)
+# Enables Claude Code mode in Butler chat — runs `claude --print`
+# on the host and streams the response back to Butler via SSE.
+# ──────────────────────────────────────────────────
+echo ""
+echo -e "${YELLOW}Claude Code Mode (optional)${NC}"
+echo "Adds a toggle in Butler chat that sends messages to Claude Code CLI"
+echo "instead of the Claude API. Uses your Claude Max/Pro subscription."
+echo ""
+read -rp "Set up Claude Code mode? (y/N): " setup_cc < /dev/tty
+
+if [[ "$setup_cc" =~ ^[Yy]$ ]]; then
+    SHIM_DIR="${SCRIPT_DIR}/../docker/claude-code-shim"
+    SHIM_VENV="${SHIM_DIR}/.venv"
+    PLIST_SRC="${SHIM_DIR}/claude-code-shim.plist"
+    PLIST_DEST="$HOME/Library/LaunchAgents/claude-code-shim.plist"
+
+    # Step 1: Ensure Node.js is installed
+    if ! command -v node &>/dev/null; then
+        echo -e "${BLUE}==>${NC} Installing Node.js via Homebrew..."
+        /opt/homebrew/bin/brew install node
+        echo -e "  ${GREEN}✓${NC} Node.js installed"
+    else
+        echo -e "  ${GREEN}✓${NC} Node.js already installed ($(node --version))"
+    fi
+
+    # Step 2: Ensure Claude Code CLI is installed
+    CLAUDE_BIN="/opt/homebrew/bin/claude"
+    if [[ ! -x "$CLAUDE_BIN" ]]; then
+        CLAUDE_BIN=$(command -v claude 2>/dev/null || true)
+    fi
+
+    if [[ -z "$CLAUDE_BIN" ]]; then
+        echo -e "${BLUE}==>${NC} Installing Claude Code CLI..."
+        /opt/homebrew/bin/npm install -g @anthropic-ai/claude-code
+        CLAUDE_BIN=$(command -v claude 2>/dev/null || "/opt/homebrew/bin/claude")
+        echo -e "  ${GREEN}✓${NC} Claude Code CLI installed"
+    else
+        echo -e "  ${GREEN}✓${NC} Claude Code CLI already installed ($CLAUDE_BIN)"
+    fi
+
+    # Step 3: Create venv and install aiohttp
+    if [[ ! -d "$SHIM_VENV" ]]; then
+        echo -e "${BLUE}==>${NC} Creating Python venv for shim..."
+        python3 -m venv "$SHIM_VENV"
+        echo -e "  ${GREEN}✓${NC} Venv created at ${SHIM_VENV}"
+    else
+        echo -e "  ${GREEN}✓${NC} Venv already exists"
+    fi
+
+    echo -e "${BLUE}==>${NC} Installing aiohttp..."
+    "$SHIM_VENV/bin/pip" install --quiet aiohttp
+    echo -e "  ${GREEN}✓${NC} aiohttp installed"
+
+    # Step 4: Install and load launchd plist (auto-start on boot, restart on crash)
+    if [[ -f "$PLIST_SRC" ]]; then
+        cp "$PLIST_SRC" "$PLIST_DEST"
+
+        # Unload first in case it's already registered (idempotent)
+        launchctl unload "$PLIST_DEST" 2>/dev/null || true
+        launchctl load "$PLIST_DEST"
+        echo -e "  ${GREEN}✓${NC} Claude Code shim registered with launchd (auto-starts on boot)"
+    else
+        echo -e "  ${YELLOW}⚠${NC} Plist not found at ${PLIST_SRC} — skipping launchd setup"
+    fi
+
+    # Step 5: Verify shim is reachable
+    echo -e "${BLUE}==>${NC} Waiting for shim to start..."
+    SHIM_OK=false
+    for i in {1..10}; do
+        if curl -s http://localhost:7100/health 2>/dev/null | grep -q "ok"; then
+            SHIM_OK=true
+            break
+        fi
+        sleep 1
+        echo -n "."
+    done
+    echo ""
+
+    if [[ "$SHIM_OK" == "true" ]]; then
+        echo -e "  ${GREEN}✓${NC} Claude Code shim running at http://localhost:7100"
+    else
+        echo -e "  ${YELLOW}⚠${NC} Shim not yet responding — it may still be starting"
+        echo "   Check: curl http://localhost:7100/health"
+        echo "   Logs:  tail /tmp/claude-code-shim.log"
+    fi
+
+    echo ""
+    echo -e "  ${YELLOW}Action required:${NC} Log in to Claude (one-time, opens browser)"
+    echo "  Run: claude login"
+    echo ""
+    echo -e "  ${GREEN}✓${NC} Claude Code mode ready"
+    echo "  The terminal icon toggle will appear in Butler chat for admin users."
+else
+    echo -e "  ${YELLOW}⚠${NC} Claude Code mode skipped (can set up later — see README section 4.3)"
+fi
