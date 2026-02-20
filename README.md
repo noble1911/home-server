@@ -313,10 +313,48 @@ Butler uses **invite codes** for registration. The first person to log in become
 | Email | Email tools |
 | Automation | Scheduling & automation |
 | Communication | WhatsApp tools |
+| Claude Code | Run agentic tasks via Claude Code on the server (admin only by default) |
 
 **Auto-provisioning:** During onboarding, if the user provides a service username and password, Butler automatically creates accounts on Jellyfin, Audiobookshelf, Nextcloud, Immich, and Home Assistant based on the invite code's permissions. Failed services can be retried from Settings. The shared password can also be changed across all services at once from Settings.
 
-### 4.3 Set Up Media Services
+### 4.3 Set Up Claude Code (Optional)
+
+Claude Code mode adds a terminal icon toggle to the Butler chat. When active, messages go to Claude Code CLI running on the Mac Mini instead of the Claude API — useful for complex agentic tasks like editing files, running scripts, or multi-step server changes. It uses your Claude Max/Pro subscription, not API tokens.
+
+**Prerequisites on the Mac Mini:**
+
+```bash
+# SSH in
+ssh ron@192.168.1.117
+
+# Install Node.js
+/opt/homebrew/bin/brew install node
+
+# Install Claude Code CLI
+/opt/homebrew/bin/npm install -g @anthropic-ai/claude-code
+
+# Log in with your Claude account
+claude login
+
+# Install aiohttp for the shim
+/opt/homebrew/bin/pip3 install aiohttp
+
+# Start the shim (runs on port 7100, stays in foreground)
+python3 ~/home-server/docker/claude-code-shim/app.py
+```
+
+**To start the shim automatically on boot:**
+
+```bash
+cp ~/home-server/docker/claude-code-shim/claude-code-shim.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/claude-code-shim.plist
+```
+
+Once the shim is running, the **Claude Code toggle button** (terminal icon) appears in Butler chat for admin users. Grant access to other users via **Settings → Admin → user permissions → Claude Code**.
+
+> The shim is a tiny HTTP service that proxies `claude --print` invocations from Butler (Docker) to the Mac Mini host, where Claude Code has filesystem access and auth credentials.
+
+### 4.4 Set Up Media Services
 
 | Service | URL | First-Time Setup |
 |---------|-----|-----------------|
@@ -330,21 +368,21 @@ Butler uses **invite codes** for registration. The first person to log in become
 
 > Radarr, Sonarr, Prowlarr, and qBittorrent are admin-only. Household members request media through Seerr and watch via Jellyfin.
 
-### 4.4 Set Up Books & Audio
+### 4.5 Set Up Books & Audio
 
 | Service | URL | First-Time Setup |
 |---------|-----|-----------------|
 | **Audiobookshelf** | `http://<server-ip>:13378` | Auto-configured — create accounts for household members |
 | **LazyLibrarian** | `http://<server-ip>:5299` | Configure Prowlarr + qBittorrent connections |
 
-### 4.5 Set Up Photos & Files
+### 4.6 Set Up Photos & Files
 
 | Service | URL | First-Time Setup |
 |---------|-----|-----------------|
 | **Immich** | `http://<server-ip>:2283` | Create admin account, invite household members, install mobile app and enable auto-backup |
 | **Nextcloud** | `http://<server-ip>:8080` | Auto-configured — install desktop/mobile sync clients |
 
-### 4.6 Set Up Home Assistant
+### 4.7 Set Up Home Assistant
 
 1. Open `http://<server-ip>:8123`
 2. Create admin account, set location/timezone/units
@@ -355,7 +393,7 @@ Butler uses **invite codes** for registration. The first person to log in become
    cd butler && docker compose down && docker compose up -d
    ```
 
-### 4.7 Install Mobile Apps
+### 4.8 Install Mobile Apps
 
 | App | Platform | Purpose |
 |-----|----------|---------|
@@ -365,7 +403,7 @@ Butler uses **invite codes** for registration. The first person to log in become
 | [Nextcloud](https://nextcloud.com/install/#install-clients) | iOS / Android / Desktop | File sync |
 | [Home Assistant](https://companion.home-assistant.io/) | iOS / Android | Smart home control |
 
-### 4.8 Set Up Alexa Integration (Optional)
+### 4.9 Set Up Alexa Integration (Optional)
 
 If you have Amazon Echo devices, you can control Home Assistant via Alexa for free using haaska + AWS Lambda.
 

@@ -16,6 +16,8 @@ interface ChatInputProps {
   isRecording?: boolean
   onStartListening?: () => void
   onStopListening?: () => void
+  claudeCodeMode?: boolean
+  onToggleClaudeCode?: () => void
 }
 
 export default function ChatInput({
@@ -23,6 +25,8 @@ export default function ChatInput({
   isRecording = false,
   onStartListening,
   onStopListening,
+  claudeCodeMode = false,
+  onToggleClaudeCode,
 }: ChatInputProps) {
   const { voiceMode } = useSettingsStore()
   const [message, setMessage] = useState('')
@@ -112,11 +116,12 @@ export default function ChatInput({
     sendMessage(
       text,
       pendingImage ? { data: pendingImage.data, mediaType: pendingImage.mediaType } : undefined,
+      claudeCodeMode ? 'claude_code' : 'butler',
     )
     setMessage('')
     setPendingImage(null)
     setImageError(null)
-  }, [message, pendingImage, isStreaming, sendMessage])
+  }, [message, pendingImage, isStreaming, sendMessage, claudeCodeMode])
 
   return (
     <div>
@@ -179,6 +184,27 @@ export default function ChatInput({
         >
           <ImageIcon className="w-5 h-5" />
         </button>
+
+        {/* Claude Code mode toggle — only shown when user has permission */}
+        {onToggleClaudeCode && (
+          <button
+            type="button"
+            onClick={onToggleClaudeCode}
+            disabled={isStreaming}
+            title={claudeCodeMode ? 'Claude Code mode active — click to switch to Butler' : 'Switch to Claude Code mode'}
+            className={`
+              btn px-3 disabled:opacity-50 transition-colors
+              ${claudeCodeMode
+                ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40 hover:bg-amber-500/30'
+                : 'text-butler-400 hover:text-butler-200'
+              }
+            `}
+            aria-label={claudeCodeMode ? 'Claude Code mode active' : 'Enable Claude Code mode'}
+            aria-pressed={claudeCodeMode}
+          >
+            <ClaudeCodeIcon className="w-5 h-5" />
+          </button>
+        )}
 
         <input
           type="text"
@@ -255,6 +281,15 @@ function MicIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+    </svg>
+  )
+}
+
+// Terminal/code icon representing Claude Code CLI mode
+function ClaudeCodeIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
     </svg>
   )
 }

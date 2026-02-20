@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>uk.noblehaus.claude-code-shim</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/opt/homebrew/bin/python3</string>
+        <string>/Users/ron/home-server/docker/claude-code-shim/app.py</string>
+    </array>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/tmp/claude-code-shim.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/tmp/claude-code-shim.err</string>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/ron/home-server</string>
+</dict>
+</plist>

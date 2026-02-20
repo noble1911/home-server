@@ -13,12 +13,14 @@ import logging
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, Query, Response
+import aiohttp
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from starlette.responses import StreamingResponse
 
 from tools import DatabasePool, Tool
 
 from ..auto_learn import extract_and_store_facts
+from ..config import settings
 from ..context import load_user_context
 from ..deps import get_current_user, get_db_pool, get_embedding_service, get_tools, get_user_tools
 from ..llm import chat_with_tools, stream_chat_with_events
@@ -123,7 +125,7 @@ async def chat_history(
     db = pool.pool
     rows = await db.fetch(
         """
-        SELECT id, channel, role, content, metadata, created_at
+        SELECT id, channel, role, content, metadata, source, created_at
         FROM butler.conversation_history
         WHERE user_id = $1 AND created_at < $2
         ORDER BY created_at DESC, id DESC
@@ -144,6 +146,7 @@ async def chat_history(
             content=row["content"],
             type="voice" if row["channel"] == "voice" else "text",
             timestamp=row["created_at"].isoformat(),
+            source=row["source"],
         )
         for row in rows
     ]
@@ -238,6 +241,125 @@ async def stream_text_chat(
                     logger.exception(
                         "Failed to save assistant response for user=%s",
                         user_id,
+                    )
+
+    return StreamingResponse(generate(), media_type="text/event-stream")
+
+
+@router.post("/chat/claude-code/stream")
+async def claude_code_stream(
+    req: ChatRequest,
+    user_id: str = Depends(get_current_user),
+    pool: DatabasePool = Depends(get_db_pool),
+):
+    """Proxy a message to Claude Code CLI running on the host via the shim service.
+
+    Requires the ``claude_code`` permission or admin role.
+
+    The shim (docker/claude-code-shim/app.py) must be running on the host at
+    ``settings.claude_code_shim_url``. It executes ``claude --print <message>``
+    inside ~/home-server and streams stdout as SSE.
+
+    SSE format (identical to /chat/stream)::
+
+        data: {"type":"text_delta","delta":"some text"}
+        data: {"type":"done","message_id":"<uuid>"}
+        data: [DONE]
+    """
+    import json as _json
+
+    db = pool.pool
+
+    # Permission check
+    row = await db.fetchrow(
+        "SELECT role, permissions FROM butler.users WHERE id = $1", user_id
+    )
+    if row is None:
+        raise HTTPException(403, "User not found")
+
+    user_role: str | None = row["role"]
+    raw_perms = row["permissions"]
+    user_perms: list[str] = (
+        _json.loads(raw_perms) if isinstance(raw_perms, str) else (raw_perms or [])
+    )
+
+    if user_role != "admin" and "claude_code" not in user_perms:
+        raise HTTPException(403, "claude_code permission required")
+
+    # Save user message immediately
+    await db.execute(
+        """
+        INSERT INTO butler.conversation_history (user_id, channel, role, content, source)
+        VALUES ($1, 'pwa', 'user', $2, 'claude_code')
+        """,
+        user_id,
+        req.message,
+    )
+
+    message_id = str(uuid.uuid4())
+    full_response_parts: list[str] = []
+
+    async def generate():
+        try:
+            timeout = aiohttp.ClientTimeout(total=300, connect=5)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                try:
+                    async with session.post(
+                        f"{settings.claude_code_shim_url}/run",
+                        json={"message": req.message},
+                    ) as resp:
+                        if resp.status != 200:
+                            err_msg = "Claude Code shim returned an error. Check that it is running on the host."
+                            yield f"data: {json.dumps({'type': 'text_delta', 'delta': err_msg})}\n\n"
+                        else:
+                            # Forward SSE events from shim to client, accumulating text
+                            async for raw_line in resp.content:
+                                line = raw_line.decode(errors="replace").rstrip("\r\n")
+                                if not line:
+                                    continue  # Skip SSE blank-line delimiters
+                                if line == "data: [DONE]":
+                                    break
+                                if line.startswith("data: "):
+                                    data_str = line[6:]
+                                    try:
+                                        event = json.loads(data_str)
+                                        if event.get("type") == "text_delta":
+                                            full_response_parts.append(event.get("delta", ""))
+                                    except json.JSONDecodeError:
+                                        pass
+                                    yield f"{line}\n\n"
+                except aiohttp.ClientConnectorError:
+                    err_msg = (
+                        "Cannot reach Claude Code shim. "
+                        "Start it on the Mac Mini: "
+                        "python3 ~/home-server/docker/claude-code-shim/app.py"
+                    )
+                    yield f"data: {json.dumps({'type': 'text_delta', 'delta': err_msg})}\n\n"
+
+            yield f"data: {json.dumps({'type': 'done', 'message_id': message_id})}\n\n"
+            yield "data: [DONE]\n\n"
+        except Exception:
+            logger.exception("Claude Code stream failed for user=%s", user_id)
+            yield f"data: {json.dumps({'type': 'text_delta', 'delta': 'Unexpected error in Claude Code stream.'})}\n\n"
+            yield f"data: {json.dumps({'type': 'done', 'message_id': message_id})}\n\n"
+            yield "data: [DONE]\n\n"
+        finally:
+            full_text = "".join(full_response_parts)
+            if full_text:
+                try:
+                    await db.execute(
+                        """
+                        INSERT INTO butler.conversation_history
+                            (user_id, channel, role, content, metadata, source)
+                        VALUES ($1, 'pwa', 'assistant', $2, $3::jsonb, 'claude_code')
+                        """,
+                        user_id,
+                        full_text,
+                        {"message_id": message_id},
+                    )
+                except Exception:
+                    logger.exception(
+                        "Failed to save Claude Code response for user=%s", user_id
                     )
 
     return StreamingResponse(generate(), media_type="text/event-stream")

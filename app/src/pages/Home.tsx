@@ -37,8 +37,11 @@ export default function Home() {
 
   const [showClearConfirm, setShowClearConfirm] = useState(false)
   const [isClearing, setIsClearing] = useState(false)
+  const [claudeCodeMode, setClaudeCodeMode] = useState(false)
 
   const butlerName = profile?.butlerName || 'Butler'
+  const canUseClaudeCode =
+    profile?.role === 'admin' || profile?.permissions.includes('claude_code')
   const showWaveform = isRecording || voiceStatus === 'speaking'
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -58,6 +61,7 @@ export default function Home() {
             content: m.content,
             type: m.type as Message['type'],
             timestamp: m.timestamp,
+            source: m.source ?? undefined,
           }))
           .reverse()
         setMessages(chronological)
@@ -98,6 +102,7 @@ export default function Home() {
           content: m.content,
           type: m.type as Message['type'],
           timestamp: m.timestamp,
+          source: m.source ?? undefined,
         }))
         .reverse()
       prependMessages(older)
@@ -273,6 +278,8 @@ export default function Home() {
           isRecording={isRecording}
           onStartListening={startListening}
           onStopListening={stopListening}
+          claudeCodeMode={claudeCodeMode}
+          onToggleClaudeCode={canUseClaudeCode ? () => setClaudeCodeMode(m => !m) : undefined}
         />
       </div>
 

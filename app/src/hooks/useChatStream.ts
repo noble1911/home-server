@@ -34,7 +34,7 @@ export interface ImagePayload {
 }
 
 export interface UseChatStreamReturn {
-  sendMessage: (content: string, image?: ImagePayload) => void
+  sendMessage: (content: string, image?: ImagePayload, mode?: 'butler' | 'claude_code') => void
   cancelStream: () => void
   isStreaming: boolean
   error: string | null
@@ -56,13 +56,16 @@ export function useChatStream(): UseChatStreamReturn {
   // Abort on unmount
   useEffect(() => () => { abortRef.current?.abort() }, [])
 
-  const sendMessage = useCallback((content: string, image?: ImagePayload) => {
+  const sendMessage = useCallback((content: string, image?: ImagePayload, mode: 'butler' | 'claude_code' = 'butler') => {
     // Abort any in-flight stream
     abortRef.current?.abort()
 
     setError(null)
     setIsStreaming(true)
     setVoiceStatus('processing')
+
+    const isClaudeCode = mode === 'claude_code'
+    const endpoint = isClaudeCode ? '/chat/claude-code/stream' : '/chat/stream'
 
     const userMessage: Message = {
       id: crypto.randomUUID(),
@@ -71,6 +74,7 @@ export function useChatStream(): UseChatStreamReturn {
       type: 'text',
       timestamp: new Date().toISOString(),
       imageDataUrl: image ? `data:${image.mediaType};base64,${image.data}` : undefined,
+      source: isClaudeCode ? 'claude_code' : undefined,
     }
     addMessage(userMessage)
 
@@ -81,6 +85,7 @@ export function useChatStream(): UseChatStreamReturn {
       content: '',
       type: 'text',
       timestamp: new Date().toISOString(),
+      source: isClaudeCode ? 'claude_code' : undefined,
     }
     addMessage(assistantMessage)
 
@@ -90,7 +95,7 @@ export function useChatStream(): UseChatStreamReturn {
     let accumulated = ''
 
     streamSSE<ChatStreamEvent>(
-      '/chat/stream',
+      endpoint,
       { message: content, ...(image && { image: { data: image.data, mediaType: image.mediaType } }) },
       {
         onEvent(event) {

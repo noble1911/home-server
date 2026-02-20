@@ -224,6 +224,7 @@ class HistoryMessage(BaseModel):
     content: str
     type: str  # 'voice' | 'text'
     timestamp: str  # ISO 8601
+    source: str | None = None  # 'claude_code' or None for normal Butler
 
 
 class ChatHistoryResponse(BaseModel):

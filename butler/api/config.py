@@ -131,6 +131,9 @@ class Settings(BaseSettings):
     # WhatsApp Gateway (outbound notifications)
     whatsapp_gateway_url: str = ""
 
+    # Claude Code shim (host-side service that runs `claude --print`)
+    claude_code_shim_url: str = "http://host.docker.internal:7100"
+
     # Home Assistant webhook authentication
     ha_webhook_secret: str = ""
 

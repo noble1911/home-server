@@ -74,6 +74,7 @@ PERMISSION_TOOL_MAP: dict[str, list[str]] = {
     "automation": ["schedule_task"],
     "communication": ["whatsapp"],
     "admin": ["self_update"],
+    "claude_code": [],  # Capability-only permission; no tools to inject into Butler routing
 }
 
 ALL_PERMISSION_GROUPS: list[str] = sorted(PERMISSION_TOOL_MAP.keys())

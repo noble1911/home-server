@@ -10,6 +10,8 @@ export interface Message {
   toolStatus?: string
   /** data:image/...;base64,... — set for current-session image messages only */
   imageDataUrl?: string
+  /** 'claude_code' when message was produced via Claude Code mode; undefined for normal Butler */
+  source?: string
 }
 
 export interface Conversation {

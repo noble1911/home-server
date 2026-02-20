@@ -8,6 +8,7 @@ export type ToolPermission =
   | 'email'
   | 'automation'
   | 'communication'
+  | 'claude_code'
 
 export interface User {
   id: string
@@ -132,4 +133,5 @@ export const PERMISSION_INFO: Record<ToolPermission, { label: string; descriptio
   email: { label: 'Email', description: 'Gmail' },
   automation: { label: 'Automation', description: 'Scheduled tasks' },
   communication: { label: 'Communication', description: 'WhatsApp messages' },
+  claude_code: { label: 'Claude Code', description: 'Run agentic tasks using Claude Code on the server' },
 }

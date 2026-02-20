@@ -186,6 +186,7 @@ export interface HistoryMessage {
   content: string
   type: 'voice' | 'text'
   timestamp: string
+  source?: string | null  // 'claude_code' or null/undefined for normal Butler
 }
 
 /** Paginated chat history response */
