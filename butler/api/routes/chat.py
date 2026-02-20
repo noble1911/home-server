@@ -301,6 +301,9 @@ async def claude_code_stream(
 
     async def generate():
         try:
+            # Immediately signal the UI — claude --print can take a while
+            yield f"data: {json.dumps({'type': 'tool_start', 'tool': 'claude_code'})}\n\n"
+
             timeout = aiohttp.ClientTimeout(total=300, connect=5)
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 try:
@@ -336,6 +339,7 @@ async def claude_code_stream(
                     )
                     yield f"data: {json.dumps({'type': 'text_delta', 'delta': err_msg})}\n\n"
 
+            yield f"data: {json.dumps({'type': 'tool_end', 'tool': 'claude_code'})}\n\n"
             yield f"data: {json.dumps({'type': 'done', 'message_id': message_id})}\n\n"
             yield "data: [DONE]\n\n"
         except Exception:

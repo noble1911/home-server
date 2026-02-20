@@ -67,10 +67,27 @@ async def run_claude(request: web.Request) -> web.StreamResponse:
     )
 
     assert proc.stdout is not None
-    async for line in proc.stdout:
-        chunk = line.decode(errors="replace")
-        data = json.dumps({"type": "text_delta", "delta": chunk})
-        await response.write(f"data: {data}\n\n".encode())
+
+    # claude --print buffers output until completion, so the connection would
+    # sit idle for the full duration. Send SSE comment pings every 15s to keep
+    # the connection alive through Cloudflare and nginx proxies.
+    async def _read_output() -> None:
+        async for line in proc.stdout:  # type: ignore[union-attr]
+            chunk = line.decode(errors="replace")
+            data = json.dumps({"type": "text_delta", "delta": chunk})
+            await response.write(f"data: {data}\n\n".encode())
+
+    async def _keepalive() -> None:
+        while True:
+            await asyncio.sleep(15)
+            await response.write(b": keepalive\n\n")
+
+    read_task = asyncio.create_task(_read_output())
+    ping_task = asyncio.create_task(_keepalive())
+    try:
+        await read_task
+    finally:
+        ping_task.cancel()
 
     await proc.wait()
     logger.info("claude exited with code %s", proc.returncode)

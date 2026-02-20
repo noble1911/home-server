@@ -4,6 +4,7 @@ import { streamSSE } from '../services/sse'
 import type { ChatStreamEvent, Message } from '../types/conversation'
 
 const TOOL_LABELS: Record<string, string> = {
+  claude_code: 'Running Claude Code...',
   web_search: 'Searching the web...',
   weather: 'Checking weather...',
   home_assistant: 'Controlling smart home...',
