@@ -999,9 +999,7 @@ Data lives on the external drive by default, or on the internal SSD when
 /Volumes/HomeServer/ (or ~/HomeServer)  # Data directory
 │
 ├── Media/                              # 5TB allocated
-│   ├── Movies/                         # Radarr root folder
-│   │   ├── 4K/                         # 4K movies (Radarr quality profile)
-│   │   └── HD/                         # 1080p movies
+│   ├── Movies/                         # Radarr root folder (flat — movies at root)
 │   ├── TV/                             # Sonarr root folder (flat — shows at root)
 │   ├── Anime/                          # Separate anime libraries
 │   │   ├── Movies/                     # Radarr root folder (anime films)
