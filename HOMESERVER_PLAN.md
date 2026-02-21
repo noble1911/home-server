@@ -1002,9 +1002,7 @@ Data lives on the external drive by default, or on the internal SSD when
 │   ├── Movies/                         # Radarr root folder
 │   │   ├── 4K/                         # 4K movies (Radarr quality profile)
 │   │   └── HD/                         # 1080p movies
-│   ├── TV/                             # Sonarr root folder
-│   │   ├── 4K/                         # 4K shows
-│   │   └── HD/                         # 1080p shows
+│   ├── TV/                             # Sonarr root folder (flat — shows at root)
 │   ├── Anime/                          # Separate anime libraries
 │   │   ├── Movies/                     # Radarr root folder (anime films)
 │   │   └── Series/                     # Sonarr root folder (anime series)
