@@ -110,6 +110,9 @@ services:
       - "5055:5055"
     networks:
       - homeserver
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:5055/api/v1/status"]
