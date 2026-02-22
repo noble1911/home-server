@@ -287,14 +287,16 @@ async def claude_code_stream(
         raise HTTPException(403, "claude_code permission required")
 
     # Fetch recent claude_code conversation for context continuity.
-    # The last 10 messages (~5 exchanges) gives Claude Code enough history
-    # to understand the ongoing conversation without blowing up the prompt.
+    # The last 10 messages (~5 exchanges) within 7 days gives Claude Code
+    # enough history without pulling in stale context from old sessions.
     recent_rows = await db.fetch(
         """
         SELECT role, content FROM (
             SELECT id, role, content, created_at
             FROM butler.conversation_history
-            WHERE user_id = $1 AND source = 'claude_code'
+            WHERE user_id = $1
+              AND source = 'claude_code'
+              AND created_at > NOW() - INTERVAL '7 days'
             ORDER BY created_at DESC, id DESC
             LIMIT 10
         ) sub ORDER BY created_at ASC, id ASC
