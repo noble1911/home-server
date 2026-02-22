@@ -453,10 +453,10 @@ fi
 # Build and deploy Butler PWA
 # ──────────────────────────────────────────────────
 echo ""
-echo -e "${BLUE}==>${NC} Building and deploying Butler PWA..."
+echo -e "${BLUE}==>${NC} Deploying Butler PWA (pulling pre-built image from GHCR)..."
 APP_DIR="${SCRIPT_DIR}/../app"
 cd "$APP_DIR"
-docker compose build
+docker compose pull
 docker compose up -d
 
 # Wait for PWA health check
