@@ -108,12 +108,22 @@ export default function Dashboard() {
               <PlaceholderRow label="CPU" />
             )}
             {stats?.memory ? (
-              <MetricBar
-                label="RAM"
-                percent={stats.memory.dockerPercent}
-                value={`${stats.memory.dockerUsedFormatted} / ${stats.memory.dockerTotalFormatted}`}
-                hint={stats.memory.hostTotalGb ? `${stats.memory.hostTotalGb} GB host` : undefined}
-              />
+              <>
+                <MetricBar
+                  label="Docker VM"
+                  percent={stats.memory.dockerPercent}
+                  value={`${stats.memory.dockerUsedFormatted} / ${stats.memory.dockerTotalFormatted}`}
+                  hint="RAM used within container runtime"
+                />
+                {stats.memory.hostTotalGb && (
+                  <MetricBar
+                    label="Mac Host"
+                    percent={Math.round(stats.memory.dockerTotal / (stats.memory.hostTotalGb * 1024 ** 3) * 100)}
+                    value={`${stats.memory.dockerTotalFormatted} / ${stats.memory.hostTotalGb} GB`}
+                    hint="Docker's allocation of Mac RAM"
+                  />
+                )}
+              </>
             ) : (
               <PlaceholderRow label="RAM" />
             )}
