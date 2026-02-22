@@ -255,13 +255,14 @@ export interface SystemStatsResponse {
   architecture: string
   uptimeSeconds: number | null
   uptimeFormatted: string | null
+  cpu: { percent: number } | null
   memory: {
-    total: number
-    used: number
-    available: number
-    percent: number
-    totalFormatted: string
-    usedFormatted: string
+    dockerUsed: number
+    dockerTotal: number
+    dockerPercent: number
+    dockerUsedFormatted: string
+    dockerTotalFormatted: string
+    hostTotalGb: number | null
   } | null
 }
 

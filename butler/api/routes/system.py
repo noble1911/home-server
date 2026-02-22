@@ -144,7 +144,11 @@ def _read_proc_uptime() -> int | None:
 
 
 def _read_proc_meminfo() -> dict[str, Any] | None:
-    """Read memory info from /proc/meminfo (Linux only)."""
+    """Read memory info from /proc/meminfo (Linux only).
+
+    Returns raw VM/container memory values — caller is responsible for
+    overlaying the host total if HOST_MEMORY_TOTAL_GB is set.
+    """
     try:
         meminfo: dict[str, int] = {}
         with open("/proc/meminfo") as f:
@@ -170,6 +174,43 @@ def _read_proc_meminfo() -> dict[str, Any] | None:
         return None
 
 
+async def _read_cpu_percent() -> float | None:
+    """Sample CPU usage % from /proc/stat over 0.5 s.
+
+    Reads the aggregate 'cpu' line twice and computes:
+        percent = (1 - Δidle / Δtotal) * 100
+    iowait is counted as idle so we measure active CPU pressure only.
+    """
+    def _sample() -> tuple[int, int] | None:
+        try:
+            with open("/proc/stat") as f:
+                line = f.readline()
+            parts = line.split()
+            if not parts or parts[0] != "cpu":
+                return None
+            values = [int(x) for x in parts[1:]]
+            # fields: user nice system idle iowait irq softirq steal guest guest_nice
+            idle = values[3] + (values[4] if len(values) > 4 else 0)  # idle + iowait
+            total = sum(values)
+            return idle, total
+        except Exception:
+            return None
+
+    s1 = _sample()
+    if s1 is None:
+        return None
+    await asyncio.sleep(0.5)
+    s2 = _sample()
+    if s2 is None:
+        return None
+
+    diff_total = s2[1] - s1[1]
+    diff_idle = s2[0] - s1[0]
+    if diff_total <= 0:
+        return 0.0
+    return round((1.0 - diff_idle / diff_total) * 100, 1)
+
+
 def _format_uptime(seconds: int) -> str:
     """Format uptime seconds into a human-readable string like '14d 3h'."""
     days, remainder = divmod(seconds, 86400)
@@ -187,25 +228,30 @@ def _format_uptime(seconds: int) -> str:
 async def system_stats(
     _user_id: str = Depends(get_current_user),
 ) -> dict[str, Any]:
-    """Basic system metrics (uptime, memory, platform).
+    """System metrics: uptime, CPU, memory (Docker VM vs Mac host).
 
-    Uses host env vars (HOST_PLATFORM, HOST_ARCHITECTURE, HOST_MEMORY_TOTAL_GB)
-    when available, falling back to container-detected values.
+    Memory is split into two views:
+    - dockerMemory: what /proc/meminfo sees (the OrbStack Linux VM allocation)
+    - hostTotalGb: the Mac's physical RAM (from HOST_MEMORY_TOTAL_GB env var)
+
+    CPU is sampled from /proc/stat over 0.5 s — reflects the Linux VM's
+    CPU load, which maps directly to overall Docker workload.
     """
-    uptime_seconds = _read_proc_uptime()
-    memory = _read_proc_meminfo()
+    uptime_seconds, cpu_percent, vm_memory = await asyncio.gather(
+        asyncio.to_thread(_read_proc_uptime),
+        _read_cpu_percent(),
+        asyncio.to_thread(_read_proc_meminfo),
+    )
 
-    # Use host-provided memory total if available, keeping /proc/meminfo for used/available
-    if settings.host_memory_total_gb > 0 and memory:
-        host_total = settings.host_memory_total_gb * (1024 ** 3)
-        used = memory["used"]
-        memory = {
-            "total": host_total,
-            "used": used,
-            "available": host_total - used,
-            "percent": round(used / host_total * 100) if host_total > 0 else 0,
-            "totalFormatted": _format_bytes(host_total),
-            "usedFormatted": _format_bytes(used),
+    memory_out: dict[str, Any] | None = None
+    if vm_memory:
+        memory_out = {
+            "dockerUsed": vm_memory["used"],
+            "dockerTotal": vm_memory["total"],
+            "dockerPercent": vm_memory["percent"],
+            "dockerUsedFormatted": vm_memory["usedFormatted"],
+            "dockerTotalFormatted": vm_memory["totalFormatted"],
+            "hostTotalGb": settings.host_memory_total_gb if settings.host_memory_total_gb > 0 else None,
         }
 
     return {
@@ -213,7 +259,8 @@ async def system_stats(
         "architecture": settings.host_architecture or platform.machine(),
         "uptimeSeconds": uptime_seconds,
         "uptimeFormatted": _format_uptime(uptime_seconds) if uptime_seconds else None,
-        "memory": memory,
+        "cpu": {"percent": cpu_percent} if cpu_percent is not None else None,
+        "memory": memory_out,
     }
 
 

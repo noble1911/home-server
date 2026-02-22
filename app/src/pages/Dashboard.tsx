@@ -101,28 +101,26 @@ export default function Dashboard() {
       <div className="grid grid-cols-2 gap-4">
         <section className="card p-4">
           <h3 className="text-sm font-medium text-butler-400 mb-3">System</h3>
-          <div className="space-y-2">
-            {stats?.memory ? (
-              <div className="flex justify-between">
-                <span className="text-butler-300">Memory</span>
-                <span className="text-butler-100">{stats.memory.percent}%</span>
-              </div>
+          <div className="space-y-3">
+            {stats?.cpu ? (
+              <MetricBar label="CPU" percent={stats.cpu.percent} value={`${stats.cpu.percent}%`} />
             ) : (
-              <div className="flex justify-between">
-                <span className="text-butler-300">Memory</span>
-                <span className="text-butler-500">--</span>
-              </div>
+              <PlaceholderRow label="CPU" />
             )}
-            <div className="flex justify-between">
-              <span className="text-butler-300">Uptime</span>
-              <span className="text-butler-100">{stats?.uptimeFormatted ?? '--'}</span>
+            {stats?.memory ? (
+              <MetricBar
+                label="RAM"
+                percent={stats.memory.dockerPercent}
+                value={`${stats.memory.dockerUsedFormatted} / ${stats.memory.dockerTotalFormatted}`}
+                hint={stats.memory.hostTotalGb ? `${stats.memory.hostTotalGb} GB host` : undefined}
+              />
+            ) : (
+              <PlaceholderRow label="RAM" />
+            )}
+            <div className="flex justify-between text-xs pt-1">
+              <span className="text-butler-400">Uptime</span>
+              <span className="text-butler-200">{stats?.uptimeFormatted ?? '--'}</span>
             </div>
-            {stats && (
-              <div className="flex justify-between">
-                <span className="text-butler-300">Platform</span>
-                <span className="text-butler-100">{stats.platform} {stats.architecture}</span>
-              </div>
-            )}
           </div>
         </section>
 
@@ -203,6 +201,46 @@ function LoadingSkeleton() {
           <div className="h-4 bg-butler-700 rounded" />
         </div>
       </div>
+    </div>
+  )
+}
+
+function MetricBar({
+  label,
+  percent,
+  value,
+  hint,
+}: {
+  label: string
+  percent: number
+  value: string
+  hint?: string
+}) {
+  const barColor =
+    percent > 80 ? 'bg-red-400' : percent > 60 ? 'bg-yellow-400' : 'bg-green-400'
+
+  return (
+    <div>
+      <div className="flex justify-between text-xs mb-1">
+        <span className="text-butler-400">{label}</span>
+        <span className="text-butler-200">{value}</span>
+      </div>
+      <div className="w-full bg-butler-700 rounded-full h-1.5">
+        <div
+          className={`h-1.5 rounded-full transition-all ${barColor}`}
+          style={{ width: `${Math.min(percent, 100)}%` }}
+        />
+      </div>
+      {hint && <p className="text-xs text-butler-500 mt-0.5 text-right">{hint}</p>}
+    </div>
+  )
+}
+
+function PlaceholderRow({ label }: { label: string }) {
+  return (
+    <div className="flex justify-between text-xs">
+      <span className="text-butler-400">{label}</span>
+      <span className="text-butler-500">--</span>
     </div>
   )
 }
