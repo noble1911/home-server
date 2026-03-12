@@ -18,8 +18,9 @@ import logging
 import time
 import uuid
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Header, HTTPException, Request
 from fastapi import Depends
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from tools import DatabasePool, Tool
@@ -65,34 +66,10 @@ class OpenAIChatResponse(BaseModel):
     usage: dict
 
 
-# ── Endpoint ────────────────────────────────────────────────────────
+# ── Helpers ────────────────────────────────────────────────────────
 
-@router.post("/v1/chat/completions", response_model=OpenAIChatResponse)
-async def openai_chat_completions(
-    req: OpenAIChatRequest,
-    authorization: str | None = Header(None),
-    x_api_key: str | None = Header(None),
-    pool: DatabasePool = Depends(get_db_pool),
-    tools: dict[str, Tool] = Depends(get_tools),
-):
-    """OpenAI-compatible completions endpoint for wire-pod.
-
-    Extracts the last user message from the OpenAI messages array,
-    routes it through Butler's full pipeline (context, tools, memory),
-    and returns the response in OpenAI format.
-
-    Accepts the internal API key via either:
-    - Authorization: Bearer <key> (OpenAI client standard — used by wire-pod)
-    - X-API-Key: <key> (Butler internal convention)
-    """
-    # Extract key from Bearer token or X-API-Key header
-    api_key = x_api_key
-    if not api_key and authorization and authorization.startswith("Bearer "):
-        api_key = authorization.removeprefix("Bearer ")
-
-    if not api_key or not settings.internal_api_key or api_key != settings.internal_api_key:
-        raise HTTPException(401, "Invalid or missing API key")
-
+async def _get_response(req, pool, tools):
+    """Run Butler pipeline and return (user_message, response_text)."""
     # Extract the last user message from the OpenAI messages array
     user_message = ""
     for msg in reversed(req.messages):
@@ -152,11 +129,80 @@ async def openai_chat_completions(
         )
     )
 
-    # Return OpenAI-format response
+    return user_message, response_text
+
+
+# ── Endpoint ────────────────────────────────────────────────────────
+
+@router.post("/v1/chat/completions")
+async def openai_chat_completions(
+    req: OpenAIChatRequest,
+    authorization: str | None = Header(None),
+    x_api_key: str | None = Header(None),
+    pool: DatabasePool = Depends(get_db_pool),
+    tools: dict[str, Tool] = Depends(get_tools),
+):
+    """OpenAI-compatible completions endpoint for wire-pod.
+
+    Supports both streaming (SSE) and non-streaming responses.
+    Wire-pod's Go OpenAI client always requests streaming.
+    """
+    # Extract key from Bearer token or X-API-Key header
+    api_key = x_api_key
+    if not api_key and authorization and authorization.startswith("Bearer "):
+        api_key = authorization.removeprefix("Bearer ")
+
+    if not api_key or not settings.internal_api_key or api_key != settings.internal_api_key:
+        raise HTTPException(401, "Invalid or missing API key")
+
+    user_message, response_text = await _get_response(req, pool, tools)
+    completion_id = f"chatcmpl-{uuid.uuid4().hex[:12]}"
+    model = req.model or settings.anthropic_model
+    created = int(time.time())
+
+    # Streaming response (SSE) — wire-pod always requests this
+    if req.stream:
+        async def generate_stream():
+            # Single chunk with full content (Butler doesn't stream internally)
+            chunk = {
+                "id": completion_id,
+                "object": "chat.completion.chunk",
+                "created": created,
+                "model": model,
+                "choices": [{
+                    "index": 0,
+                    "delta": {"role": "assistant", "content": response_text},
+                    "finish_reason": None,
+                }],
+            }
+            yield f"data: {json.dumps(chunk)}\n\n"
+
+            # Final chunk with finish_reason
+            done_chunk = {
+                "id": completion_id,
+                "object": "chat.completion.chunk",
+                "created": created,
+                "model": model,
+                "choices": [{
+                    "index": 0,
+                    "delta": {},
+                    "finish_reason": "stop",
+                }],
+            }
+            yield f"data: {json.dumps(done_chunk)}\n\n"
+            yield "data: [DONE]\n\n"
+
+        return StreamingResponse(
+            generate_stream(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
+        )
+
+    # Non-streaming response
     return OpenAIChatResponse(
-        id=f"chatcmpl-{uuid.uuid4().hex[:12]}",
-        created=int(time.time()),
-        model=req.model or settings.anthropic_model,
+        id=completion_id,
+        created=created,
+        model=model,
         choices=[{
             "index": 0,
             "message": {
