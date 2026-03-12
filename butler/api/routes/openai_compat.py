@@ -37,7 +37,7 @@ router = APIRouter()
 
 # The Butler user ID that Vector will use for all interactions.
 # This is Ron's user — Vector shares his memory, facts, and context.
-VECTOR_USER_ID = "ron"
+VECTOR_USER_ID = "invite_ron_6969"
 VECTOR_CHANNEL = "vector"
 
 

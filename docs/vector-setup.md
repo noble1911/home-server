@@ -27,7 +27,7 @@ docker compose up -d
 
 3. Go to **Custom Settings > Knowledge Graph**:
    - **Provider:** Custom
-   - **API URL:** `http://butler-api:8000/api/openai/v1/chat/completions`
+   - **API URL:** `http://localhost:8000/api/openai/v1` (wire-pod's Go client appends `/chat/completions` automatically)
    - **API Key:** Your `INTERNAL_API_KEY` value (from butler `.env`)
    - **Model:** `claude-sonnet` (any value works — Butler uses its own model config)
 
