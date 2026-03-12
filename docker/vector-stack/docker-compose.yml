@@ -1,38 +1,35 @@
 # Vector Robot Stack (wire-pod)
 # Provides local server for Anki/DDL Vector robots
 # Connects to Butler API for AI responses via OpenAI-compatible endpoint
+#
+# Uses host networking so wire-pod can communicate directly with Vector
+# robots on the LAN (required for SDK/gRPC commands back to the robot).
+# Port 8080 (web UI) will be on the host directly — no remapping.
 
 services:
   wire-pod:
     container_name: wire-pod
     hostname: escapepod
-    image: spkuja/wire-pod:latest
+    build: .
+    image: wire-pod-arm64
     restart: unless-stopped
+    privileged: true
+    network_mode: host
     dns:
       - 8.8.8.8
       - 8.8.4.4
     environment:
       WIREPOD_DATA_DIR: /data
-    ports:
-      - "80:80"       # HTTP (robot initial setup)
-      - "443:443"     # HTTPS/gRPC (robot communication)
-      - "8084:8084"   # Additional robot services
-      - "8090:8080"   # Web UI (remapped — 8080 used by Nextcloud)
+      WEBSERVER_PORT: "8090"
     volumes:
       - wire-pod-data:/data
       - wire-pod-images:/images
-    networks:
-      - homeserver
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8080/ok"]
+      test: ["CMD", "curl", "-fsS", "http://localhost:8090/ok"]
       interval: 30s
       timeout: 5s
       retries: 5
       start_period: 30s
-
-networks:
-  homeserver:
-    external: true
 
 volumes:
   wire-pod-data:
