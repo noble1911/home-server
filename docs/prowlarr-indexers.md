@@ -177,6 +177,51 @@ For anime, you may want both Radarr and Sonarr to receive anime results:
 - Movies/Anime (2060) → Radarr picks these up
 - TV/Anime (5070) → Sonarr picks these up
 
+## 6. Byparr / FlareSolverr (Cloudflare Bypass)
+
+Some indexers (e.g. 1337x, LimeTorrents) use Cloudflare anti-bot protection which blocks Prowlarr's direct requests. We use **Byparr** — a drop-in FlareSolverr replacement that uses Camoufox (Firefox-based anti-detection browser) to solve modern Cloudflare challenges.
+
+> **Why Byparr?** The original FlareSolverr (v3) can no longer solve Cloudflare's newer Turnstile challenges. Byparr is actively maintained and uses the same API, so Prowlarr sees it as FlareSolverr.
+
+Byparr runs as a container named `flaresolverr` at `http://flaresolverr:8191` for compatibility.
+
+### How It Works
+
+```
+Prowlarr → Byparr (Camoufox browser) → Cloudflare challenge → Indexer site
+```
+
+Byparr is registered as a **FlareSolverr indexer proxy** in Prowlarr. Indexers that need it are tagged with the `flaresolverr` tag — the proxy only applies to tagged indexers.
+
+### Adding the Proxy Manually (if not auto-configured)
+
+1. Go to **Settings > Indexers** (in Prowlarr)
+2. Under **Indexer Proxies**, click **+**
+3. Select **FlareSolverr** (Byparr is API-compatible)
+4. Set **Host** to `http://flaresolverr:8191/`
+5. Set **Request Timeout** to `60` seconds
+6. Under **Tags**, create and assign a tag (e.g. `flaresolverr`)
+7. Click **Test** and **Save**
+
+### Tagging Indexers to Use Byparr
+
+1. Open the indexer that needs Cloudflare bypass (e.g. 1337x)
+2. Add the `flaresolverr` tag to the indexer
+3. Save — Prowlarr will now route requests through Byparr
+
+### Known Cloudflare-Protected Indexers
+
+| Indexer | Needs Bypass |
+|---------|-------------|
+| 1337x | Yes |
+| LimeTorrents | Yes |
+| EZTV | Sometimes |
+| YTS | No |
+| The Pirate Bay | No |
+| Nyaa.si | No |
+
+> **Note:** Byparr uses ~200-400MB RAM when actively solving challenges. It idles with minimal resource usage.
+
 ## Troubleshooting
 
 ### Indexer test fails with "Unable to connect"
@@ -218,6 +263,14 @@ For anime, you may want both Radarr and Sonarr to receive anime results:
 - Too many indexers slow down every search. Disable or remove indexers you don't actually use
 - Check **System > Tasks** for any stuck tasks
 - Under **Indexers**, review response times — consistently slow indexers can be removed
+
+### Cloudflare challenge / "Access denied" errors
+
+- Verify Byparr is running: `docker logs flaresolverr`
+- Check the health endpoint: `curl http://localhost:8191/health`
+- Ensure the indexer has the `flaresolverr` tag applied
+- Check **Settings > Indexers > Indexer Proxies** — FlareSolverr proxy should show a green checkmark
+- If challenges keep failing, try increasing the request timeout to 120 seconds
 
 ## Next Steps
 

@@ -109,6 +109,11 @@ The Mac Mini is set up and all Docker stacks are deployed via OrbStack. Active w
 | **voice-stack** | LiveKit, Kokoro TTS, LiveKit Agent | Running |
 | **messaging-stack** | WhatsApp Gateway | Running |
 
+### Native Services (not Docker)
+| Service | Description | Status |
+|---------|-------------|--------|
+| **wire-pod** | Vector robot server (WirePod v1.2.13 macOS app) | Running |
+
 ### Butler API (~4k LOC, FastAPI)
 - **25+ custom Python tools** — media, smart home, memory, scheduling, email, calendar, etc.
 - **10 database migrations** — PostgreSQL with pgvector (768-dim nomic-embed-text embeddings)
@@ -141,6 +146,7 @@ home-server/
 │   ├── photos-files-stack/# Immich, Nextcloud, PostgreSQL
 │   ├── smart-home-stack/  # Home Assistant, Cloudflare Tunnel
 │   └── voice-stack/       # LiveKit, Kokoro TTS
+│   # wire-pod runs natively via /Applications/WirePod.app (not Docker)
 ├── scripts/               # Individual setup scripts (01-15)
 │   ├── 01-homebrew.sh
 │   ├── 03-power-settings.sh

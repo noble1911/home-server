@@ -26,9 +26,30 @@ services:
       retries: 3
       start_period: 30s
 
+  flaresolverr:
+    image: ghcr.io/thephaseless/byparr:latest
+    container_name: flaresolverr
+    environment:
+      - LOG_LEVEL=info
+      - TZ=Europe/London
+    ports:
+      - "8191:8191"
+    networks:
+      - homeserver
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8191/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
   prowlarr:
     image: lscr.io/linuxserver/prowlarr:2.3.0
     container_name: prowlarr
+    depends_on:
+      flaresolverr:
+        condition: service_healthy
     environment:
       - PUID=501
       - PGID=20

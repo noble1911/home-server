@@ -12,12 +12,16 @@ Vector Robot → wire-pod (STT + intent) → Butler API (OpenAI-compat endpoint)
 - **Butler API** handles: AI responses, tool execution, memory/facts
 - Vector uses Ron's user profile — same memory, facts, and personality as voice/PWA
 
-## Deploy
+## Install (Native macOS)
 
-```bash
-cd ~/home-server/docker/vector-stack
-docker compose up -d
-```
+Wire-pod runs natively on macOS (not in Docker) so the Vector SDK has full access to the robot.
+
+1. Download `WirePod-v1.2.13.dmg` from [WirePod releases](https://github.com/kercre123/WirePod/releases)
+2. Drag `WirePod.app` to `/Applications`
+3. Open WirePod from Applications (approve the unsigned app in System Settings → Security)
+4. Config is stored at:
+   - `~/Library/Application Support/wire-pod/wire-pod-conf.json` — app settings (port, auto-start)
+   - `/Applications/WirePod.app/Contents/Frameworks/chipper/` — robot data, jdocs, certs
 
 ## Configure wire-pod
 
@@ -61,7 +65,7 @@ The Vector robot needs to be pointed to wire-pod. Follow the [wire-pod setup gui
 
 ## Troubleshooting
 
-- **Robot can't connect:** Ensure ports 80/443 aren't blocked. Check `docker logs wire-pod`.
+- **Robot can't connect:** Ensure ports 80/443 aren't blocked. Check the WirePod app logs (systray → View Logs).
 - **No AI responses:** Verify the API URL and key in wire-pod settings. Test with:
   ```bash
   curl -X POST http://localhost:8000/api/openai/v1/chat/completions \
@@ -70,3 +74,4 @@ The Vector robot needs to be pointed to wire-pod. Follow the [wire-pod setup gui
     -d '{"messages":[{"role":"user","content":"Hello"}]}'
   ```
 - **Wire-pod web UI not loading:** Check `http://192.168.1.117:8090`
+- **Migrating from Docker:** Back up `/data` from the container, copy `chipper/jdocs/`, `chipper/apiConfig.json`, and `certs/server_config.json` to the native app's `Frameworks/chipper/` directory.

@@ -75,6 +75,40 @@ else
 fi
 
 # ─────────────────────────────────────────────
+# Register FlareSolverr as indexer proxy
+# ─────────────────────────────────────────────
+echo ""
+echo -e "${BLUE}==>${NC} Configuring FlareSolverr proxy in Prowlarr..."
+
+FLARESOLVERR_TAG_ID=""
+if [[ -n "$PROWLARR_API_KEY" ]]; then
+    # Create a "flaresolverr" tag for indexers that need it
+    EXISTING_TAGS=$(arr_api_get "http://localhost:9696/api/v1/tag" "$PROWLARR_API_KEY")
+    FLARESOLVERR_TAG_ID=$(echo "$EXISTING_TAGS" | grep -o '"id":[0-9]*,"label":"flaresolverr"' | grep -o '"id":[0-9]*' | grep -o '[0-9]*')
+
+    if [[ -z "$FLARESOLVERR_TAG_ID" ]]; then
+        TAG_RESPONSE=$(arr_api_post "http://localhost:9696/api/v1/tag" "$PROWLARR_API_KEY" '{"label":"flaresolverr"}')
+        FLARESOLVERR_TAG_ID=$(echo "$TAG_RESPONSE" | grep -o '"id":[0-9]*' | head -1 | grep -o '[0-9]*')
+        echo -e "  ${GREEN}✓${NC} Created 'flaresolverr' tag (ID: ${FLARESOLVERR_TAG_ID})"
+    else
+        echo -e "  ${GREEN}✓${NC} Tag 'flaresolverr' already exists (ID: ${FLARESOLVERR_TAG_ID})"
+    fi
+
+    # Register FlareSolverr as an indexer proxy
+    EXISTING_PROXIES=$(arr_api_get "http://localhost:9696/api/v1/indexerproxy" "$PROWLARR_API_KEY")
+    if echo "$EXISTING_PROXIES" | grep -q '"name":"FlareSolverr"'; then
+        echo -e "  ${GREEN}✓${NC} FlareSolverr proxy already registered"
+    else
+        arr_api_post "http://localhost:9696/api/v1/indexerproxy" "$PROWLARR_API_KEY" \
+            "{\"name\":\"FlareSolverr\",\"implementation\":\"FlareSolverr\",\"configContract\":\"FlareSolverrSettings\",\"tags\":[${FLARESOLVERR_TAG_ID}],\"fields\":[{\"name\":\"host\",\"value\":\"http://flaresolverr:8191/\"},{\"name\":\"requestTimeout\",\"value\":60}]}" > /dev/null \
+            && echo -e "  ${GREEN}✓${NC} FlareSolverr proxy registered" \
+            || echo -e "  ${YELLOW}⚠${NC} FlareSolverr proxy could not be registered"
+    fi
+else
+    echo -e "  ${YELLOW}⚠${NC} No Prowlarr API key — configure FlareSolverr manually in Prowlarr"
+fi
+
+# ─────────────────────────────────────────────
 # Add default public indexers to Prowlarr
 # ─────────────────────────────────────────────
 echo ""
@@ -83,27 +117,33 @@ echo -e "${BLUE}==>${NC} Adding public indexers to Prowlarr..."
 if [[ -n "$PROWLARR_API_KEY" ]]; then
     EXISTING_INDEXERS=$(arr_api_get "http://localhost:9696/api/v1/indexer" "$PROWLARR_API_KEY")
 
-    # add_public_indexer <display_name> <definition_name>
+    # add_public_indexer <display_name> <definition_name> [use_flaresolverr]
     add_public_indexer() {
         local display_name="$1"
         local def_name="$2"
+        local use_flaresolverr="${3:-false}"
+        local tags="[]"
+
+        if [[ "$use_flaresolverr" == "true" && -n "$FLARESOLVERR_TAG_ID" ]]; then
+            tags="[${FLARESOLVERR_TAG_ID}]"
+        fi
 
         if echo "$EXISTING_INDEXERS" | grep -q "\"definitionName\":\"${def_name}\""; then
             echo -e "  ${GREEN}✓${NC} ${display_name} already added"
         else
             arr_api_post "http://localhost:9696/api/v1/indexer" "$PROWLARR_API_KEY" \
-                "{\"name\":\"${display_name}\",\"definitionName\":\"${def_name}\",\"implementation\":\"Cardigann\",\"configContract\":\"CardigannSettings\",\"enable\":true,\"appProfileId\":1,\"priority\":25,\"tags\":[],\"fields\":[{\"name\":\"definitionFile\",\"value\":\"${def_name}\"}]}" > /dev/null \
+                "{\"name\":\"${display_name}\",\"definitionName\":\"${def_name}\",\"implementation\":\"Cardigann\",\"configContract\":\"CardigannSettings\",\"enable\":true,\"appProfileId\":1,\"priority\":25,\"tags\":${tags},\"fields\":[{\"name\":\"definitionFile\",\"value\":\"${def_name}\"}]}" > /dev/null \
                 && echo -e "  ${GREEN}✓${NC} ${display_name} added" \
                 || echo -e "  ${YELLOW}⚠${NC} ${display_name} could not be added"
         fi
     }
 
-    # General
-    add_public_indexer "1337x" "1337x"
+    # General (1337x needs FlareSolverr for Cloudflare bypass)
+    add_public_indexer "1337x" "1337x" true
     add_public_indexer "YTS" "yts"
     add_public_indexer "EZTV" "eztv"
     add_public_indexer "The Pirate Bay" "thepiratebay"
-    add_public_indexer "LimeTorrents" "limetorrents"
+    add_public_indexer "LimeTorrents" "limetorrents" true
 
     # Japanese / Anime
     add_public_indexer "Nyaa.si" "nyaasi"
