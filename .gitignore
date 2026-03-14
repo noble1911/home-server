@@ -1,5 +1,6 @@
 # Claude Code project files
-.claude/
+.claude/*
+!.claude/skills/
 
 # Development tracking (not for end users)
 TODO.md
