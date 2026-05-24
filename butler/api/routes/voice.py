@@ -32,6 +32,27 @@ _FAREWELL_PHRASES = frozenset(
     ["goodbye", "goodnight", "good night", "talk to you later", "that's all"]
 )
 
+# Extra system guidance for ESP32 device sessions (surface == "device"): tell Claude
+# it has a screen and should proactively draw cards. PWA voice (surface == "voice")
+# keeps using display_in_chat and never sees this.
+_DEVICE_SCREEN_INSTRUCTION = {
+    "type": "text",
+    "text": (
+        "You are speaking through a small physical device that has a touchscreen. "
+        "Proactively call display_on_device to show glanceable information as a card — "
+        "weather, short lists, numbers, a status, a confirmation, or a value/meter — "
+        "whenever it would help the user see it, and always also give a brief spoken "
+        "summary. For any data-heavy or numeric answer (e.g. weather), show a card."
+    ),
+}
+
+
+def _with_surface(system_prompt: list[dict], surface: str) -> list[dict]:
+    """Append device-screen guidance for ESP32 device sessions."""
+    if surface == "device":
+        return list(system_prompt) + [_DEVICE_SCREEN_INSTRUCTION]
+    return system_prompt
+
 
 @router.post("/process", response_model=VoiceProcessResponse)
 async def process_voice(
@@ -63,7 +84,7 @@ async def process_voice(
     all_tools["display_on_device"] = DisplayOnDeviceTool()
 
     response_text = await chat_with_tools(
-        system_prompt=ctx.system_prompt,
+        system_prompt=_with_surface(ctx.system_prompt, req.surface),
         user_message=req.transcript,
         tools=all_tools,
         history=ctx.history,
@@ -134,7 +155,7 @@ async def stream_voice(
     async def generate():
         try:
             async for chunk in stream_chat_with_tools(
-                system_prompt=ctx.system_prompt,
+                system_prompt=_with_surface(ctx.system_prompt, req.surface),
                 user_message=req.transcript,
                 tools=all_tools,
                 history=ctx.history,
