@@ -239,6 +239,7 @@ class VoiceProcessRequest(BaseModel):
     transcript: str
     user_id: str
     session_id: str
+    surface: str = "voice"  # "voice" (PWA/LiveKit) | "device" (ESP32 — enables display_on_device cards)
 
 
 class VoiceProcessResponse(BaseModel):
