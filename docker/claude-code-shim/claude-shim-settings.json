@@ -59,6 +59,12 @@
         "~/.claude.json",
         "~/.config/claude"
       ]
+    },
+    "network": {
+      "allowUnixSockets": [
+        "~/.orbstack/run/docker.sock",
+        "/var/run/docker.sock"
+      ]
     }
   }
 }

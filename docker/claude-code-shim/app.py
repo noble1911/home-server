@@ -57,13 +57,14 @@ if not Path(CLAUDE_BIN).exists():
     import shutil
     CLAUDE_BIN = shutil.which("claude") or CLAUDE_BIN
 
-# When launched via launchd the environment has a minimal PATH that doesn't
-# include Homebrew. Patch it so the `claude` Node.js script can find `node`.
-_HOMEBREW_BIN = "/opt/homebrew/bin"
-_HOMEBREW_SBIN = "/opt/homebrew/sbin"
+# When launched via launchd the environment has a minimal PATH. Patch it so the
+# `claude` Node.js script can find `node` (Homebrew) and so delegated tasks can
+# find `docker`, which OrbStack installs at /usr/local/bin/docker.
+_EXTRA_PATHS = ["/opt/homebrew/bin", "/opt/homebrew/sbin", "/usr/local/bin"]
 _current_path = os.environ.get("PATH", "/usr/bin:/bin:/usr/sbin:/sbin")
-if _HOMEBREW_BIN not in _current_path:
-    os.environ["PATH"] = f"{_HOMEBREW_BIN}:{_HOMEBREW_SBIN}:{_current_path}"
+_missing = [p for p in _EXTRA_PATHS if p not in _current_path.split(":")]
+if _missing:
+    os.environ["PATH"] = ":".join(_missing) + ":" + _current_path
 
 
 def _authorized(request: web.Request) -> bool:

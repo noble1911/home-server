@@ -40,9 +40,9 @@ via Cloudflare Tunnel, so the shim is locked down in three independent layers:
 3. **macOS Seatbelt sandbox.** The hard, OS-level wall. Filesystem writes are
    confined to the repo + data dirs; reads of `~/.ssh`, keychains, cloud creds,
    etc. are denied; `allowUnsandboxedCommands: false` means a blocked command
-   cannot silently retry outside the sandbox. `docker`/`docker compose` are
-   excluded from the sandbox (they need the daemon socket) but remain subject to
-   the deny-list.
+   cannot silently retry outside the sandbox. `docker` can still manage
+   containers because the OrbStack daemon socket is allowed through
+   (`network.allowUnixSockets`); its data-destroying subcommands stay denied.
 
 We deliberately do **not** use `--dangerously-skip-permissions`, and we do **not**
 use `--bare` (it forces `ANTHROPIC_API_KEY` auth and would break the subscription
