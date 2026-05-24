@@ -20,10 +20,13 @@ class DisplayOnDeviceTool(Tool):
     def description(self) -> str:
         return (
             "Display a structured card on the user's physical device screen (a small "
-            "ESP32 touchscreen) during a voice conversation. Use this for glanceable "
-            "info that's easier to see than hear — weather, a short list, a status, a "
-            "confirmation, or a single value/meter. Keep it concise: a short title and "
-            "up to ~6 short rows. Always also give a brief spoken summary in your reply."
+            "ESP32 touchscreen) during a voice conversation. Use it for glanceable info "
+            "that's easier to see than hear. Building blocks: a title (+optional icon and "
+            "accent colour), free-text 'rows', two-column 'fields' (label/value), one or "
+            "more labelled 'meters' (0..1 bars), and a coloured 'status' pill. Ops: 'card' "
+            "(default, combine the blocks above), 'text' (title + paragraph 'body'), 'toast' "
+            "(transient 'message' banner, auto-dismiss via ttl_ms), 'clear'. Keep it concise "
+            "and always also give a brief spoken summary."
         )
 
     @property
@@ -51,8 +54,10 @@ class DisplayOnDeviceTool(Tool):
                 "icon": {
                     "type": "string",
                     "description": (
-                        "Optional icon name: cloud, clock, check, warning, info, music, "
-                        "home, media, calendar, mail."
+                        "Optional icon shown next to the title. Supported: check, ok, "
+                        "warning, alert, info, bell, music, audio, media, video, home, mail, "
+                        "image, wifi, battery, location, gps, settings, list, calendar, "
+                        "refresh, play, pause, download, upload, power, charge, phone, call, file."
                     ),
                 },
                 "accent": {
@@ -65,7 +70,37 @@ class DisplayOnDeviceTool(Tool):
                         "label": {"type": "string"},
                         "value": {"type": "number"},
                     },
-                    "description": "Optional progress meter; value is 0..1.",
+                    "description": "Optional single progress meter; value is 0..1.",
+                },
+                "meters": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "label": {"type": "string"},
+                            "value": {"type": "number"},
+                        },
+                    },
+                    "description": "Several labelled progress meters (each value 0..1).",
+                },
+                "fields": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "label": {"type": "string"},
+                            "value": {"type": "string"},
+                        },
+                    },
+                    "description": "Key/value rows, rendered two-column (label left, value right).",
+                },
+                "status": {
+                    "type": "object",
+                    "properties": {
+                        "text": {"type": "string"},
+                        "color": {"type": "string"},
+                    },
+                    "description": "A coloured status pill, e.g. {\"text\":\"Online\",\"color\":\"#16a34a\"}.",
                 },
                 "ttl_ms": {
                     "type": "integer",
