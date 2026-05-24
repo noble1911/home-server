@@ -37,6 +37,12 @@ services:
     networks:
       - homeserver
     restart: unless-stopped
+    # Cap PIDs: the headless-browser solver can leak processes over time
+    # (observed ~48k, which exhausted the OrbStack VM's process capacity and
+    # broke other containers' healthchecks with EAGAIN on exec). This confines a
+    # runaway to this container — it hits the cap and restarts instead of taking
+    # the whole VM down.
+    pids_limit: 1024
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:8191/health"]
       interval: 30s
