@@ -80,8 +80,13 @@ async def process_voice(
         channel="voice",
     )
     all_tools = await get_user_tools(user_id, tools, pool)
-    all_tools["display_in_chat"] = DisplayInChatTool()
-    all_tools["display_on_device"] = DisplayOnDeviceTool()
+    # Surface-specific render tool: the ESP32 device gets display_on_device (cards),
+    # the website/PWA gets display_in_chat (chat panel). Mutually exclusive so Claude
+    # never draws device cards for the website (where they'd render nothing).
+    if req.surface == "device":
+        all_tools["display_on_device"] = DisplayOnDeviceTool()
+    else:
+        all_tools["display_in_chat"] = DisplayInChatTool()
 
     response_text = await chat_with_tools(
         system_prompt=_with_surface(ctx.system_prompt, req.surface),
@@ -147,8 +152,13 @@ async def stream_voice(
         channel="voice",
     )
     all_tools = await get_user_tools(user_id, tools, pool)
-    all_tools["display_in_chat"] = DisplayInChatTool()
-    all_tools["display_on_device"] = DisplayOnDeviceTool()
+    # Surface-specific render tool: the ESP32 device gets display_on_device (cards),
+    # the website/PWA gets display_in_chat (chat panel). Mutually exclusive so Claude
+    # never draws device cards for the website (where they'd render nothing).
+    if req.surface == "device":
+        all_tools["display_on_device"] = DisplayOnDeviceTool()
+    else:
+        all_tools["display_in_chat"] = DisplayInChatTool()
     full_response_parts: list[str] = []
     visual_parts: list[str] = []
 

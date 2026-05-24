@@ -63,7 +63,7 @@ from .ratelimit import start_ratelimit_cleanup, stop_ratelimit_cleanup
 
 ALWAYS_ALLOWED_TOOLS: set[str] = {
     "remember_fact", "recall_facts", "get_user",
-    "get_conversations", "update_soul", "display_in_chat", "display_on_device",
+    "get_conversations", "update_soul", "display_in_chat",
     "weather", "server_health", "storage_monitor",
 }
 
