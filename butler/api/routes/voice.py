@@ -142,8 +142,11 @@ async def stream_voice(
                 user_id=user_id,
                 channel="voice",
             ):
-                if isinstance(chunk, dict) and chunk.get("type") == "visual_content":
-                    visual_parts.append(chunk.get("content", ""))
+                if isinstance(chunk, dict):
+                    # Structured events (visual_content, device_card) pass straight
+                    # through as their own SSE event — never wrapped as a text delta.
+                    if chunk.get("type") == "visual_content":
+                        visual_parts.append(chunk.get("content", ""))
                     yield f"data: {json.dumps(chunk)}\n\n"
                 else:
                     full_response_parts.append(chunk)
