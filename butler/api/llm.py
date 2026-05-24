@@ -85,7 +85,7 @@ def _build_tool_definitions(tools: dict[str, Tool]) -> list[dict]:
 # Others go in the lightweight catalog and are loaded on demand.
 ROUTING_CORE_TOOLS: set[str] = {
     "remember_fact", "recall_facts", "get_user",
-    "weather", "display_in_chat", "display_on_device",
+    "weather", "display_in_chat", "display_on_device", "display_image",
     "radarr", "seerr", "books", "sonarr",
     # Escalation path for server fixes — keep core so Claude reliably knows it
     # can delegate to a real shell without first round-tripping request_tools.
@@ -534,6 +534,11 @@ async def stream_chat_with_tools(
             # esp-gateway to forward to the physical device screen.
             if block.name == "display_on_device":
                 yield {"type": "device_card", "card": dict(block.input)}
+
+            # Intercept display_image: yield an SVG event; the esp-gateway rasterizes
+            # it to a PNG and sends it to the device.
+            if block.name == "display_image":
+                yield {"type": "device_image", "svg": block.input.get("svg", "")}
 
             if block.name == "request_tools":
                 result = router.handle_request_tools(

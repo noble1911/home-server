@@ -49,6 +49,7 @@ from .media_files import MediaFilesTool
 from .display_in_chat import DisplayInChatTool
 from .claude_code import ClaudeCodeTool
 from .display_on_device import DisplayOnDeviceTool
+from .display_image import DisplayImageTool
 
 __all__ = [
     # Base
@@ -108,4 +109,5 @@ __all__ = [
     # Claude Code delegation (host shell access via shim)
     "ClaudeCodeTool",
     "DisplayOnDeviceTool",
+    "DisplayImageTool",
 ]

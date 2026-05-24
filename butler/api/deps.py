@@ -19,6 +19,7 @@ from tools import (
     DatabasePool,
     DisplayInChatTool,
     DisplayOnDeviceTool,
+    DisplayImageTool,
     EmbeddingService,
     GetConversationsTool,
     GmailTool,
@@ -134,6 +135,7 @@ async def init_resources() -> None:
         "update_soul": UpdateSoulTool(_db_pool),
         "display_in_chat": DisplayInChatTool(),
         "display_on_device": DisplayOnDeviceTool(),
+        "display_image": DisplayImageTool(),
     }
 
     # Only register HA tools if configured

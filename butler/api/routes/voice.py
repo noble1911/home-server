@@ -18,6 +18,7 @@ from starlette.responses import StreamingResponse
 from tools import DatabasePool, Tool
 from tools.display_in_chat import DisplayInChatTool
 from tools.display_on_device import DisplayOnDeviceTool
+from tools.display_image import DisplayImageTool
 
 from ..context import load_user_context
 from ..deps import get_db_pool, get_embedding_service, get_internal_or_user, get_tools, get_user_tools
@@ -42,7 +43,10 @@ _DEVICE_SCREEN_INSTRUCTION = {
         "Proactively call display_on_device to show glanceable information as a card — "
         "weather, short lists, numbers, a status, a confirmation, or a value/meter — "
         "whenever it would help the user see it, and always also give a brief spoken "
-        "summary. For any data-heavy or numeric answer (e.g. weather), show a card."
+        "summary. For any data-heavy or numeric answer (e.g. weather), show a card. "
+        "When the visual design matters or a card can't express it (a chart, a diagram, "
+        "a styled layout, a big headline figure), call display_image with a 352x280 SVG "
+        "instead."
     ),
 }
 
@@ -85,6 +89,7 @@ async def process_voice(
     # never draws device cards for the website (where they'd render nothing).
     if req.surface == "device":
         all_tools["display_on_device"] = DisplayOnDeviceTool()
+        all_tools["display_image"] = DisplayImageTool()
     else:
         all_tools["display_in_chat"] = DisplayInChatTool()
 
@@ -157,6 +162,7 @@ async def stream_voice(
     # never draws device cards for the website (where they'd render nothing).
     if req.surface == "device":
         all_tools["display_on_device"] = DisplayOnDeviceTool()
+        all_tools["display_image"] = DisplayImageTool()
     else:
         all_tools["display_in_chat"] = DisplayInChatTool()
     full_response_parts: list[str] = []
