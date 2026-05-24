@@ -88,6 +88,10 @@ services:
       - HOST_ARCHITECTURE=${HOST_ARCHITECTURE:-}
       - HOST_MEMORY_TOTAL_GB=${HOST_MEMORY_TOTAL_GB:-0}
       - HAS_EXTERNAL_DRIVE=${HAS_EXTERNAL_DRIVE:-false}
+      # Claude Code shim (host-side `claude --print`). Token must match
+      # CLAUDE_SHIM_TOKEN on the host shim so butler-api can authenticate.
+      - CLAUDE_CODE_SHIM_URL=${CLAUDE_CODE_SHIM_URL:-http://host.docker.internal:7100}
+      - CLAUDE_CODE_SHIM_TOKEN=${CLAUDE_CODE_SHIM_TOKEN:-}
     volumes:
       - ./api:/app/api:ro
       - ./tools:/app/tools:ro

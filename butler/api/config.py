@@ -133,6 +133,9 @@ class Settings(BaseSettings):
 
     # Claude Code shim (host-side service that runs `claude --print`)
     claude_code_shim_url: str = "http://host.docker.internal:7100"
+    # Shared secret sent as the X-Shim-Token header so only butler-api can
+    # invoke the shim. Must match CLAUDE_SHIM_TOKEN on the host shim.
+    claude_code_shim_token: str = ""
 
     # Home Assistant webhook authentication
     ha_webhook_secret: str = ""

@@ -15,6 +15,7 @@ from fastapi import Depends, Header, HTTPException
 from tools import (
     AlertStateManager,
     BookTool,
+    ClaudeCodeTool,
     DatabasePool,
     DisplayInChatTool,
     EmbeddingService,
@@ -74,7 +75,9 @@ PERMISSION_TOOL_MAP: dict[str, list[str]] = {
     "automation": ["schedule_task"],
     "communication": ["whatsapp"],
     "admin": ["self_update"],
-    "claude_code": [],  # Capability-only permission; no tools to inject into Butler routing
+    # Grants Butler the run_claude_code delegation tool (host shell access via
+    # the shim). Also gates the dedicated /chat/claude-code/stream endpoint.
+    "claude_code": ["run_claude_code"],
 }
 
 ALL_PERMISSION_GROUPS: list[str] = sorted(PERMISSION_TOOL_MAP.keys())
@@ -248,6 +251,14 @@ async def init_resources() -> None:
 
     # Self-update tool (always registered — admin permission required)
     _tools["self_update"] = SelfUpdateTool()
+
+    # Claude Code delegation (always registered; injected only for users with
+    # the 'claude_code' permission via PERMISSION_TOOL_MAP). Gives Butler an
+    # escalation path to a real shell on the host for fixing server issues.
+    _tools["run_claude_code"] = ClaudeCodeTool(
+        shim_url=settings.claude_code_shim_url,
+        shim_token=settings.claude_code_shim_token,
+    )
 
     # ── Alert dispatch ──────────────────────────────────────────────
     # Wire NotificationDispatcher with Push + WhatsApp channels so that

@@ -87,6 +87,9 @@ ROUTING_CORE_TOOLS: set[str] = {
     "remember_fact", "recall_facts", "get_user",
     "weather", "display_in_chat",
     "radarr", "seerr", "books", "sonarr",
+    # Escalation path for server fixes — keep core so Claude reliably knows it
+    # can delegate to a real shell without first round-tripping request_tools.
+    "run_claude_code",
 }
 
 # Only enable routing when there are this many non-core tools.

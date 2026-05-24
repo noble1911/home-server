@@ -11,6 +11,16 @@
         <string>/Users/ron/home-server/docker/claude-code-shim/app.py</string>
     </array>
 
+    <!-- Shared secret so only butler-api can invoke /run. Replace the
+         placeholder with a random value (openssl rand -hex 32) and set the
+         SAME value as CLAUDE_CODE_SHIM_TOKEN on butler-api. Edit this in your
+         copy under ~/Library/LaunchAgents/, not the committed repo file. -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>CLAUDE_SHIM_TOKEN</key>
+        <string>REPLACE_WITH_RANDOM_SECRET</string>
+    </dict>
+
     <key>RunAtLoad</key>
     <true/>
 

@@ -319,7 +319,9 @@ Butler uses **invite codes** for registration. The first person to log in become
 
 ### 4.3 Set Up Claude Code (Optional)
 
-Claude Code mode adds a terminal icon toggle to the Butler chat. When active, messages go to Claude Code CLI running on the Mac Mini instead of the Claude API — useful for complex agentic tasks like editing files, running scripts, or multi-step server changes. It uses your Claude Max/Pro subscription, not API tokens.
+Claude Code mode adds a terminal icon toggle to the Butler chat. When active, messages go to Claude Code CLI running on the Mac Mini instead of the Claude API — useful for complex agentic tasks like editing files, running scripts, or multi-step server changes. It uses your Claude Max/Pro subscription, not API tokens. Butler can also **delegate to it automatically** via the `run_claude_code` tool when a request needs real shell access (e.g. "Sonarr crashed, restart it") — granted to users with the Claude Code permission.
+
+> **Security:** the shim runs under a hardened policy (deny-list of catastrophic commands + a macOS sandbox) and requires a shared-secret token so only Butler can invoke it. See [`docker/claude-code-shim/README.md`](docker/claude-code-shim/README.md) for the full model and tuning guide.
 
 **If you ran `setup.sh`:** It will prompt you to set this up automatically at the end of Phase 8 (Butler). Just answer `y` when asked and then run `claude login` when prompted.
 
@@ -337,11 +339,18 @@ claude login
 python3 -m venv ~/home-server/docker/claude-code-shim/.venv
 ~/home-server/docker/claude-code-shim/.venv/bin/pip install aiohttp
 
+# Generate the shared-secret token and set it on BOTH sides:
+TOKEN=$(openssl rand -hex 32)
+#  1) butler-api: add to ~/home-server/butler/.env  ->  CLAUDE_CODE_SHIM_TOKEN=$TOKEN
+#  2) the shim:   put it in the plist's CLAUDE_SHIM_TOKEN (edited below)
+
 # Register as a launchd service (auto-starts on boot, restarts on crash)
 cp ~/home-server/docker/claude-code-shim/claude-code-shim.plist ~/Library/LaunchAgents/
+#   edit ~/Library/LaunchAgents/claude-code-shim.plist and replace
+#   REPLACE_WITH_RANDOM_SECRET with $TOKEN, then:
 launchctl load ~/Library/LaunchAgents/claude-code-shim.plist
 
-# Verify it's running
+# Verify it's running (authenticated:true, policy:true means it's locked down)
 curl http://localhost:7100/health
 ```
 

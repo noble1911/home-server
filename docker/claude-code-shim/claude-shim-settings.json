@@ -1,0 +1,64 @@
+{
+  "$comment": "Hardened permission policy for the claude-code-shim. Passed to `claude --print --settings`. Rule precedence is deny -> ask -> allow (first match wins); deny ALWAYS wins. In headless mode an allow-list does NOT contain (unlisted/safe commands still run), so the deny-list below plus the Seatbelt sandbox are the real boundaries. See docker/claude-code-shim/README.md for the tuning guide.",
+
+  "permissions": {
+    "defaultMode": "dontAsk",
+    "deny": [
+      "Bash(sudo *)",
+      "Bash(sudo)",
+      "Bash(su *)",
+      "Bash(doas *)",
+      "Bash(shutdown *)",
+      "Bash(reboot *)",
+      "Bash(halt *)",
+      "Bash(pmset *)",
+      "Bash(launchctl *)",
+      "Bash(diskutil *)",
+      "Bash(dd *)",
+      "Bash(mkfs *)",
+      "Bash(newfs *)",
+      "Bash(fdisk *)",
+      "Bash(asr *)",
+      "Bash(rm -rf /*)",
+      "Bash(rm -fr /*)",
+      "Bash(rm -rf ~*)",
+      "Bash(rm -fr ~*)",
+      "Bash(rm -rf $HOME*)",
+      "Bash(docker system prune *)",
+      "Bash(docker volume rm *)",
+      "Bash(docker volume prune *)",
+      "Bash(docker image prune *)",
+      "Bash(docker network prune *)",
+      "Bash(docker compose down -v *)",
+      "Bash(git push --force *)",
+      "Bash(git push -f *)",
+      "Bash(git push --force)",
+      "Bash(git reset --hard *)",
+      "Bash(git clean -f*)",
+      "Bash(git filter-branch *)",
+      "Edit(./docker/claude-code-shim/**)",
+      "Write(./docker/claude-code-shim/**)"
+    ]
+  },
+
+  "sandbox": {
+    "enabled": true,
+    "failIfUnavailable": true,
+    "autoAllowBashIfSandboxed": true,
+    "allowUnsandboxedCommands": false,
+    "excludedCommands": ["docker", "docker compose", "docker-compose"],
+    "filesystem": {
+      "allowWrite": ["~/home-server", "~/HomeServer", "/tmp", "/private/tmp"],
+      "denyWrite": ["~/home-server/docker/claude-code-shim"],
+      "denyRead": [
+        "~/.ssh",
+        "~/.aws",
+        "~/.gnupg",
+        "~/.config/gcloud",
+        "~/Library/Keychains",
+        "~/.claude.json",
+        "~/.config/claude"
+      ]
+    }
+  }
+}

@@ -337,11 +337,16 @@ async def claude_code_stream(
             yield f"data: {json.dumps({'type': 'tool_start', 'tool': 'claude_code'})}\n\n"
 
             timeout = aiohttp.ClientTimeout(total=300, connect=5)
+            # Authenticate to the shim with the shared secret (if configured).
+            shim_headers = {}
+            if settings.claude_code_shim_token:
+                shim_headers["X-Shim-Token"] = settings.claude_code_shim_token
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 try:
                     async with session.post(
                         f"{settings.claude_code_shim_url}/run",
                         json={"message": contextualised_message},
+                        headers=shim_headers,
                     ) as resp:
                         if resp.status != 200:
                             err_msg = "Claude Code shim returned an error. Check that it is running on the host."
