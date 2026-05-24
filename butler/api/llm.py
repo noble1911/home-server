@@ -85,7 +85,7 @@ def _build_tool_definitions(tools: dict[str, Tool]) -> list[dict]:
 # Others go in the lightweight catalog and are loaded on demand.
 ROUTING_CORE_TOOLS: set[str] = {
     "remember_fact", "recall_facts", "get_user",
-    "weather", "display_in_chat",
+    "weather", "display_in_chat", "display_on_device",
     "radarr", "seerr", "books", "sonarr",
 }
 
@@ -526,6 +526,11 @@ async def stream_chat_with_tools(
                     "content": block.input.get("content", ""),
                     "title": block.input.get("title", ""),
                 }
+
+            # Intercept display_on_device: yield a structured card event for the
+            # esp-gateway to forward to the physical device screen.
+            if block.name == "display_on_device":
+                yield {"type": "device_card", "card": dict(block.input)}
 
             if block.name == "request_tools":
                 result = router.handle_request_tools(

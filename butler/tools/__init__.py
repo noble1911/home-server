@@ -47,6 +47,7 @@ from .whatsapp import WhatsAppTool
 from .self_update import SelfUpdateTool
 from .media_files import MediaFilesTool
 from .display_in_chat import DisplayInChatTool
+from .display_on_device import DisplayOnDeviceTool
 
 __all__ = [
     # Base
@@ -103,4 +104,5 @@ __all__ = [
     "MediaFilesTool",
     # Display in chat (voice-only)
     "DisplayInChatTool",
+    "DisplayOnDeviceTool",
 ]

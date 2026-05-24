@@ -17,6 +17,7 @@ from starlette.responses import StreamingResponse
 
 from tools import DatabasePool, Tool
 from tools.display_in_chat import DisplayInChatTool
+from tools.display_on_device import DisplayOnDeviceTool
 
 from ..context import load_user_context
 from ..deps import get_db_pool, get_embedding_service, get_internal_or_user, get_tools, get_user_tools
@@ -59,6 +60,7 @@ async def process_voice(
     )
     all_tools = await get_user_tools(user_id, tools, pool)
     all_tools["display_in_chat"] = DisplayInChatTool()
+    all_tools["display_on_device"] = DisplayOnDeviceTool()
 
     response_text = await chat_with_tools(
         system_prompt=ctx.system_prompt,
@@ -125,6 +127,7 @@ async def stream_voice(
     )
     all_tools = await get_user_tools(user_id, tools, pool)
     all_tools["display_in_chat"] = DisplayInChatTool()
+    all_tools["display_on_device"] = DisplayOnDeviceTool()
     full_response_parts: list[str] = []
     visual_parts: list[str] = []
 
