@@ -267,6 +267,11 @@ def _build_rules_text(channel: str | None = None) -> str:
             "lists, links), use display_in_chat to show rich content in the chat "
             "while providing a brief spoken summary"
         )
+        parts.append(
+            "- If the user is on a physical device with a screen, use display_on_device "
+            "to show a concise card (weather, short lists, a status, a confirmation, or "
+            "a value/meter) when it helps; always also give a brief spoken summary"
+        )
 
     return "\n".join(parts)
 

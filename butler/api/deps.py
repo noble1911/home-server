@@ -18,6 +18,7 @@ from tools import (
     ClaudeCodeTool,
     DatabasePool,
     DisplayInChatTool,
+    DisplayOnDeviceTool,
     EmbeddingService,
     GetConversationsTool,
     GmailTool,
@@ -62,7 +63,7 @@ from .ratelimit import start_ratelimit_cleanup, stop_ratelimit_cleanup
 
 ALWAYS_ALLOWED_TOOLS: set[str] = {
     "remember_fact", "recall_facts", "get_user",
-    "get_conversations", "update_soul", "display_in_chat",
+    "get_conversations", "update_soul", "display_in_chat", "display_on_device",
     "weather", "server_health", "storage_monitor",
 }
 
@@ -132,6 +133,7 @@ async def init_resources() -> None:
         "get_conversations": GetConversationsTool(_db_pool),
         "update_soul": UpdateSoulTool(_db_pool),
         "display_in_chat": DisplayInChatTool(),
+        "display_on_device": DisplayOnDeviceTool(),
     }
 
     # Only register HA tools if configured

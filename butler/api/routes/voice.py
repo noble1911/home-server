@@ -17,6 +17,7 @@ from starlette.responses import StreamingResponse
 
 from tools import DatabasePool, Tool
 from tools.display_in_chat import DisplayInChatTool
+from tools.display_on_device import DisplayOnDeviceTool
 
 from ..context import load_user_context
 from ..deps import get_db_pool, get_embedding_service, get_internal_or_user, get_tools, get_user_tools
@@ -30,6 +31,27 @@ router = APIRouter()
 _FAREWELL_PHRASES = frozenset(
     ["goodbye", "goodnight", "good night", "talk to you later", "that's all"]
 )
+
+# Extra system guidance for ESP32 device sessions (surface == "device"): tell Claude
+# it has a screen and should proactively draw cards. PWA voice (surface == "voice")
+# keeps using display_in_chat and never sees this.
+_DEVICE_SCREEN_INSTRUCTION = {
+    "type": "text",
+    "text": (
+        "You are speaking through a small physical device that has a touchscreen. "
+        "Proactively call display_on_device to show glanceable information as a card — "
+        "weather, short lists, numbers, a status, a confirmation, or a value/meter — "
+        "whenever it would help the user see it, and always also give a brief spoken "
+        "summary. For any data-heavy or numeric answer (e.g. weather), show a card."
+    ),
+}
+
+
+def _with_surface(system_prompt: list[dict], surface: str) -> list[dict]:
+    """Append device-screen guidance for ESP32 device sessions."""
+    if surface == "device":
+        return list(system_prompt) + [_DEVICE_SCREEN_INSTRUCTION]
+    return system_prompt
 
 
 @router.post("/process", response_model=VoiceProcessResponse)
@@ -59,9 +81,10 @@ async def process_voice(
     )
     all_tools = await get_user_tools(user_id, tools, pool)
     all_tools["display_in_chat"] = DisplayInChatTool()
+    all_tools["display_on_device"] = DisplayOnDeviceTool()
 
     response_text = await chat_with_tools(
-        system_prompt=ctx.system_prompt,
+        system_prompt=_with_surface(ctx.system_prompt, req.surface),
         user_message=req.transcript,
         tools=all_tools,
         history=ctx.history,
@@ -125,13 +148,14 @@ async def stream_voice(
     )
     all_tools = await get_user_tools(user_id, tools, pool)
     all_tools["display_in_chat"] = DisplayInChatTool()
+    all_tools["display_on_device"] = DisplayOnDeviceTool()
     full_response_parts: list[str] = []
     visual_parts: list[str] = []
 
     async def generate():
         try:
             async for chunk in stream_chat_with_tools(
-                system_prompt=ctx.system_prompt,
+                system_prompt=_with_surface(ctx.system_prompt, req.surface),
                 user_message=req.transcript,
                 tools=all_tools,
                 history=ctx.history,
@@ -139,8 +163,11 @@ async def stream_voice(
                 user_id=user_id,
                 channel="voice",
             ):
-                if isinstance(chunk, dict) and chunk.get("type") == "visual_content":
-                    visual_parts.append(chunk.get("content", ""))
+                if isinstance(chunk, dict):
+                    # Structured events (visual_content, device_card) pass straight
+                    # through as their own SSE event — never wrapped as a text delta.
+                    if chunk.get("type") == "visual_content":
+                        visual_parts.append(chunk.get("content", ""))
                     yield f"data: {json.dumps(chunk)}\n\n"
                 else:
                     full_response_parts.append(chunk)
