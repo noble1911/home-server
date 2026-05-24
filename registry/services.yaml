@@ -1,0 +1,89 @@
+# Machine-readable service map for the Mac Mini (192.168.1.117).
+# Source of truth for "which host port is taken". `doctor.sh` greps `host_port:`
+# values and cross-checks them against live `docker ps`.
+#
+# When you add a service: pick a free host_port (not listed below), add an entry,
+# and run ./doctor.sh.
+
+host: 192.168.1.117
+docker_network: homeserver          # external: true — join this to talk to shared services
+
+services:
+  # ── home-server: butler ──────────────────────────────────────────
+  - name: butler-api
+    project: home-server
+    container: butler-api
+    host_port: 8000
+    shared: true                    # brain + per-user memory + tools
+  - name: butler-app
+    project: home-server
+    container: butler-app
+    host_port: 3000                 # PWA (nginx)
+
+  # ── home-server: voice-stack ─────────────────────────────────────
+  - name: kokoro-tts
+    project: home-server
+    container: kokoro-tts
+    host_port: 8880
+    shared: true
+  - name: livekit
+    project: home-server
+    container: livekit
+    host_port: 7880                 # +7881 tcp (signaling/ICE-TCP)
+  - name: livekit-media
+    project: home-server
+    container: livekit
+    host_port: 7882                 # WebRTC media (UDP) — LAN-only, not tunnelled
+  - name: livekit-agent
+    project: home-server
+    container: livekit-agent        # internal only
+
+  # ── home-server: photos-files-stack ──────────────────────────────
+  - name: immich-server
+    project: home-server
+    container: immich-server
+    host_port: 2283
+  - name: postgres
+    project: home-server
+    container: immich-postgres
+    host_port: 5432
+    shared: true                    # db=immich, schema=butler (+pgvector)
+  - name: nextcloud
+    project: home-server
+    container: nextcloud
+    host_port: 8080
+
+  # ── home-server: media-stack ─────────────────────────────────────
+  - { name: sonarr,      project: home-server, container: sonarr,      host_port: 8989 }
+  - { name: radarr,      project: home-server, container: radarr,      host_port: 7878 }
+  - { name: bazarr,      project: home-server, container: bazarr,      host_port: 6767 }
+  - { name: prowlarr,    project: home-server, container: prowlarr,    host_port: 9696 }
+  - { name: seerr,       project: home-server, container: seerr,       host_port: 5055 }
+  - { name: flaresolverr,project: home-server, container: flaresolverr,host_port: 8191 }
+
+  # ── home-server: download-stack ──────────────────────────────────
+  - { name: qbittorrent, project: home-server, container: qbittorrent, host_port: 8081 }  # WebUI
+  - { name: qbittorrent-torrent, project: home-server, container: qbittorrent, host_port: 6881 }  # torrent tcp/udp
+
+  # ── home-server: books-stack ─────────────────────────────────────
+  - { name: audiobookshelf, project: home-server, container: audiobookshelf, host_port: 13378 }
+  - { name: lazylibrarian,  project: home-server, container: lazylibrarian,  host_port: 5299 }
+
+  # ── home-server: smart-home-stack ────────────────────────────────
+  - { name: homeassistant,  project: home-server, container: homeassistant,  host_port: 8123 }
+  - { name: whatsapp-gateway, project: home-server, container: whatsapp-gateway }  # internal only
+
+  # ── other projects ───────────────────────────────────────────────
+  - { name: dont-lie-app, project: dont-lie, container: dont-lie-app, host_port: 3001 }
+
+  # ── vector-llm ───────────────────────────────────────────────────
+  # vector-llm itself runs as a host Python process (no container). Its compose
+  # provides ollama:
+  - { name: ollama, project: vector-llm, container: ollama, host_port: 11434, shared: true, status: stopped }  # ollama/ollama — embeddings + qwen; start vector-llm stack
+
+  # ── planned (not yet deployed) ───────────────────────────────────
+  - name: esp-gateway
+    project: claude-esp
+    container: esp-gateway
+    host_port: 8770
+    status: planned
