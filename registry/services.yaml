@@ -54,6 +54,10 @@ services:
     host_port: 8080
 
   # ── home-server: media-stack ─────────────────────────────────────
+  # jellyfin is the NATIVE macOS app (/Applications/Jellyfin.app), NOT a container —
+  # the Linux image can't use Apple VideoToolbox. doctor.sh lists 8096 under
+  # "in registry but NOT live" because it only sees docker ps; that's expected.
+  - { name: jellyfin,    project: home-server, host_port: 8096, native: true }
   - { name: sonarr,      project: home-server, container: sonarr,      host_port: 8989 }
   - { name: radarr,      project: home-server, container: radarr,      host_port: 7878 }
   - { name: bazarr,      project: home-server, container: bazarr,      host_port: 6767 }

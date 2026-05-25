@@ -101,7 +101,7 @@ The Mac Mini is set up and all Docker stacks are deployed via OrbStack. Active w
 ### Deployed Stacks
 | Stack | Services | Status |
 |-------|----------|--------|
-| **media-stack** | Jellyfin, Radarr, Sonarr, Bazarr, Seerr | Running |
+| **media-stack** | Radarr, Sonarr, Bazarr, Seerr | Running |
 | **download-stack** | qBittorrent, Prowlarr | Running |
 | **books-stack** | Audiobookshelf, LazyLibrarian | Running |
 | **photos-files-stack** | Immich, PostgreSQL, Redis, Nextcloud | Running |
@@ -112,6 +112,7 @@ The Mac Mini is set up and all Docker stacks are deployed via OrbStack. Active w
 ### Native Services (not Docker)
 | Service | Description | Status |
 |---------|-------------|--------|
+| **Jellyfin** | Media streaming — native `/Applications/Jellyfin.app` (uses VideoToolbox HW transcode; Docker container retired 2026-05-25). Port 8096; Butler reaches it via `host.docker.internal:8096`. | Running |
 | **wire-pod** | Vector robot server (WirePod v1.2.13 macOS app) | Running |
 
 ### Butler API (~4k LOC, FastAPI)
@@ -141,7 +142,7 @@ home-server/
 ├── docker/                # Docker Compose stacks
 │   ├── books-stack/       # Audiobookshelf, LazyLibrarian
 │   ├── download-stack/    # qBittorrent, Prowlarr
-│   ├── media-stack/       # Jellyfin, Radarr, Sonarr, Bazarr, Seerr
+│   ├── media-stack/       # Radarr, Sonarr, Bazarr, Seerr (Jellyfin = native app, see above)
 │   ├── messaging-stack/   # WhatsApp gateway
 │   ├── photos-files-stack/# Immich, Nextcloud, PostgreSQL
 │   ├── smart-home-stack/  # Home Assistant, Cloudflare Tunnel

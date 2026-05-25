@@ -41,7 +41,10 @@ DEFAULT_TIMEOUT = 5
 DEFAULT_SERVICES: dict[str, dict[str, Any]] = {
     # Media stack
     "jellyfin": {
-        "url": "http://jellyfin:8096/health",
+        # Native macOS Jellyfin.app on the host (not a container — the Linux image
+        # can't use Apple VideoToolbox for HW transcode). Reachable from this
+        # container via host.docker.internal.
+        "url": "http://host.docker.internal:8096/health",
         "stack": "media",
     },
     "radarr": {

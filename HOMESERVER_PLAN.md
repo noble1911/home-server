@@ -139,7 +139,7 @@
 
 | Service | Homepage | Purpose | Run Method | RAM (Idle) | RAM (Peak) | Port |
 |---------|----------|---------|------------|------------|------------|------|
-| [**Jellyfin**](https://jellyfin.org/) | [jellyfin.org](https://jellyfin.org/) | Media streaming (4K HDR, Dolby Atmos) | Docker container | 500MB | 4GB* | 8096 |
+| [**Jellyfin**](https://jellyfin.org/) | [jellyfin.org](https://jellyfin.org/) | Media streaming (4K HDR, Dolby Atmos) | Native macOS app | 500MB | 4GB* | 8096 |
 | [**Radarr**](https://radarr.video/) | [radarr.video](https://radarr.video/) | Movie automation & management | Docker container | 300MB | 500MB | 7878 |
 | [**Sonarr**](https://sonarr.tv/) | [sonarr.tv](https://sonarr.tv/) | TV series automation & management | Docker container | 300MB | 500MB | 8989 |
 | [**Bazarr**](https://www.bazarr.media/) | [bazarr.media](https://www.bazarr.media/) | Subtitle automation | Docker container | 200MB | 400MB | 6767 |

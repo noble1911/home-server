@@ -1,30 +1,8 @@
 services:
-  jellyfin:
-    image: jellyfin/jellyfin:10.11.6
-    container_name: jellyfin
-    environment:
-      - PUID=501
-      - PGID=20
-      - TZ=Europe/London
-    volumes:
-      - jellyfin-config:/config
-      - jellyfin-cache:/cache
-      - ${DRIVE_PATH:-/Volumes/HomeServer}/Media/Movies:/media/movies:ro
-      - ${DRIVE_PATH:-/Volumes/HomeServer}/Media/TV:/media/tv:ro
-      - ${DRIVE_PATH:-/Volumes/HomeServer}/Media/Anime/Movies:/media/anime-movies:ro
-      - ${DRIVE_PATH:-/Volumes/HomeServer}/Media/Anime/Series:/media/anime-series:ro
-      - ${DRIVE_PATH:-/Volumes/HomeServer}/Media/Music:/media/music:ro
-    ports:
-      - "8096:8096"
-    networks:
-      - homeserver
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:8096/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
+  # NOTE: Jellyfin runs as the NATIVE macOS app (/Applications/Jellyfin.app) on the host,
+  # NOT a container — the Linux image can't use Apple VideoToolbox for hardware transcode.
+  # It serves host port 8096 directly; Butler reaches it via host.docker.internal:8096.
+  # (Retired the container 2026-05-25.)
 
   radarr:
     image: lscr.io/linuxserver/radarr:6.0.4
@@ -126,10 +104,6 @@ networks:
     external: true
 
 volumes:
-  jellyfin-config:
-    name: jellyfin-config
-  jellyfin-cache:
-    name: jellyfin-cache
   radarr-config:
     name: radarr-config
   sonarr-config:

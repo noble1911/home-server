@@ -36,8 +36,8 @@ services:
       # Sonarr
       - SONARR_URL=http://sonarr:8989
       - SONARR_API_KEY=${SONARR_API_KEY:-}
-      # Jellyfin
-      - JELLYFIN_URL=http://jellyfin:8096
+      # Jellyfin — native macOS app on the host (not a container); reach via host.docker.internal
+      - JELLYFIN_URL=http://host.docker.internal:8096
       - JELLYFIN_API_KEY=${JELLYFIN_API_KEY:-}
       # Health & storage monitoring
       - EXTERNAL_DRIVE_PATH=${EXTERNAL_DRIVE_PATH:-/mnt/external}
