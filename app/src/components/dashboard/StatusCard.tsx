@@ -1,9 +1,10 @@
 interface StatusCardProps {
   name: string
   status: 'online' | 'offline' | 'unknown'
+  detail?: string
 }
 
-export default function StatusCard({ name, status }: StatusCardProps) {
+export default function StatusCard({ name, status, detail }: StatusCardProps) {
   const statusColors = {
     online: 'bg-green-500/20 text-green-400 border-green-500/30',
     offline: 'bg-red-500/20 text-red-400 border-red-500/30',
@@ -18,6 +19,7 @@ export default function StatusCard({ name, status }: StatusCardProps) {
 
   return (
     <div
+      title={detail ? `${name}: ${detail}` : name}
       className={`
         inline-flex items-center gap-2 px-3 py-1.5 rounded-full border
         ${statusColors[status]}

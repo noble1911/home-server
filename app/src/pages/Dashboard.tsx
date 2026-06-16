@@ -4,12 +4,48 @@ import {
   getSystemHealth,
   getSystemStorage,
   getSystemStats,
+  type ServiceStatus,
   type SystemHealthResponse,
   type SystemStorageResponse,
   type SystemStatsResponse,
 } from '../services/api'
 
 const REFRESH_INTERVAL = 30_000
+
+// Human-readable labels + preferred display order for the stacks the
+// health endpoint reports (the `stack` field on each service).
+const STACK_LABELS: Record<string, string> = {
+  butler: 'Butler',
+  media: 'Media',
+  download: 'Downloads',
+  books: 'Books',
+  'photos-files': 'Photos & Files',
+  'smart-home': 'Smart Home',
+  voice: 'Voice',
+  messaging: 'Messaging',
+  'claude-esp': 'ESP Device',
+  apps: 'Apps',
+}
+const STACK_ORDER = Object.keys(STACK_LABELS)
+
+/** Group services by their `stack`, ordered by STACK_ORDER (unknown stacks last). */
+function groupByStack(services: ServiceStatus[]): [string, ServiceStatus[]][] {
+  const groups = new Map<string, ServiceStatus[]>()
+  for (const svc of services) {
+    const key = svc.stack || 'other'
+    const arr = groups.get(key) ?? []
+    arr.push(svc)
+    groups.set(key, arr)
+  }
+  return [...groups.entries()].sort(([a], [b]) => {
+    const ia = STACK_ORDER.indexOf(a)
+    const ib = STACK_ORDER.indexOf(b)
+    if (ia !== -1 && ib !== -1) return ia - ib
+    if (ia !== -1) return -1
+    if (ib !== -1) return 1
+    return a.localeCompare(b)
+  })
+}
 
 type LoadState = 'loading' | 'loaded' | 'error'
 
@@ -79,20 +115,38 @@ export default function Dashboard() {
 
       {errorMsg && <ErrorBanner message={errorMsg} onRetry={() => fetchAll(true)} />}
 
-      {/* Connection Status */}
+      {/* Connection Status — grouped by stack */}
       {health && (
         <section>
           <h2 className="text-sm font-medium text-butler-400 uppercase tracking-wide mb-3">
             Services ({health.summary.healthy}/{health.summary.total} healthy)
           </h2>
-          <div className="flex flex-wrap gap-2">
-            {health.services.map(svc => (
-              <StatusCard
-                key={svc.name}
-                name={svc.name}
-                status={svc.status === 'online' ? 'online' : 'offline'}
-              />
-            ))}
+          <div className="space-y-4">
+            {groupByStack(health.services).map(([stack, svcs]) => {
+              const up = svcs.filter(s => s.status === 'online').length
+              return (
+                <div key={stack}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <h3 className="text-xs font-semibold text-butler-300">
+                      {STACK_LABELS[stack] ?? stack}
+                    </h3>
+                    <span className={`text-xs ${up < svcs.length ? 'text-yellow-400' : 'text-butler-500'}`}>
+                      {up}/{svcs.length}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {svcs.map(svc => (
+                      <StatusCard
+                        key={svc.name}
+                        name={svc.name}
+                        status={svc.status === 'online' ? 'online' : 'offline'}
+                        detail={svc.detail}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </section>
       )}

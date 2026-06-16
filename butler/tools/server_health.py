@@ -75,6 +75,11 @@ DEFAULT_SERVICES: dict[str, dict[str, Any]] = {
         "stack": "download",
         "headers": {"X-Api-Key": "{prowlarr_api_key}"},
     },
+    "flaresolverr": {
+        # byparr image (flaresolverr-compatible) — Cloudflare bypass for Prowlarr.
+        "url": "http://flaresolverr:8191/health",
+        "stack": "download",
+    },
     # Books stack
     "audiobookshelf": {
         "url": "http://audiobookshelf:80/healthcheck",
@@ -114,6 +119,25 @@ DEFAULT_SERVICES: dict[str, dict[str, Any]] = {
     "kokoro-tts": {
         "url": "http://kokoro-tts:8880/health",
         "stack": "voice",
+    },
+    "livekit-agent": {
+        "url": "http://livekit-agent:8081/",
+        "stack": "voice",
+    },
+    # Messaging stack
+    "whatsapp-gateway": {
+        "url": "http://whatsapp-gateway:3000/health",
+        "stack": "messaging",
+    },
+    # claude-esp — ESP32 voice device bridge (separate project, shares the network)
+    "esp-gateway": {
+        "url": "http://esp-gateway:8770/health",
+        "stack": "claude-esp",
+    },
+    # Apps — other projects co-hosted on the box
+    "dont-lie": {
+        "url": "http://dont-lie-app:80/",
+        "stack": "apps",
     },
     # Butler stack (self-check via localhost since we're inside butler-api)
     "butler-api": {
