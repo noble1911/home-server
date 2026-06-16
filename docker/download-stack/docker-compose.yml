@@ -29,6 +29,11 @@ services:
   flaresolverr:
     image: ghcr.io/thephaseless/byparr:latest
     container_name: flaresolverr
+    labels:
+      # Opt this container into autoheal: when the healthcheck below trips
+      # (browser PIDs leak to the cap → /health 500), autoheal restarts it.
+      # restart:unless-stopped can't recover it because the process never exits.
+      - autoheal=true
     environment:
       - LOG_LEVEL=info
       - TZ=Europe/London
@@ -73,6 +78,25 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+
+  # Restarts any container marked `autoheal=true` when it goes unhealthy.
+  # Needed because Docker's restart policies act on *exit*, not on an
+  # unhealthy-but-still-running container (e.g. byparr saturating its PID cap).
+  # Opt-in by label only (AUTOHEAL_CONTAINER_LABEL=autoheal) so a transient
+  # unhealthy elsewhere can't trigger mass restarts.
+  autoheal:
+    image: willfarrell/autoheal:latest
+    container_name: autoheal
+    environment:
+      - AUTOHEAL_CONTAINER_LABEL=autoheal
+      - AUTOHEAL_INTERVAL=15        # seconds between checks
+      - AUTOHEAL_START_PERIOD=60    # grace after a container starts
+      - TZ=Europe/London
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - homeserver
+    restart: always
 
 networks:
   homeserver:
