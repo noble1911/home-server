@@ -1,8 +1,7 @@
-services:
-  # NOTE: Jellyfin runs as the NATIVE macOS app (/Applications/Jellyfin.app) on the host,
-  # NOT a container — the Linux image can't use Apple VideoToolbox for hardware transcode.
-  # It serves host port 8096 directly; Butler reaches it via host.docker.internal:8096.
-  # (Retired the container 2026-05-25.)
+# NOTE: Jellyfin runs as the NATIVE macOS app (/Applications/Jellyfin.app) on the host,
+# NOT a container — the Linux image can't use Apple VideoToolbox for hardware transcode.
+# It serves host port 8096 directly; Butler reaches it via host.docker.internal:8096.
+# (Retired the container 2026-05-25.)
 
 services:
   radarr:
