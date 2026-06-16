@@ -13,10 +13,10 @@ Cloudflare dashboard (domain `noblehaus.uk`) — mirror them here so they're dis
 |---|---|---|---|
 | **home-server** | `~/home-server` | `~/random/HomeServer` | Umbrella: butler (AI brain+PWA+voice) + media/photos/books/smart-home/download stacks. Public via `cloudflared`. |
 | **vector-llm** | `~/vector-llm` | `~/random/vector-llm` | Always-on-mic LLM brain for the Anki Vector robot. Runs as a **host Python process** (`python src/main.py`): host mic → faster-whisper STT → Ollama (qwen) → Kokoro TTS; escalates to butler; shares Postgres as user `vector-robot`. Its compose **provides the `ollama` container** (:11434). **Paused 2026-05-25** — host process stopped. |
-| **claude-esp** | gateway → `~/home-server`-net | `~/random/claude-esp` | ESP32 AMOLED voice device. `esp-gateway` (:8770) bridges device ↔ Groq STT ↔ butler ↔ Kokoro; Claude draws cards via `display_on_device`. *(gateway not yet deployed)* |
-| **dont-lie** | `~/dont-lie` | — | Containerised web app: nginx serving a JS app on **:3001** (`dont-lie-app`), on the `homeserver` net. **Purpose not documented in-repo (no README/description) — owner to confirm.** |
+| **claude-esp** | `~/esp-gateway` | `~/random/claude-esp` | ESP32 AMOLED voice device. `esp-gateway` container (:8770) bridges device ↔ Groq STT ↔ butler ↔ Kokoro; Claude draws cards via `display_on_device`. **Deployed & running** from `~/esp-gateway`. |
+| **dont-lie** | `~/dont-lie` | — | "Don't Lie" web game — Expo/React-Native app (`App.tsx`, `app.json`, `eas.json`) built into an nginx image serving on **:3001** (`dont-lie-app`), on the `homeserver` net. |
 | **wire-pod-backup** | `~/wire-pod-backup` | — | Backup/escrow data for wire-pod (Anki Vector auth), supporting vector-llm. **Not a running service.** |
-| **gunpey** | `~/gunpey` | — | Local project directory — **no server footprint** (no compose/container, not deployed). |
+| **gunpey** | `~/gunpey` | — | Browser game (`gunpey.html`) with a Node multiplayer server (`multiplayer/server.js`). Files present on the box but **not currently running** (no container, no host process). |
 
 ## Native (host) services — not Docker
 
@@ -47,7 +47,7 @@ See `services.yaml` for the full machine-readable port map (the source of truth 
 |---|---|
 | `butler.noblehaus.uk` | `butler-app:80` (PWA) |
 | `butler-api.noblehaus.uk` | `butler-api:8000` |
-| `esp-gateway.noblehaus.uk` | `esp-gateway:8770` *(to add when the gateway deploys)* |
+| `esp-gateway.noblehaus.uk` | `esp-gateway:8770` *(gateway deployed & running; confirm route exists in dashboard)* |
 | _…(add the rest from the dashboard: photos, jellyfin, ha, etc.)_ | |
 
 > `doctor.sh` can verify host ports against live containers, but it **cannot** see

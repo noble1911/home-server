@@ -115,6 +115,23 @@ The Mac Mini is set up and all Docker stacks are deployed via OrbStack. Active w
 | **Jellyfin** | Media streaming — native `/Applications/Jellyfin.app` (uses VideoToolbox HW transcode; Docker container retired 2026-05-25). Port 8096; Butler reaches it via `host.docker.internal:8096`. | Running |
 | **wire-pod** | Vector robot server (WirePod v1.2.13 macOS app) | Running |
 
+### Co-hosted Projects (shared Mac Mini)
+
+The Mac Mini runs more than just home-server. The **deployment registry** (`registry/`)
+is the single source of truth for *every* project sharing the box — host-port map,
+shared-service contracts (butler-api, Kokoro, Postgres, Ollama, LiveKit), and Cloudflare
+routes. **Read `registry/REGISTRY.md` and `registry/services.yaml` before binding a new
+port or adding a service**, and run `registry/doctor.sh` to check for drift against live
+`docker ps`.
+
+| Project | Server path | What it is | Status |
+|---------|-------------|------------|--------|
+| **esp-gateway** (claude-esp) | `~/esp-gateway` | ESP32 AMOLED voice device bridge (device ↔ Groq STT ↔ butler ↔ Kokoro), port 8770 | Running |
+| **dont-lie** | `~/dont-lie` | "Don't Lie" web game — Expo/React-Native app served via nginx, port 3001 (`dont-lie-app`) | Running |
+| **gunpey** | `~/gunpey` | Browser game (`gunpey.html`) + Node multiplayer server (`multiplayer/server.js`) | Files present, **not currently running** |
+| **vector-llm** | `~/vector-llm` | Always-on-mic LLM brain for the Anki Vector robot (host Python process; its compose provides the shared `ollama` container) | Paused (2026-05-25) |
+| **wire-pod-backup** | `~/wire-pod-backup` | Backup/escrow data for wire-pod (Anki Vector auth) | Not a service |
+
 ### Butler API (~4k LOC, FastAPI)
 - **25+ custom Python tools** — media, smart home, memory, scheduling, email, calendar, etc.
 - **10 database migrations** — PostgreSQL with pgvector (768-dim nomic-embed-text embeddings)
@@ -148,6 +165,10 @@ home-server/
 │   ├── smart-home-stack/  # Home Assistant, Cloudflare Tunnel
 │   └── voice-stack/       # LiveKit, Kokoro TTS
 │   # wire-pod runs natively via /Applications/WirePod.app (not Docker)
+├── registry/              # Deployment registry — source of truth for ALL projects on the Mac Mini
+│   ├── REGISTRY.md        #   human-readable: projects, shared services, tunnel routes
+│   ├── services.yaml      #   machine-readable host-port map
+│   └── doctor.sh          #   drift check: registry vs live `docker ps`
 ├── scripts/               # Individual setup scripts (01-15)
 │   ├── 01-homebrew.sh
 │   ├── 03-power-settings.sh
@@ -239,3 +260,4 @@ home-server/
 - **Create issues for discovered work** — don't let insights get lost between sessions
 - **BookTool replaced Readarr** — uses Open Library for search, Prowlarr + qBit for downloads
 - **CI/CD exists** — `.github/workflows/` has build-and-push and CI pipelines
+- **`registry/` is the source of truth for the shared box** — every project on the Mac Mini, its host ports, shared-service contracts, and Cloudflare routes. Update `REGISTRY.md` + `services.yaml` and run `registry/doctor.sh` when you add/move/remove a service. Co-hosted projects: esp-gateway (:8770), dont-lie (:3001), gunpey (not running), vector-llm (paused)

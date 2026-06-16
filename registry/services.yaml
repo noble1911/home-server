@@ -63,11 +63,11 @@ services:
   - { name: bazarr,      project: home-server, container: bazarr,      host_port: 6767 }
   - { name: prowlarr,    project: home-server, container: prowlarr,    host_port: 9696 }
   - { name: seerr,       project: home-server, container: seerr,       host_port: 5055 }
-  - { name: flaresolverr,project: home-server, container: flaresolverr,host_port: 8191 }
+  - { name: flaresolverr,project: home-server, container: flaresolverr,host_port: 8191 }  # image: byparr (flaresolverr-compatible)
 
   # ── home-server: download-stack ──────────────────────────────────
   - { name: qbittorrent, project: home-server, container: qbittorrent, host_port: 8081 }  # WebUI
-  - { name: qbittorrent-torrent, project: home-server, container: qbittorrent, host_port: 6881 }  # torrent tcp/udp
+  - { name: qbittorrent-torrent, project: home-server, container: qbittorrent, host_port: 50413 }  # torrent tcp/udp (moved off blacklisted 6881)
 
   # ── home-server: books-stack ─────────────────────────────────────
   - { name: audiobookshelf, project: home-server, container: audiobookshelf, host_port: 13378 }
@@ -78,16 +78,17 @@ services:
   - { name: whatsapp-gateway, project: home-server, container: whatsapp-gateway }  # internal only
 
   # ── other projects ───────────────────────────────────────────────
-  - { name: dont-lie-app, project: dont-lie, container: dont-lie-app, host_port: 3001 }
+  - { name: dont-lie-app, project: dont-lie, container: dont-lie-app, host_port: 3001 }  # "Don't Lie" web game (Expo app via nginx)
+  # gunpey: browser game in ~/gunpey (gunpey.html + multiplayer/server.js Node server).
+  #   No host port bound / not currently running — start with `node multiplayer/server.js` if needed.
 
   # ── vector-llm ───────────────────────────────────────────────────
   # vector-llm itself runs as a host Python process (no container). Its compose
   # provides ollama:
   - { name: ollama, project: vector-llm, container: ollama, host_port: 11434, shared: true, status: stopped }  # ollama/ollama — embeddings + qwen; start vector-llm stack
 
-  # ── planned (not yet deployed) ───────────────────────────────────
+  # ── claude-esp ───────────────────────────────────────────────────
   - name: esp-gateway
     project: claude-esp
     container: esp-gateway
-    host_port: 8770
-    status: planned
+    host_port: 8770                 # ESP32 voice device bridge — deployed & running from ~/esp-gateway
