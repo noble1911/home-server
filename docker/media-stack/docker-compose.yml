@@ -4,6 +4,7 @@ services:
   # It serves host port 8096 directly; Butler reaches it via host.docker.internal:8096.
   # (Retired the container 2026-05-25.)
 
+services:
   radarr:
     image: lscr.io/linuxserver/radarr:6.0.4
     container_name: radarr
@@ -16,11 +17,13 @@ services:
       - ${DRIVE_PATH:-/Volumes/HomeServer}/Media/Movies:/movies
       - ${DRIVE_PATH:-/Volumes/HomeServer}/Media/Anime/Movies:/anime-movies
       - ${DRIVE_PATH:-/Volumes/HomeServer}/Downloads:/downloads
+      - /Volumes/HomeServer2/media/Movies:/Volumes/HomeServer2/media/Movies
+      - /Volumes/HomeServer2/media/Anime:/Volumes/HomeServer2/media/Anime
     ports:
       - "7878:7878"
     networks:
       - homeserver
-    restart: unless-stopped
+    restart: always
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:7878/ping"]
       interval: 30s
@@ -40,11 +43,13 @@ services:
       - ${DRIVE_PATH:-/Volumes/HomeServer}/Media/TV:/tv
       - ${DRIVE_PATH:-/Volumes/HomeServer}/Media/Anime/Series:/anime-series
       - ${DRIVE_PATH:-/Volumes/HomeServer}/Downloads:/downloads
+      - /Volumes/HomeServer2/media/TV:/Volumes/HomeServer2/media/TV
+      - /Volumes/HomeServer2/media/Anime:/Volumes/HomeServer2/media/Anime
     ports:
       - "8989:8989"
     networks:
       - homeserver
-    restart: unless-stopped
+    restart: always
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:8989/ping"]
       interval: 30s
@@ -65,11 +70,14 @@ services:
       - ${DRIVE_PATH:-/Volumes/HomeServer}/Media/TV:/tv
       - ${DRIVE_PATH:-/Volumes/HomeServer}/Media/Anime/Movies:/anime-movies
       - ${DRIVE_PATH:-/Volumes/HomeServer}/Media/Anime/Series:/anime-series
+      - /Volumes/HomeServer2/media/Movies:/Volumes/HomeServer2/media/Movies
+      - /Volumes/HomeServer2/media/TV:/Volumes/HomeServer2/media/TV
+      - /Volumes/HomeServer2/media/Anime:/Volumes/HomeServer2/media/Anime
     ports:
       - "6767:6767"
     networks:
       - homeserver
-    restart: unless-stopped
+    restart: always
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:6767/"]
       interval: 30s
@@ -91,7 +99,7 @@ services:
     dns:
       - 8.8.8.8
       - 1.1.1.1
-    restart: unless-stopped
+    restart: always
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:5055/api/v1/status"]
       interval: 30s

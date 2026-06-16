@@ -14,11 +14,11 @@ services:
       - ${DRIVE_PATH:-/Volumes/HomeServer}/Books/eBooks:/ebooks
     ports:
       - "8081:8081"
-      - "6881:6881"
-      - "6881:6881/udp"
+      - "50413:50413"
+      - "50413:50413/udp"
     networks:
       - homeserver
-    restart: unless-stopped
+    restart: always
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:8081/"]
       interval: 30s

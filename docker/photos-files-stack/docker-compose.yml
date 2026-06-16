@@ -20,7 +20,7 @@ services:
         condition: service_healthy
       immich-postgres:
         condition: service_healthy
-    restart: unless-stopped
+    restart: always
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:2283/api/server/ping"]
       interval: 30s
@@ -100,7 +100,7 @@ services:
     depends_on:
       immich-postgres:
         condition: service_healthy
-    restart: unless-stopped
+    restart: always
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:80/status.php"]
       interval: 30s
