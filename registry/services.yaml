@@ -63,11 +63,11 @@ services:
   - { name: bazarr,      project: home-server, container: bazarr,      host_port: 6767 }
   - { name: prowlarr,    project: home-server, container: prowlarr,    host_port: 9696 }
   - { name: seerr,       project: home-server, container: seerr,       host_port: 5055 }
-  - { name: flaresolverr,project: home-server, container: flaresolverr,host_port: 8191 }  # image: byparr (flaresolverr-compatible)
 
   # ── home-server: download-stack ──────────────────────────────────
   - { name: qbittorrent, project: home-server, container: qbittorrent, host_port: 8081 }  # WebUI
   - { name: qbittorrent-torrent, project: home-server, container: qbittorrent, host_port: 50413 }  # torrent tcp/udp (moved off blacklisted 6881)
+  - { name: flaresolverr,project: home-server, container: flaresolverr,host_port: 8191 }  # image: byparr (flaresolverr-compatible); leaks browser PIDs, see notes
 
   # ── home-server: books-stack ─────────────────────────────────────
   - { name: audiobookshelf, project: home-server, container: audiobookshelf, host_port: 13378 }
