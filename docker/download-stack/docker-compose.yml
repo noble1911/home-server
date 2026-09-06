@@ -27,7 +27,12 @@ services:
       start_period: 30s
 
   flaresolverr:
-    image: ghcr.io/thephaseless/byparr:latest
+    # Pinned: the old `latest` we ran was the 2026-02 v2.1.0 build, which leaked
+    # zombie browser PIDs (#379), hung forever once a request's timeout budget
+    # was exhausted (#405), and left one ~18MB playwright profile in /tmp per
+    # timed-out solve (54GB by 2026-09-06). 3.0.x fixes all three and bakes in
+    # tini as PID 1. Bump deliberately; check release notes.
+    image: ghcr.io/thephaseless/byparr:3.0.4
     container_name: flaresolverr
     labels:
       # Opt this container into autoheal: when the healthcheck below trips
@@ -48,6 +53,12 @@ services:
     # runaway to this container — it hits the cap and restarts instead of taking
     # the whole VM down.
     pids_limit: 1024
+    # Bound the disk leak: browser profiles land in /tmp. A size-capped tmpfs
+    # means a leak fills 512MB instead of the disk, solves then fail, the
+    # healthcheck trips, autoheal restarts the container and the tmpfs is
+    # recreated empty. Supported by byparr >= 3.0.2 (#391).
+    tmpfs:
+      - /tmp:size=512m
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:8191/health"]
       interval: 30s
