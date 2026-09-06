@@ -287,6 +287,9 @@ export interface SystemStorageResponse {
   drives?: StorageDrive[]
   pool?: StoragePool
   categoriesAt?: number | null
+  /** false when macOS privacy settings block the host agent from reading a drive */
+  diskAccess?: boolean
+  agentPython?: string | null
 }
 
 export interface ProcessUsage {

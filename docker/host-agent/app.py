@@ -36,9 +36,10 @@ import logging
 import os
 import shutil
 import subprocess
+import sys
 import time
 import uuid
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -131,6 +132,49 @@ MOVE_SOURCES = [p for p in os.environ.get("HOST_AGENT_MOVE_SOURCES", ":".join(DE
 MOVE_DESTINATIONS = [p for p in os.environ.get("HOST_AGENT_MOVE_DESTINATIONS", ":".join(DEFAULT_MOVE_DESTINATIONS)).split(":") if p]
 
 DOCKER_BIN = next((p for p in ("/usr/local/bin/docker", "/opt/homebrew/bin/docker") if Path(p).exists()), "docker")
+
+
+# ── macOS privacy (TCC) ──────────────────────────────────────────────
+#
+# A launchd-spawned Python has no "Files and Folders → Removable Volumes" /
+# Full Disk Access grant by default. The first os.listdir() on an external
+# drive then BLOCKS on a consent prompt nobody may ever see. Probe each drive
+# with a timeout so we can say so instead of silently hanging du and moves.
+
+DISK_ACCESS: dict[str, bool | None] = {}   # drive path -> True/False/None(unknown)
+PYTHON_BIN = os.path.realpath(sys.executable)
+
+
+def _probe_disk_access() -> None:
+    for d in DRIVES:
+        path = d["path"]
+        if not os.path.isdir(path):
+            DISK_ACCESS[path] = None
+            continue
+        probe = ThreadPoolExecutor(max_workers=1, thread_name_prefix="tcc-probe")
+        fut = probe.submit(os.listdir, path)
+        try:
+            fut.result(timeout=5)
+            DISK_ACCESS[path] = True
+        except FutureTimeout:
+            DISK_ACCESS[path] = False
+            logger.error(
+                "No permission to read %s (macOS privacy). Grant Full Disk Access to %s in "
+                "System Settings → Privacy & Security, then restart the agent.", path, PYTHON_BIN,
+            )
+        except Exception as e:
+            DISK_ACCESS[path] = False
+            logger.error("Cannot read %s: %s", path, e)
+        finally:
+            probe.shutdown(wait=False, cancel_futures=True)
+
+
+def _disk_ok(path: str) -> bool:
+    """True unless a drive containing `path` is known to be blocked."""
+    for drive, ok in DISK_ACCESS.items():
+        if ok is False and (path == drive or path.startswith(drive.rstrip("/") + "/")):
+            return False
+    return True
 
 
 # ── Auth ─────────────────────────────────────────────────────────────
@@ -312,10 +356,14 @@ class Sampler:
                 "percent": round(used / total * 100, 1) if total else 0,
                 "categories": cats,
             })
+        for dr in drives:
+            dr["diskAccess"] = DISK_ACCESS.get(dr["path"])
         self.storage = {
             "sampledAt": time.time(),
             "categoriesAt": self.categories_at or None,
             "drives": drives,
+            "diskAccess": all(v is not False for v in DISK_ACCESS.values()),
+            "pythonBin": PYTHON_BIN,
         }
 
     def sample_categories(self) -> None:
@@ -324,7 +372,7 @@ class Sampler:
         for d in DRIVES:
             per: dict[str, int | None] = {}
             for label, cpath in (d.get("categories") or {}).items():
-                if not os.path.exists(cpath) or os.path.islink(cpath):
+                if not _disk_ok(cpath) or not os.path.exists(cpath) or os.path.islink(cpath):
                     per[label] = None
                     continue
                 try:
@@ -452,6 +500,8 @@ async def health(request: web.Request) -> web.Response:
         "status": "ok",
         "authenticated": bool(TOKEN),
         "drives": [d["name"] for d in DRIVES],
+        "diskAccess": {d["name"]: DISK_ACCESS.get(d["path"]) for d in DRIVES},
+        "pythonBin": PYTHON_BIN,
         "metricsAge": round(time.time() - sampler.metrics.get("sampledAt", 0), 1) if sampler.metrics else None,
     })
 
@@ -480,6 +530,10 @@ async def start_move(request: web.Request) -> web.Response:
         raise web.HTTPForbidden(reason=f"source must be under one of {MOVE_SOURCES}")
     if not _within(dst, MOVE_DESTINATIONS):
         raise web.HTTPForbidden(reason=f"destination must be under one of {MOVE_DESTINATIONS}")
+    if not _disk_ok(src) or not _disk_ok(dst):
+        raise web.HTTPServiceUnavailable(
+            reason=f"agent has no permission to read that drive; grant Full Disk Access to {PYTHON_BIN}"
+        )
     if not os.path.exists(src):
         raise web.HTTPNotFound(reason="source does not exist")
     if os.path.exists(dst) and os.path.isfile(src):
@@ -527,7 +581,9 @@ async def _loop(fn, interval: float, name: str, executor=None) -> None:
 
 async def on_startup(app: web.Application) -> None:
     psutil.cpu_percent(interval=None)  # prime the counters
+    await asyncio.get_running_loop().run_in_executor(None, _probe_disk_access)
     app["tasks"] = [
+        asyncio.create_task(_loop(_probe_disk_access, 60, "disk-access")),
         asyncio.create_task(_loop(sampler.sample_metrics, METRICS_INTERVAL, "metrics")),
         asyncio.create_task(_loop(sampler.sample_containers, DOCKER_STATS_INTERVAL, "docker")),
         asyncio.create_task(_loop(sampler.sample_storage, 30, "storage")),

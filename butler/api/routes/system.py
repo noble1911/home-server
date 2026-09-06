@@ -225,6 +225,8 @@ async def system_storage(
             "freeFormatted": _format_bytes(pool_total - pool_used),
         }
         out["categoriesAt"] = agent.get("categoriesAt")
+        out["diskAccess"] = agent.get("diskAccess", True)
+        out["agentPython"] = agent.get("pythonBin")
     return out
 
 

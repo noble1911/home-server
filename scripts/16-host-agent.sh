@@ -59,10 +59,17 @@ launchctl bootstrap "gui/$(id -u)" "$PLIST_DEST"
 launchctl enable "gui/$(id -u)/${PLIST_LABEL}"
 echo -e "  ${GREEN}✓${NC} ${PLIST_LABEL} registered with launchd"
 
-# 4. Verify
+# 4. Verify (and check macOS let it read the external drives)
 for _ in $(seq 1 20); do
-    if curl -sf --max-time 2 http://localhost:7101/health >/dev/null 2>&1; then
+    if HEALTH="$(curl -sf --max-time 2 http://localhost:7101/health 2>/dev/null)"; then
         echo -e "  ${GREEN}✓${NC} host-agent answering on :7101"
+        if echo "$HEALTH" | grep -q '"diskAccess": {[^}]*false'; then
+            PYBIN="$(echo "$HEALTH" | sed -n 's/.*"pythonBin": "\([^"]*\)".*/\1/p')"
+            echo -e "  ${YELLOW}⚠${NC} macOS is blocking the agent from reading an external drive."
+            echo "     System Settings → Privacy & Security → Full Disk Access → + → ⌘⇧G →"
+            echo "     ${PYBIN}"
+            echo "     then: launchctl kickstart -k gui/$(id -u)/${PLIST_LABEL}"
+        fi
         exit 0
     fi
     sleep 1

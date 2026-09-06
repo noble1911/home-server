@@ -37,6 +37,20 @@ installs `~/Library/LaunchAgents/uk.noblehaus.host-agent.plist` and waits for
 3. `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/uk.noblehaus.host-agent.plist`
 4. `curl localhost:7101/health` → `{"status":"ok","authenticated":true,...}`
 
+## macOS privacy (required once)
+
+A launchd-spawned Python has no permission to read external drives. Without
+it, the agent's folder-size scan and move jobs block forever on a consent
+prompt you may never see. Grant it once:
+
+1. System Settings → Privacy & Security → **Full Disk Access** → **+**
+2. Press ⌘⇧G and paste the agent's interpreter (printed by `/health` as
+   `pythonBin`, e.g. `/opt/homebrew/Cellar/python@3.12/<ver>/Frameworks/Python.framework/Versions/3.12/Resources/Python.app`)
+3. Toggle it on, then `launchctl kickstart -k gui/$(id -u)/uk.noblehaus.host-agent`
+
+`/health` reports `diskAccess` per drive; the dashboard's Storage panel shows
+a banner while access is missing.
+
 ## Verify
 
 ```bash
