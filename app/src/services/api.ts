@@ -246,8 +246,75 @@ export interface StorageVolume {
   categories?: Record<string, { bytes: number; formatted: string }>
 }
 
+export interface StorageCategory {
+  label: string
+  bytes: number | null
+  formatted: string | null
+  linkedTo: string | null
+  exists: boolean
+}
+
+export interface StorageDrive {
+  name: string
+  path: string
+  role: 'system' | 'downloads' | 'library' | string | null
+  mounted: boolean
+  total?: number
+  used?: number
+  free?: number
+  percent?: number
+  totalFormatted?: string
+  usedFormatted?: string
+  freeFormatted?: string
+  categories?: StorageCategory[]
+}
+
+export interface StoragePool {
+  name: string
+  drives: string[]
+  total: number
+  used: number
+  free: number
+  percent: number
+  totalFormatted: string
+  usedFormatted: string
+  freeFormatted: string
+}
+
 export interface SystemStorageResponse {
   volumes: StorageVolume[]
+  /** Present when the host agent is reachable: every drive, incl. ones not mounted into Docker. */
+  drives?: StorageDrive[]
+  pool?: StoragePool
+  categoriesAt?: number | null
+}
+
+export interface ProcessUsage {
+  name: string
+  cpu: number | null
+  rss: number | null
+  rssFormatted: string
+}
+
+export interface ContainerUsage {
+  name: string
+  cpu: number | null
+  memory: number | null
+  memoryFormatted: string
+}
+
+/** Bare-metal numbers from the host agent (null when it is not running). */
+export interface HostStats {
+  sampledAt: number | null
+  uptimeSeconds: number | null
+  uptimeFormatted: string | null
+  cpu: { percent: number | null; cores: number | null; load: number[] | null; perCore: number[] | null }
+  memory: { total: number | null; used: number | null; percent: number | null; totalFormatted: string; usedFormatted: string }
+  swap: { total: number | null; used: number | null; percent: number | null; usedFormatted: string; totalFormatted: string }
+  apps: ProcessUsage[]
+  topCpu: ProcessUsage[]
+  topMemory: ProcessUsage[]
+  containers: ContainerUsage[]
 }
 
 export interface SystemStatsResponse {
@@ -264,6 +331,7 @@ export interface SystemStatsResponse {
     dockerTotalFormatted: string
     hostTotalGb: number | null
   } | null
+  host: HostStats | null
 }
 
 export function getSystemHealth(): Promise<SystemHealthResponse> {
@@ -295,6 +363,107 @@ export interface SystemAlertsResponse {
 
 export function getSystemAlerts(): Promise<SystemAlertsResponse> {
   return api.get<SystemAlertsResponse>('/system/alerts')
+}
+
+// ── Media inbox (Downloads/Complete → library) ──────────────────────
+
+export interface InboxArrSummary {
+  app: 'sonarr' | 'radarr'
+  files: number
+  matched: number
+  titles: string[]
+  episodes: number | null
+  rejections: string[]
+}
+
+export interface InboxItem {
+  name: string
+  isDir: boolean
+  bytes: number
+  modifiedAt: number
+  ageDays: number
+  seeding: boolean
+  empty?: boolean
+  leftover?: boolean
+  suggestion: {
+    app: 'sonarr' | 'radarr'
+    titles: string[]
+    episodes?: number | null
+    files: number
+    matched: number
+    partial: boolean
+    inLibrary: number
+    allInLibrary: boolean
+  } | null
+  sonarr: InboxArrSummary | null
+  radarr: InboxArrSummary | null
+}
+
+export interface InboxDestination {
+  key: string
+  label: string
+  path: string
+}
+
+export interface InboxResponse {
+  path?: string
+  error?: string
+  items: InboxItem[]
+  summary?: { count: number; bytes: number; importable: number; seeding: number; inLibrary: number; leftovers: number }
+  destinations?: InboxDestination[]
+}
+
+export interface InboxImportResult {
+  name: string
+  app?: 'sonarr' | 'radarr'
+  mode?: 'move' | 'copy'
+  commandId?: number
+  files?: number
+  status: 'queued' | 'unmatched' | 'failed'
+  error?: string
+}
+
+export interface ArrCommandStatus {
+  name: string
+  app: 'sonarr' | 'radarr'
+  commandId: number
+  mode: 'move' | 'copy'
+  status: string
+  message?: string | null
+}
+
+export interface MoveJob {
+  id: string
+  source: string
+  destination: string
+  status: 'queued' | 'running' | 'done' | 'failed'
+  totalBytes: number
+  copiedBytes: number
+  files: number
+  filesDone: number
+  error: string | null
+  startedAt: number
+  finishedAt: number | null
+}
+
+export function getMediaInbox(): Promise<InboxResponse> {
+  return api.get<InboxResponse>('/media/inbox')
+}
+
+export function importInboxItems(names: string[]): Promise<{ results: InboxImportResult[] }> {
+  return api.post('/media/inbox/import', { names })
+}
+
+export function moveInboxItem(name: string, destination: string): Promise<{ job: MoveJob }> {
+  return api.post('/media/inbox/move', { name, destination })
+}
+
+export function getInboxJobs(): Promise<{ commands: ArrCommandStatus[]; moves: MoveJob[] }> {
+  return api.get('/media/inbox/jobs')
+}
+
+export function refreshJellyfinLibrary(): Promise<{ ok: boolean }> {
+  return api.post('/media/library/refresh')
 }
 
 // ── Downloads (qBittorrent proxy) ────────────────────────────────────

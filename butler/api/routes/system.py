@@ -19,6 +19,7 @@ from fastapi import APIRouter, Depends, Query
 
 from tools import AlertStateManager, DatabasePool, ServerHealthTool, StorageMonitorTool, Tool
 
+from .. import host_agent
 from ..config import settings
 from ..deps import get_admin_user, get_alert_manager, get_current_user, get_db_pool, get_tools
 from ..models import ToolUsageEntry, ToolUsageResponse, ToolUsageSummary
@@ -129,6 +130,7 @@ async def system_storage(
         return {"volumes": []}
 
     volumes = []
+    agent = await host_agent.get_storage()
 
     if storage_tool._has_external_drive:
         # Two-volume mode: external drive + Mac SSD
@@ -176,7 +178,54 @@ async def system_storage(
                 "categories": {k: {"bytes": v, "formatted": _format_bytes(v)} for k, v in categories.items()},
             })
 
-    return {"volumes": volumes}
+    out: dict[str, Any] = {"volumes": volumes}
+    if agent and agent.get("drives"):
+        drives = []
+        for d in agent["drives"]:
+            if not d.get("mounted"):
+                drives.append({"name": d["name"], "path": d["path"], "role": d.get("role"), "mounted": False})
+                continue
+            drives.append({
+                "name": d["name"],
+                "path": d["path"],
+                "role": d.get("role"),
+                "mounted": True,
+                "total": d["total"],
+                "used": d["used"],
+                "free": d["free"],
+                "percent": d["percent"],
+                "totalFormatted": _format_bytes(d["total"]),
+                "usedFormatted": _format_bytes(d["used"]),
+                "freeFormatted": _format_bytes(d["free"]),
+                "categories": [
+                    {
+                        "label": c["label"],
+                        "bytes": c.get("bytes"),
+                        "formatted": _format_bytes(c["bytes"]) if c.get("bytes") is not None else None,
+                        "linkedTo": c.get("linkedTo"),
+                        "exists": c.get("exists", True),
+                    }
+                    for c in d.get("categories", [])
+                ],
+            })
+        mounted = [d for d in drives if d.get("mounted")]
+        media = [d for d in mounted if d.get("role") in ("downloads", "library")]
+        pool_total = sum(d["total"] for d in media)
+        pool_used = sum(d["used"] for d in media)
+        out["drives"] = drives
+        out["pool"] = {
+            "name": "Media drives",
+            "drives": [d["name"] for d in media],
+            "total": pool_total,
+            "used": pool_used,
+            "free": pool_total - pool_used,
+            "percent": round(pool_used / pool_total * 100, 1) if pool_total else 0,
+            "totalFormatted": _format_bytes(pool_total),
+            "usedFormatted": _format_bytes(pool_used),
+            "freeFormatted": _format_bytes(pool_total - pool_used),
+        }
+        out["categoriesAt"] = agent.get("categoriesAt")
+    return out
 
 
 def _read_proc_uptime() -> int | None:
@@ -269,6 +318,42 @@ def _format_uptime(seconds: int) -> str:
     return f"{minutes}m"
 
 
+def _shape_host(h: dict[str, Any]) -> dict[str, Any]:
+    """Trim the host-agent snapshot to what the dashboard renders."""
+    mem = h.get("memory") or {}
+    swap = h.get("swap") or {}
+    procs = h.get("processes") or {}
+    cpu = h.get("cpu") or {}
+
+    def _proc(p: dict[str, Any]) -> dict[str, Any]:
+        return {"name": p.get("name"), "cpu": p.get("cpu"), "rss": p.get("rss"),
+                "rssFormatted": _format_bytes(p.get("rss") or 0)}
+
+    return {
+        "sampledAt": h.get("sampledAt"),
+        "uptimeSeconds": h.get("uptimeSeconds"),
+        "uptimeFormatted": _format_uptime(int(h["uptimeSeconds"])) if h.get("uptimeSeconds") else None,
+        "cpu": {"percent": cpu.get("percent"), "cores": cpu.get("cores"), "load": cpu.get("load"),
+                "perCore": cpu.get("perCore")},
+        "memory": {
+            "total": mem.get("total"), "used": mem.get("used"), "percent": mem.get("percent"),
+            "totalFormatted": _format_bytes(mem.get("total") or 0),
+            "usedFormatted": _format_bytes(mem.get("used") or 0),
+        },
+        "swap": {"total": swap.get("total"), "used": swap.get("used"), "percent": swap.get("percent"),
+                 "usedFormatted": _format_bytes(swap.get("used") or 0),
+                 "totalFormatted": _format_bytes(swap.get("total") or 0)},
+        "apps": [_proc(p) for p in procs.get("apps", [])],
+        "topCpu": [_proc(p) for p in procs.get("topCpu", [])],
+        "topMemory": [_proc(p) for p in procs.get("topMemory", [])],
+        "containers": [
+            {"name": c.get("name"), "cpu": c.get("cpu"), "memory": c.get("memory"),
+             "memoryFormatted": _format_bytes(c.get("memory") or 0)}
+            for c in h.get("containers", [])
+        ],
+    }
+
+
 @router.get("/system/stats")
 async def system_stats(
     _user_id: str = Depends(get_current_user),
@@ -282,10 +367,11 @@ async def system_stats(
     CPU is sampled from /proc/stat over 0.5 s — reflects the Linux VM's
     CPU load, which maps directly to overall Docker workload.
     """
-    uptime_seconds, cpu_percent, vm_memory = await asyncio.gather(
+    uptime_seconds, cpu_percent, vm_memory, host = await asyncio.gather(
         asyncio.to_thread(_read_proc_uptime),
         _read_cpu_percent(),
         asyncio.to_thread(_read_proc_meminfo),
+        host_agent.get_metrics(),
     )
 
     memory_out: dict[str, Any] | None = None
@@ -299,6 +385,10 @@ async def system_stats(
             "hostTotalGb": settings.host_memory_total_gb if settings.host_memory_total_gb > 0 else None,
         }
 
+    host_out: dict[str, Any] | None = None
+    if host:
+        host_out = _shape_host(host)
+
     return {
         "platform": settings.host_platform or platform.system(),
         "architecture": settings.host_architecture or platform.machine(),
@@ -306,6 +396,7 @@ async def system_stats(
         "uptimeFormatted": _format_uptime(uptime_seconds) if uptime_seconds else None,
         "cpu": {"percent": cpu_percent} if cpu_percent is not None else None,
         "memory": memory_out,
+        "host": host_out,
     }
 
 

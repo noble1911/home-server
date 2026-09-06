@@ -136,6 +136,11 @@ class Settings(BaseSettings):
     # Shared secret sent as the X-Shim-Token header so only butler-api can
     # invoke the shim. Must match CLAUDE_SHIM_TOKEN on the host shim.
     claude_code_shim_token: str = ""
+    # Host agent (docker/host-agent) — bare-metal metrics, multi-drive storage
+    # and move jobs. Runs on the Mac via launchd; see scripts/16-host-agent.sh.
+    host_agent_url: str = "http://host.docker.internal:7101"
+    host_agent_token: str = ""
+
 
     # Home Assistant webhook authentication
     ha_webhook_secret: str = ""

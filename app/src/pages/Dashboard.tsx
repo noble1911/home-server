@@ -1,6 +1,11 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import StatusCard from '../components/dashboard/StatusCard'
+import Section from '../components/dashboard/Section'
+import ComputePanel from '../components/dashboard/ComputePanel'
+import StoragePanel from '../components/dashboard/StoragePanel'
+import MediaInbox from '../components/dashboard/MediaInbox'
+import { useAuthStore } from '../stores/authStore'
 import {
   getSystemHealth,
   getSystemStorage,
@@ -34,8 +39,7 @@ const STACK_LABELS: Record<string, string> = {
 }
 const STACK_ORDER = Object.keys(STACK_LABELS)
 
-/** Group services by their `stack`, ordered by STACK_ORDER (unknown stacks last).
- *  Within a group, offline services come first so problems are visible. */
+/** Group services by `stack`, ordered by STACK_ORDER; offline first within a group. */
 function groupByStack(services: ServiceStatus[]): [string, ServiceStatus[]][] {
   const groups = new Map<string, ServiceStatus[]>()
   for (const svc of services) {
@@ -73,28 +77,23 @@ function buildAttention(
   alerts: AlertInfo[],
   torrents: TorrentInfo[],
   storage: SystemStorageResponse | null,
+  stats: SystemStatsResponse | null,
 ): AttentionItem[] {
   const items: AttentionItem[] = []
 
   for (const svc of health?.services ?? []) {
     if (svc.status !== 'online') {
-      items.push({
-        key: `svc:${svc.name}`,
-        severity: 'critical',
-        title: `${svc.name} is down`,
-        detail: svc.detail,
-      })
+      items.push({ key: `svc:${svc.name}`, severity: 'critical', title: `${svc.name} is down`, detail: svc.detail })
     }
   }
 
   for (const a of alerts) {
-    // Service-down alerts duplicate the live probe above; keep the rest.
-    if (a.type === 'service_down' && health) continue
+    if (a.type === 'service_down' && health) continue // duplicates the live probe above
     items.push({
       key: `alert:${a.id}`,
       severity: a.severity === 'critical' ? 'critical' : 'warning',
       title: a.message,
-      detail: a.lastTriggeredAt ? `since ${new Date(a.firstTriggeredAt ?? a.lastTriggeredAt).toLocaleString()}` : undefined,
+      detail: a.firstTriggeredAt ? `since ${new Date(a.firstTriggeredAt).toLocaleString()}` : undefined,
     })
   }
 
@@ -119,21 +118,47 @@ function buildAttention(
     })
   }
 
-  for (const vol of storage?.volumes ?? []) {
-    if (vol.percent >= DISK_WARN_PERCENT) {
-      items.push({
-        key: `disk:${vol.name}`,
-        severity: vol.percent >= 90 ? 'critical' : 'warning',
-        title: `${vol.name} is ${vol.percent}% full`,
-        detail: `${vol.freeFormatted} free of ${vol.totalFormatted}`,
-      })
+  // Prefer the host agent's drive list (it sees every drive); fall back to volumes.
+  const drives = storage?.drives?.filter(d => d.mounted && typeof d.percent === 'number')
+  if (drives?.length) {
+    for (const d of drives) {
+      if ((d.percent ?? 0) >= DISK_WARN_PERCENT) {
+        items.push({
+          key: `disk:${d.name}`,
+          severity: (d.percent ?? 0) >= 90 ? 'critical' : 'warning',
+          title: `${d.name} is ${d.percent}% full`,
+          detail: `${d.freeFormatted} free of ${d.totalFormatted}`,
+        })
+      }
     }
+  } else {
+    for (const vol of storage?.volumes ?? []) {
+      if (vol.percent >= DISK_WARN_PERCENT) {
+        items.push({
+          key: `disk:${vol.name}`,
+          severity: vol.percent >= 90 ? 'critical' : 'warning',
+          title: `${vol.name} is ${vol.percent}% full`,
+          detail: `${vol.freeFormatted} free of ${vol.totalFormatted}`,
+        })
+      }
+    }
+  }
+
+  const host = stats?.host
+  if (host?.memory.percent && host.memory.percent >= 92) {
+    items.push({
+      key: 'host:mem',
+      severity: 'warning',
+      title: `Mac memory at ${host.memory.percent}%`,
+      detail: `${host.memory.usedFormatted} used · swap ${host.swap.percent ?? 0}%`,
+    })
   }
 
   return items.sort((a, b) => Number(b.severity === 'critical') - Number(a.severity === 'critical'))
 }
 
 export default function Dashboard() {
+  const isAdmin = useAuthStore(s => s.role === 'admin')
   const [health, setHealth] = useState<SystemHealthResponse | null>(null)
   const [storage, setStorage] = useState<SystemStorageResponse | null>(null)
   const [stats, setStats] = useState<SystemStatsResponse | null>(null)
@@ -195,15 +220,23 @@ export default function Dashboard() {
   }, [fetchAll])
 
   const header = (
-    <div>
-      <h1 className="text-xl font-bold text-butler-100">Dashboard</h1>
-      <p className="text-sm text-butler-400">Server status and monitoring</p>
+    <div className="flex items-end justify-between gap-3">
+      <div>
+        <h1 className="text-xl font-bold text-butler-100">Dashboard</h1>
+        <p className="text-sm text-butler-400">Server status and monitoring</p>
+      </div>
+      <div className="flex items-center gap-3 text-xs text-butler-500">
+        {updatedAt && <span className="tabular-nums">Updated {updatedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>}
+        <button className="btn btn-secondary text-xs py-1.5" onClick={() => fetchAll(false)}>
+          Refresh
+        </button>
+      </div>
     </div>
   )
 
   if (loadState === 'loading') {
     return (
-      <div className="flex-1 overflow-y-auto p-4 space-y-6">
+      <div className="flex-1 overflow-y-auto p-4 space-y-8">
         {header}
         <LoadingSkeleton />
       </div>
@@ -212,29 +245,26 @@ export default function Dashboard() {
 
   if (loadState === 'error' && !health) {
     return (
-      <div className="flex-1 overflow-y-auto p-4 space-y-6">
+      <div className="flex-1 overflow-y-auto p-4 space-y-8">
         {header}
         <ErrorBanner message={errorMsg} onRetry={() => fetchAll(true)} />
       </div>
     )
   }
 
-  const attention = buildAttention(health, alerts, torrents, storage)
+  const attention = buildAttention(health, alerts, torrents, storage, stats)
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 space-y-6">
+    <div className="flex-1 overflow-y-auto p-4 space-y-8 pb-24 md:pb-8">
       {header}
 
       {errorMsg && <ErrorBanner message={errorMsg} onRetry={() => fetchAll(true)} />}
 
       {/* Attention — anything that needs a human, most severe first */}
-      <section>
-        <h2 className="text-sm font-medium text-butler-400 uppercase tracking-wide mb-3">
-          Attention
-        </h2>
+      <Section title="Attention" aside={attention.length ? `${attention.length} item${attention.length === 1 ? '' : 's'}` : undefined}>
         {attention.length === 0 ? (
-          <div className="card p-3 flex items-center gap-2 border border-green-500/20">
-            <span className="text-green-400">✓</span>
+          <div className="card p-3 flex items-center gap-2 border-green-500/20">
+            <span className="text-green-400" aria-hidden>✓</span>
             <span className="text-sm text-butler-200">All clear — nothing needs you right now.</span>
           </div>
         ) : (
@@ -244,24 +274,25 @@ export default function Dashboard() {
             ))}
           </div>
         )}
-      </section>
+      </Section>
 
-      {/* Connection Status — grouped by stack, offline first */}
+      <ComputePanel stats={stats} />
+
+      <StoragePanel storage={storage} />
+
+      {isAdmin && <MediaInbox />}
+
+      {/* Services — grouped by stack, offline first */}
       {health && (
-        <section>
-          <h2 className="text-sm font-medium text-butler-400 uppercase tracking-wide mb-3">
-            Services ({health.summary.healthy}/{health.summary.total} healthy)
-          </h2>
-          <div className="space-y-4">
+        <Section title="Services" aside={`${health.summary.healthy}/${health.summary.total} healthy`}>
+          <div className="card p-4 space-y-4">
             {groupByStack(health.services).map(([stack, svcs]) => {
               const up = svcs.filter(s => s.status === 'online').length
               return (
                 <div key={stack}>
                   <div className="flex items-center gap-2 mb-2">
-                    <h3 className="text-xs font-semibold text-butler-300">
-                      {STACK_LABELS[stack] ?? stack}
-                    </h3>
-                    <span className={`text-xs ${up < svcs.length ? 'text-yellow-400' : 'text-butler-500'}`}>
+                    <h3 className="text-xs font-semibold text-butler-300">{STACK_LABELS[stack] ?? stack}</h3>
+                    <span className={`text-xs tabular-nums ${up < svcs.length ? 'text-yellow-400' : 'text-butler-500'}`}>
                       {up}/{svcs.length}
                     </span>
                   </div>
@@ -279,98 +310,8 @@ export default function Dashboard() {
               )
             })}
           </div>
-        </section>
+        </Section>
       )}
-
-      {/* System & Storage */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <section className="card p-4">
-          <h3 className="text-sm font-medium text-butler-400 mb-1">Docker VM</h3>
-          <p className="text-xs text-butler-500 mb-3">
-            The Linux VM running the containers. Native apps (Jellyfin, Ollama) aren't included.
-          </p>
-          <div className="space-y-3">
-            {stats?.cpu ? (
-              <MetricBar label="CPU" percent={stats.cpu.percent} value={`${stats.cpu.percent}%`} />
-            ) : (
-              <PlaceholderRow label="CPU" />
-            )}
-            {stats?.memory ? (
-              <MetricBar
-                label="RAM"
-                percent={stats.memory.dockerPercent}
-                value={`${stats.memory.dockerUsedFormatted} / ${stats.memory.dockerTotalFormatted}`}
-                hint={stats.memory.hostTotalGb ? `of the Mac's ${stats.memory.hostTotalGb} GB` : undefined}
-              />
-            ) : (
-              <PlaceholderRow label="RAM" />
-            )}
-            <div className="flex justify-between text-xs pt-1">
-              <span className="text-butler-400">Uptime</span>
-              <span className="text-butler-200">{stats?.uptimeFormatted ?? '--'}</span>
-            </div>
-          </div>
-        </section>
-
-        <section className="card p-4">
-          <h3 className="text-sm font-medium text-butler-400 mb-3">Storage</h3>
-          <div className="space-y-3">
-            {storage && storage.volumes.length > 0 ? (
-              storage.volumes.map(vol => (
-                <MetricBar
-                  key={vol.name}
-                  label={vol.name}
-                  percent={vol.percent}
-                  value={`${vol.usedFormatted} / ${vol.totalFormatted}`}
-                  hint={`${vol.freeFormatted} free`}
-                />
-              ))
-            ) : (
-              <div className="text-butler-500 text-sm">No volumes detected</div>
-            )}
-          </div>
-        </section>
-      </div>
-
-      {/* Storage Categories (if external drive has breakdown) */}
-      {storage?.volumes.some(v => v.categories && Object.keys(v.categories).length > 0) && (
-        <section>
-          <h2 className="text-sm font-medium text-butler-400 uppercase tracking-wide mb-3">
-            Storage Breakdown
-          </h2>
-          <div className="card divide-y divide-butler-700">
-            {storage.volumes
-              .filter(v => v.categories)
-              .map(vol =>
-                Object.entries(vol.categories!)
-                  .sort(([, a], [, b]) => b.bytes - a.bytes)
-                  .map(([label, info]) => (
-                    <div key={label} className="p-3 flex justify-between items-center">
-                      <span className="text-butler-100 font-medium">{label}</span>
-                      <span className="text-sm text-butler-400">{info.formatted}</span>
-                    </div>
-                  ))
-              )}
-          </div>
-        </section>
-      )}
-
-      {/* Quick Actions */}
-      <section>
-        <h2 className="text-sm font-medium text-butler-400 uppercase tracking-wide mb-3">
-          Quick Actions
-        </h2>
-        <div className="flex flex-wrap items-center gap-3">
-          <button className="btn btn-secondary text-sm" onClick={() => fetchAll(false)}>
-            Refresh Now
-          </button>
-          {updatedAt && (
-            <span className="text-xs text-butler-500">
-              Updated {updatedAt.toLocaleTimeString()}
-            </span>
-          )}
-        </div>
-      </section>
     </div>
   )
 }
@@ -378,18 +319,14 @@ export default function Dashboard() {
 function AttentionRow({ item }: { item: AttentionItem }) {
   const critical = item.severity === 'critical'
   const body = (
-    <div
-      className={`card p-3 border ${
-        critical ? 'border-red-500/30 bg-red-500/10' : 'border-yellow-500/30 bg-yellow-500/10'
-      }`}
-    >
+    <div className={`card p-3 ${critical ? 'border-red-500/30 bg-red-500/10' : 'border-yellow-500/30 bg-yellow-500/10'}`}>
       <div className="flex items-start gap-2">
-        <span className={critical ? 'text-red-400' : 'text-yellow-400'}>{critical ? '✕' : '!'}</span>
+        <span className={critical ? 'text-red-400' : 'text-yellow-400'} aria-hidden>{critical ? '✕' : '!'}</span>
         <div className="min-w-0 flex-1">
           <p className={`text-sm font-medium ${critical ? 'text-red-300' : 'text-yellow-300'}`}>{item.title}</p>
           {item.detail && <p className="text-xs text-butler-400 truncate">{item.detail}</p>}
         </div>
-        {item.link && <span className="text-xs text-butler-500">›</span>}
+        {item.link && <span className="text-xs text-butler-500" aria-hidden>›</span>}
       </div>
     </div>
   )
@@ -398,65 +335,22 @@ function AttentionRow({ item }: { item: AttentionItem }) {
 
 function LoadingSkeleton() {
   return (
-    <div className="space-y-6 animate-pulse">
-      <div className="h-12 bg-butler-700 rounded-lg" />
-      <div className="flex flex-wrap gap-2">
-        {[1, 2, 3, 4].map(i => (
-          <div key={i} className="h-8 w-24 bg-butler-700 rounded-full" />
+    <div className="space-y-8 animate-pulse">
+      <div className="h-12 bg-butler-800 rounded-xl" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {[1, 2].map(i => (
+          <div key={i} className="card p-4 space-y-3">
+            <div className="h-4 w-24 bg-butler-700 rounded" />
+            <div className="h-3 bg-butler-700 rounded" />
+            <div className="h-3 bg-butler-700 rounded" />
+            <div className="h-3 bg-butler-700 rounded" />
+          </div>
         ))}
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="card p-4 space-y-3">
-          <div className="h-4 w-16 bg-butler-700 rounded" />
-          <div className="h-4 bg-butler-700 rounded" />
-          <div className="h-4 bg-butler-700 rounded" />
-        </div>
-        <div className="card p-4 space-y-3">
-          <div className="h-4 w-16 bg-butler-700 rounded" />
-          <div className="h-4 bg-butler-700 rounded" />
-          <div className="h-4 bg-butler-700 rounded" />
-        </div>
+      <div className="card p-4 space-y-3">
+        <div className="h-8 w-40 bg-butler-700 rounded" />
+        <div className="h-3 bg-butler-700 rounded" />
       </div>
-    </div>
-  )
-}
-
-function MetricBar({
-  label,
-  percent,
-  value,
-  hint,
-}: {
-  label: string
-  percent: number
-  value: string
-  hint?: string
-}) {
-  const barColor =
-    percent > 80 ? 'bg-red-400' : percent > 60 ? 'bg-yellow-400' : 'bg-green-400'
-
-  return (
-    <div>
-      <div className="flex justify-between text-xs mb-1">
-        <span className="text-butler-400">{label}</span>
-        <span className="text-butler-200">{value}</span>
-      </div>
-      <div className="w-full bg-butler-700 rounded-full h-1.5">
-        <div
-          className={`h-1.5 rounded-full transition-all ${barColor}`}
-          style={{ width: `${Math.min(percent, 100)}%` }}
-        />
-      </div>
-      {hint && <p className="text-xs text-butler-500 mt-0.5 text-right">{hint}</p>}
-    </div>
-  )
-}
-
-function PlaceholderRow({ label }: { label: string }) {
-  return (
-    <div className="flex justify-between text-xs">
-      <span className="text-butler-400">{label}</span>
-      <span className="text-butler-500">--</span>
     </div>
   )
 }

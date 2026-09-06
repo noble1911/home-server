@@ -53,6 +53,11 @@ services:
     container: nextcloud
     host_port: 8080
 
+  # host-agent: docker/host-agent/app.py via launchd uk.noblehaus.host-agent (NOT a container).
+  # Bare-metal CPU/RAM/swap, native apps + docker stats, all drives, allow-listed move jobs.
+  # butler-api calls host.docker.internal:7101 with X-Agent-Token (HOST_AGENT_TOKEN in butler/.env).
+  - { name: host-agent,  project: home-server, host_port: 7101, native: true }
+
   # ── home-server: media-stack ─────────────────────────────────────
   # jellyfin is the NATIVE macOS app (/Applications/Jellyfin.app), NOT a container —
   # the Linux image can't use Apple VideoToolbox. doctor.sh lists 8096 under

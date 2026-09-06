@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>uk.noblehaus.host-agent</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/ron/home-server/docker/host-agent/.venv/bin/python3</string>
+        <string>/Users/ron/home-server/docker/host-agent/app.py</string>
+    </array>
+
+    <!-- Shared secret; butler-api sends it as X-Agent-Token. scripts/16-host-agent.sh
+         fills this in from HOST_AGENT_TOKEN in butler/.env. Edit the copy under
+         ~/Library/LaunchAgents/, not this committed file. -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>HOST_AGENT_TOKEN</key>
+        <string>REPLACE_WITH_RANDOM_SECRET</string>
+        <key>PATH</key>
+        <string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/tmp/host-agent.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/tmp/host-agent.err</string>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/ron/home-server</string>
+</dict>
+</plist>

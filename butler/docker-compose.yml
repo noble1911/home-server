@@ -87,6 +87,9 @@ services:
       - HOST_PLATFORM=${HOST_PLATFORM:-}
       - HOST_ARCHITECTURE=${HOST_ARCHITECTURE:-}
       - HOST_MEMORY_TOTAL_GB=${HOST_MEMORY_TOTAL_GB:-0}
+      # Host agent on the Mac (docker/host-agent): bare-metal CPU/RAM, both drives, move jobs
+      - HOST_AGENT_URL=${HOST_AGENT_URL:-http://host.docker.internal:7101}
+      - HOST_AGENT_TOKEN=${HOST_AGENT_TOKEN:-}
       - HAS_EXTERNAL_DRIVE=${HAS_EXTERNAL_DRIVE:-false}
       # Claude Code shim (host-side `claude --print`). Token must match
       # CLAUDE_SHIM_TOKEN on the host shim so butler-api can authenticate.

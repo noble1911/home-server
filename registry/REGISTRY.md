@@ -23,6 +23,7 @@ Cloudflare dashboard (domain `noblehaus.uk`) — mirror them here so they're dis
 | Service | Host port | Notes |
 |---|---|---|
 | **Jellyfin** | `8096` | `/Applications/Jellyfin.app` — runs natively (uses Apple VideoToolbox for HW transcode, which the Linux container can't). Reach from containers via `host.docker.internal:8096`. Container retired 2026-05-25. |
+| **host-agent** | `7101` | `docker/host-agent/app.py` via launchd `uk.noblehaus.host-agent` — bare-metal CPU/RAM/swap, native apps + `docker stats`, all three drives, allow-listed move jobs for the media inbox. butler-api calls `host.docker.internal:7101` with `X-Agent-Token` (`HOST_AGENT_TOKEN` in `butler/.env`). Install: `scripts/16-host-agent.sh`. |
 | **wire-pod** | — | WirePod macOS app (Anki Vector auth/server), supporting vector-llm. **Not running as of 2026-09-06** (only its mDNS helper launchd job is up). |
 
 ## Shared services (the contracts every project should reuse, not duplicate)
