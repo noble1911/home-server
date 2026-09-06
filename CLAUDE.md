@@ -112,7 +112,7 @@ The Mac Mini is set up and all Docker stacks are deployed via OrbStack. Active w
 ### Native Services (not Docker)
 | Service | Description | Status |
 |---------|-------------|--------|
-| **Jellyfin** | Media streaming — native `/Applications/Jellyfin.app` (uses VideoToolbox HW transcode; Docker container retired 2026-05-25). Port 8096; Butler reaches it via `host.docker.internal:8096`. | Running |
+| **Jellyfin** | Media streaming — native `/Applications/Jellyfin.app`, 10.11.11 arm64 as of 2026-09-06 (uses VideoToolbox HW transcode; Docker container retired 2026-05-25). Upgrade = swap the app bundle from repo.jellyfin.org macOS arm64 dmg; backups in `/Volumes/HomeServer/Backups/jellyfin/`. Port 8096; Butler reaches it via `host.docker.internal:8096`. | Running |
 | **wire-pod** | Vector robot server (WirePod v1.2.13 macOS app) | Running |
 
 ### Co-hosted Projects (shared Mac Mini)
