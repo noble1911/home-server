@@ -286,6 +286,17 @@ class QBittorrentTool(Tool):
         detail = ("\nDownloading now:\n" + "\n".join(self._row(t) for t in active[:5])) if active else ""
         return f"qBittorrent: {len(torrents)} torrent(s) — {summary}.{speeds}{detail}"
 
+    async def add(self, url: str, category: str) -> str:
+        """Public entry for other tools (Prowlarr grab)."""
+        if not self.url:
+            return "Error: QBITTORRENT_URL not configured."
+        try:
+            return await self._add(url, category)
+        except aiohttp.ClientError as e:
+            return f"Error: could not reach qBittorrent — {e}"
+        except TimeoutError:
+            return "Error: qBittorrent request timed out."
+
     async def _add(self, url: str, category: str) -> str:
         url = url.strip()
         if not (url.startswith("magnet:") or url.startswith("http://") or url.startswith("https://")):

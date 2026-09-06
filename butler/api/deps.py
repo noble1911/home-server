@@ -45,6 +45,7 @@ from tools import (
     SelfUpdateTool,
     WhatsAppTool,
     QBittorrentTool,
+    ProwlarrTool,
 )
 
 from tools.alerting import NotificationDispatcher
@@ -70,8 +71,12 @@ ALWAYS_ALLOWED_TOOLS: set[str] = {
     "weather", "server_health", "storage_monitor",
 }
 
+# Tools that only make sense when there is a voice session / device screen to
+# render to. get_user_tools() leaves them out; routes/voice.py adds them.
+VOICE_ONLY_TOOLS: set[str] = {"display_in_chat", "display_on_device", "display_image"}
+
 PERMISSION_TOOL_MAP: dict[str, list[str]] = {
-    "media": ["radarr", "seerr", "books", "sonarr", "immich", "jellyfin", "media_files", "qbittorrent"],
+    "media": ["radarr", "seerr", "books", "sonarr", "immich", "jellyfin", "media_files", "qbittorrent", "prowlarr"],
     "home": ["home_assistant", "list_ha_entities"],
     "location": ["phone_location"],
     "calendar": ["google_calendar"],
@@ -192,6 +197,14 @@ async def init_resources() -> None:
             url=settings.qbittorrent_url,
             username=settings.qbittorrent_username,
             password=settings.qbittorrent_password,
+        )
+
+    # Prowlarr: search the indexers and grab a chosen result into qBittorrent
+    if settings.prowlarr_url and settings.prowlarr_api_key:
+        _tools["prowlarr"] = ProwlarrTool(
+            url=settings.prowlarr_url,
+            api_key=settings.prowlarr_api_key,
+            qbit=_tools.get("qbittorrent"),
         )
 
     # Only register Immich tool if configured
@@ -434,8 +447,13 @@ async def get_user_tools(
     for perm in user_perms:
         allowed.update(PERMISSION_TOOL_MAP.get(perm, []))
 
-    # Filter global tools
-    user_tools = {name: tool for name, tool in global_tools.items() if name in allowed}
+    # Filter global tools. Display tools are voice/device-only: the voice route
+    # adds them itself per surface. In text chat their output is dropped, and
+    # the model then says "it's on your screen" with nothing on screen.
+    user_tools = {
+        name: tool for name, tool in global_tools.items()
+        if name in allowed and name not in VOICE_ONLY_TOOLS
+    }
 
     # Add per-user OAuth tools only if user has the corresponding permission
     if settings.google_client_id:

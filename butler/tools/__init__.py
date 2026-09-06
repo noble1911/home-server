@@ -51,6 +51,7 @@ from .claude_code import ClaudeCodeTool
 from .display_on_device import DisplayOnDeviceTool
 from .display_image import DisplayImageTool
 from .qbittorrent import QBittorrentTool
+from .prowlarr import ProwlarrTool
 
 __all__ = [
     # Base
@@ -113,4 +114,6 @@ __all__ = [
     "DisplayImageTool",
     # qBittorrent download client
     "QBittorrentTool",
+    # Prowlarr indexer search + grab
+    "ProwlarrTool",
 ]
