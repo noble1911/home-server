@@ -3,6 +3,7 @@
 GET /api/system/health     — Service health statuses for all Docker services
 GET /api/system/storage    — Disk usage for SSD + external drive
 GET /api/system/stats      — Basic system metrics (uptime, memory)
+GET /api/system/alerts     — Active (unresolved) alerts from the scheduled checks
 GET /api/system/tool-usage — Recent tool calls with optional filters (admin only)
 """
 
@@ -11,14 +12,15 @@ from __future__ import annotations
 import asyncio
 import logging
 import platform
+import time
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query
 
-from tools import DatabasePool, ServerHealthTool, StorageMonitorTool, Tool
+from tools import AlertStateManager, DatabasePool, ServerHealthTool, StorageMonitorTool, Tool
 
 from ..config import settings
-from ..deps import get_admin_user, get_current_user, get_db_pool, get_tools
+from ..deps import get_admin_user, get_alert_manager, get_current_user, get_db_pool, get_tools
 from ..models import ToolUsageEntry, ToolUsageResponse, ToolUsageSummary
 
 logger = logging.getLogger(__name__)
@@ -66,6 +68,49 @@ async def system_health(
     }
 
 
+# Category sizes come from `du -sb` over the whole media drive. Cheap while
+# the FS cache is warm, seconds (and disk-thrashing) when it isn't — and the
+# dashboard polls every 30 s from every open tab. Cache them briefly.
+_CATEGORY_TTL_SECONDS = 600
+_category_cache: dict[str, Any] = {"at": 0.0, "sizes": None}
+_category_lock = asyncio.Lock()
+
+
+async def _cached_category_sizes(storage_tool: StorageMonitorTool) -> dict[str, int]:
+    now = time.monotonic()
+    if _category_cache["sizes"] is not None and now - _category_cache["at"] < _CATEGORY_TTL_SECONDS:
+        return _category_cache["sizes"]
+    async with _category_lock:
+        now = time.monotonic()
+        if _category_cache["sizes"] is not None and now - _category_cache["at"] < _CATEGORY_TTL_SECONDS:
+            return _category_cache["sizes"]
+        sizes = await storage_tool._get_category_sizes()
+        _category_cache.update(at=time.monotonic(), sizes=sizes)
+        return sizes
+
+
+@router.get("/system/alerts")
+async def system_alerts(
+    _user_id: str = Depends(get_current_user),
+    alert_manager: AlertStateManager = Depends(get_alert_manager),
+) -> dict[str, Any]:
+    """Active (unresolved) alerts raised by the scheduled health/storage checks."""
+    rows = await alert_manager.get_active_alerts()
+    alerts = [
+        {
+            "id": r["id"],
+            "key": r["alert_key"],
+            "type": r["alert_type"],
+            "severity": r["severity"],
+            "message": r["message"],
+            "firstTriggeredAt": r["first_triggered_at"].isoformat() if r.get("first_triggered_at") else None,
+            "lastTriggeredAt": r["last_triggered_at"].isoformat() if r.get("last_triggered_at") else None,
+        }
+        for r in rows
+    ]
+    return {"alerts": alerts, "summary": {"total": len(alerts)}}
+
+
 @router.get("/system/storage")
 async def system_storage(
     _user_id: str = Depends(get_current_user),
@@ -89,7 +134,7 @@ async def system_storage(
         # Two-volume mode: external drive + Mac SSD
         ext = storage_tool._check_volume(storage_tool._external_path)
         if ext:
-            categories = await storage_tool._get_category_sizes()
+            categories = await _cached_category_sizes(storage_tool)
             volumes.append({
                 "name": "External Drive",
                 "total": ext["total"],
@@ -118,7 +163,7 @@ async def system_storage(
         # Single-volume mode: /mnt/external IS the Mac SSD
         ssd = storage_tool._check_volume(storage_tool._external_path)
         if ssd:
-            categories = await storage_tool._get_category_sizes()
+            categories = await _cached_category_sizes(storage_tool)
             volumes.append({
                 "name": "Mac SSD",
                 "total": ssd["total"],

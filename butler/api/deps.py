@@ -91,6 +91,7 @@ _db_pool: DatabasePool | None = None
 _tools: dict[str, Tool] | None = None
 _scheduler: TaskScheduler | None = None
 _embedding_service: EmbeddingService | None = None
+_alert_manager: AlertStateManager | None = None
 
 MIGRATIONS_DIR = Path("/app/migrations")
 
@@ -118,7 +119,7 @@ async def _run_migrations(pool: DatabasePool) -> None:
 
 async def init_resources() -> None:
     """Initialize database pool and tool instances. Called once at startup."""
-    global _db_pool, _tools, _scheduler, _embedding_service
+    global _db_pool, _tools, _scheduler, _embedding_service, _alert_manager
     _db_pool = await DatabasePool.create(settings.database_url)
 
     # Apply all DB migrations before initializing tools
@@ -219,6 +220,7 @@ async def init_resources() -> None:
 
     # Health & storage monitoring (always registered — degrade gracefully)
     alert_manager = AlertStateManager(_db_pool)
+    _alert_manager = alert_manager
 
     # Collect API keys for services that need authenticated health checks
     api_keys = {}
@@ -230,6 +232,8 @@ async def init_resources() -> None:
         api_keys["prowlarr_api_key"] = settings.prowlarr_api_key
     if settings.home_assistant_token:
         api_keys["ha_token"] = settings.home_assistant_token
+    if settings.ollama_url:
+        api_keys["ollama_url"] = settings.ollama_url.rstrip("/")
 
     thresholds = tuple(
         int(t) for t in settings.storage_thresholds.split(",") if t.strip()
@@ -318,6 +322,13 @@ def get_db_pool() -> DatabasePool:
     if _db_pool is None:
         raise HTTPException(503, "Database not initialized")
     return _db_pool
+
+
+def get_alert_manager() -> AlertStateManager:
+    """FastAPI dependency: the shared AlertStateManager."""
+    if _alert_manager is None:
+        raise RuntimeError("Alert manager not initialized")
+    return _alert_manager
 
 
 def get_tools() -> dict[str, Tool]:

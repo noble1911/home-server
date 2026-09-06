@@ -1,16 +1,22 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
+import { Link } from 'react-router-dom'
 import StatusCard from '../components/dashboard/StatusCard'
 import {
   getSystemHealth,
   getSystemStorage,
   getSystemStats,
+  getSystemAlerts,
+  getDownloads,
   type ServiceStatus,
   type SystemHealthResponse,
   type SystemStorageResponse,
   type SystemStatsResponse,
+  type AlertInfo,
+  type TorrentInfo,
 } from '../services/api'
 
 const REFRESH_INTERVAL = 30_000
+const DISK_WARN_PERCENT = 80
 
 // Human-readable labels + preferred display order for the stacks the
 // health endpoint reports (the `stack` field on each service).
@@ -28,7 +34,8 @@ const STACK_LABELS: Record<string, string> = {
 }
 const STACK_ORDER = Object.keys(STACK_LABELS)
 
-/** Group services by their `stack`, ordered by STACK_ORDER (unknown stacks last). */
+/** Group services by their `stack`, ordered by STACK_ORDER (unknown stacks last).
+ *  Within a group, offline services come first so problems are visible. */
 function groupByStack(services: ServiceStatus[]): [string, ServiceStatus[]][] {
   const groups = new Map<string, ServiceStatus[]>()
   for (const svc of services) {
@@ -36,6 +43,9 @@ function groupByStack(services: ServiceStatus[]): [string, ServiceStatus[]][] {
     const arr = groups.get(key) ?? []
     arr.push(svc)
     groups.set(key, arr)
+  }
+  for (const arr of groups.values()) {
+    arr.sort((a, b) => Number(a.status === 'online') - Number(b.status === 'online'))
   }
   return [...groups.entries()].sort(([a], [b]) => {
     const ia = STACK_ORDER.indexOf(a)
@@ -49,46 +59,152 @@ function groupByStack(services: ServiceStatus[]): [string, ServiceStatus[]][] {
 
 type LoadState = 'loading' | 'loaded' | 'error'
 
+interface AttentionItem {
+  key: string
+  severity: 'critical' | 'warning'
+  title: string
+  detail?: string
+  link?: string
+}
+
+/** Everything a home user should look at first, most severe first. */
+function buildAttention(
+  health: SystemHealthResponse | null,
+  alerts: AlertInfo[],
+  torrents: TorrentInfo[],
+  storage: SystemStorageResponse | null,
+): AttentionItem[] {
+  const items: AttentionItem[] = []
+
+  for (const svc of health?.services ?? []) {
+    if (svc.status !== 'online') {
+      items.push({
+        key: `svc:${svc.name}`,
+        severity: 'critical',
+        title: `${svc.name} is down`,
+        detail: svc.detail,
+      })
+    }
+  }
+
+  for (const a of alerts) {
+    // Service-down alerts duplicate the live probe above; keep the rest.
+    if (a.type === 'service_down' && health) continue
+    items.push({
+      key: `alert:${a.id}`,
+      severity: a.severity === 'critical' ? 'critical' : 'warning',
+      title: a.message,
+      detail: a.lastTriggeredAt ? `since ${new Date(a.firstTriggeredAt ?? a.lastTriggeredAt).toLocaleString()}` : undefined,
+    })
+  }
+
+  const errored = torrents.filter(t => t.state === 'error')
+  const stalled = torrents.filter(t => t.state === 'stalled')
+  if (errored.length) {
+    items.push({
+      key: 'dl:error',
+      severity: 'critical',
+      title: `${errored.length} download${errored.length > 1 ? 's' : ''} errored`,
+      detail: errored.slice(0, 3).map(t => t.name).join(' · '),
+      link: '/downloads',
+    })
+  }
+  if (stalled.length) {
+    items.push({
+      key: 'dl:stalled',
+      severity: 'warning',
+      title: `${stalled.length} download${stalled.length > 1 ? 's' : ''} stalled`,
+      detail: stalled.slice(0, 3).map(t => t.name).join(' · '),
+      link: '/downloads',
+    })
+  }
+
+  for (const vol of storage?.volumes ?? []) {
+    if (vol.percent >= DISK_WARN_PERCENT) {
+      items.push({
+        key: `disk:${vol.name}`,
+        severity: vol.percent >= 90 ? 'critical' : 'warning',
+        title: `${vol.name} is ${vol.percent}% full`,
+        detail: `${vol.freeFormatted} free of ${vol.totalFormatted}`,
+      })
+    }
+  }
+
+  return items.sort((a, b) => Number(b.severity === 'critical') - Number(a.severity === 'critical'))
+}
+
 export default function Dashboard() {
   const [health, setHealth] = useState<SystemHealthResponse | null>(null)
   const [storage, setStorage] = useState<SystemStorageResponse | null>(null)
   const [stats, setStats] = useState<SystemStatsResponse | null>(null)
+  const [alerts, setAlerts] = useState<AlertInfo[]>([])
+  const [torrents, setTorrents] = useState<TorrentInfo[]>([])
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [errorMsg, setErrorMsg] = useState('')
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null)
+  const inFlight = useRef(false)
 
   const fetchAll = useCallback(async (isInitial = false) => {
+    if (inFlight.current) return
+    inFlight.current = true
     if (isInitial) setLoadState('loading')
 
     try {
-      const [h, st, sg] = await Promise.all([
+      // Each source is independent: qBittorrent being down must not blank
+      // the whole dashboard. Health is the one we treat as required.
+      const [h, st, sg, al, dl] = await Promise.allSettled([
         getSystemHealth(),
         getSystemStats(),
         getSystemStorage(),
+        getSystemAlerts(),
+        getDownloads(),
       ])
-      setHealth(h)
-      setStats(st)
-      setStorage(sg)
-      setLoadState('loaded')
-      setErrorMsg('')
-    } catch (err) {
-      setLoadState('error')
-      setErrorMsg(err instanceof Error ? err.message : 'Failed to load monitoring data')
+
+      if (h.status === 'fulfilled') {
+        setHealth(h.value)
+        setLoadState('loaded')
+        setErrorMsg('')
+      } else {
+        setLoadState('error')
+        setErrorMsg(h.reason instanceof Error ? h.reason.message : 'Failed to load monitoring data')
+      }
+      if (st.status === 'fulfilled') setStats(st.value)
+      if (sg.status === 'fulfilled') setStorage(sg.value)
+      if (al.status === 'fulfilled') setAlerts(al.value.alerts)
+      if (dl.status === 'fulfilled') setTorrents(dl.value.torrents)
+      setUpdatedAt(new Date())
+    } finally {
+      inFlight.current = false
     }
   }, [])
 
   useEffect(() => {
     fetchAll(true)
-    const id = setInterval(() => fetchAll(false), REFRESH_INTERVAL)
-    return () => clearInterval(id)
+    // Poll only while the tab is visible; refresh immediately on return.
+    const id = setInterval(() => {
+      if (!document.hidden) fetchAll(false)
+    }, REFRESH_INTERVAL)
+    const onVisible = () => {
+      if (!document.hidden) fetchAll(false)
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      clearInterval(id)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
   }, [fetchAll])
+
+  const header = (
+    <div>
+      <h1 className="text-xl font-bold text-butler-100">Dashboard</h1>
+      <p className="text-sm text-butler-400">Server status and monitoring</p>
+    </div>
+  )
 
   if (loadState === 'loading') {
     return (
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
-        <div>
-          <h1 className="text-xl font-bold text-butler-100">Dashboard</h1>
-          <p className="text-sm text-butler-400">Server status and monitoring</p>
-        </div>
+        {header}
         <LoadingSkeleton />
       </div>
     )
@@ -97,25 +213,40 @@ export default function Dashboard() {
   if (loadState === 'error' && !health) {
     return (
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
-        <div>
-          <h1 className="text-xl font-bold text-butler-100">Dashboard</h1>
-          <p className="text-sm text-butler-400">Server status and monitoring</p>
-        </div>
+        {header}
         <ErrorBanner message={errorMsg} onRetry={() => fetchAll(true)} />
       </div>
     )
   }
 
+  const attention = buildAttention(health, alerts, torrents, storage)
+
   return (
     <div className="flex-1 overflow-y-auto p-4 space-y-6">
-      <div>
-        <h1 className="text-xl font-bold text-butler-100">Dashboard</h1>
-        <p className="text-sm text-butler-400">Server status and monitoring</p>
-      </div>
+      {header}
 
       {errorMsg && <ErrorBanner message={errorMsg} onRetry={() => fetchAll(true)} />}
 
-      {/* Connection Status — grouped by stack */}
+      {/* Attention — anything that needs a human, most severe first */}
+      <section>
+        <h2 className="text-sm font-medium text-butler-400 uppercase tracking-wide mb-3">
+          Attention
+        </h2>
+        {attention.length === 0 ? (
+          <div className="card p-3 flex items-center gap-2 border border-green-500/20">
+            <span className="text-green-400">✓</span>
+            <span className="text-sm text-butler-200">All clear — nothing needs you right now.</span>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {attention.map(item => (
+              <AttentionRow key={item.key} item={item} />
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Connection Status — grouped by stack, offline first */}
       {health && (
         <section>
           <h2 className="text-sm font-medium text-butler-400 uppercase tracking-wide mb-3">
@@ -152,9 +283,12 @@ export default function Dashboard() {
       )}
 
       {/* System & Storage */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <section className="card p-4">
-          <h3 className="text-sm font-medium text-butler-400 mb-3">System</h3>
+          <h3 className="text-sm font-medium text-butler-400 mb-1">Docker VM</h3>
+          <p className="text-xs text-butler-500 mb-3">
+            The Linux VM running the containers. Native apps (Jellyfin, Ollama) aren't included.
+          </p>
           <div className="space-y-3">
             {stats?.cpu ? (
               <MetricBar label="CPU" percent={stats.cpu.percent} value={`${stats.cpu.percent}%`} />
@@ -162,22 +296,12 @@ export default function Dashboard() {
               <PlaceholderRow label="CPU" />
             )}
             {stats?.memory ? (
-              <>
-                <MetricBar
-                  label="Docker VM"
-                  percent={stats.memory.dockerPercent}
-                  value={`${stats.memory.dockerUsedFormatted} / ${stats.memory.dockerTotalFormatted}`}
-                  hint="RAM used within container runtime"
-                />
-                {stats.memory.hostTotalGb && (
-                  <MetricBar
-                    label="Mac Host"
-                    percent={Math.round(stats.memory.dockerTotal / (stats.memory.hostTotalGb * 1024 ** 3) * 100)}
-                    value={`${stats.memory.dockerTotalFormatted} / ${stats.memory.hostTotalGb} GB`}
-                    hint="Docker's allocation of Mac RAM"
-                  />
-                )}
-              </>
+              <MetricBar
+                label="RAM"
+                percent={stats.memory.dockerPercent}
+                value={`${stats.memory.dockerUsedFormatted} / ${stats.memory.dockerTotalFormatted}`}
+                hint={stats.memory.hostTotalGb ? `of the Mac's ${stats.memory.hostTotalGb} GB` : undefined}
+              />
             ) : (
               <PlaceholderRow label="RAM" />
             )}
@@ -190,15 +314,16 @@ export default function Dashboard() {
 
         <section className="card p-4">
           <h3 className="text-sm font-medium text-butler-400 mb-3">Storage</h3>
-          <div className="space-y-2">
+          <div className="space-y-3">
             {storage && storage.volumes.length > 0 ? (
               storage.volumes.map(vol => (
-                <div key={vol.name} className="flex justify-between">
-                  <span className="text-butler-300">{vol.name}</span>
-                  <span className={vol.percent > 80 ? 'text-red-400' : vol.percent > 60 ? 'text-yellow-400' : 'text-green-400'}>
-                    {vol.usedFormatted} / {vol.totalFormatted}
-                  </span>
-                </div>
+                <MetricBar
+                  key={vol.name}
+                  label={vol.name}
+                  percent={vol.percent}
+                  value={`${vol.usedFormatted} / ${vol.totalFormatted}`}
+                  hint={`${vol.freeFormatted} free`}
+                />
               ))
             ) : (
               <div className="text-butler-500 text-sm">No volumes detected</div>
@@ -235,25 +360,52 @@ export default function Dashboard() {
         <h2 className="text-sm font-medium text-butler-400 uppercase tracking-wide mb-3">
           Quick Actions
         </h2>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-3">
           <button className="btn btn-secondary text-sm" onClick={() => fetchAll(false)}>
             Refresh Now
           </button>
+          {updatedAt && (
+            <span className="text-xs text-butler-500">
+              Updated {updatedAt.toLocaleTimeString()}
+            </span>
+          )}
         </div>
       </section>
     </div>
   )
 }
 
+function AttentionRow({ item }: { item: AttentionItem }) {
+  const critical = item.severity === 'critical'
+  const body = (
+    <div
+      className={`card p-3 border ${
+        critical ? 'border-red-500/30 bg-red-500/10' : 'border-yellow-500/30 bg-yellow-500/10'
+      }`}
+    >
+      <div className="flex items-start gap-2">
+        <span className={critical ? 'text-red-400' : 'text-yellow-400'}>{critical ? '✕' : '!'}</span>
+        <div className="min-w-0 flex-1">
+          <p className={`text-sm font-medium ${critical ? 'text-red-300' : 'text-yellow-300'}`}>{item.title}</p>
+          {item.detail && <p className="text-xs text-butler-400 truncate">{item.detail}</p>}
+        </div>
+        {item.link && <span className="text-xs text-butler-500">›</span>}
+      </div>
+    </div>
+  )
+  return item.link ? <Link to={item.link} className="block">{body}</Link> : body
+}
+
 function LoadingSkeleton() {
   return (
     <div className="space-y-6 animate-pulse">
+      <div className="h-12 bg-butler-700 rounded-lg" />
       <div className="flex flex-wrap gap-2">
         {[1, 2, 3, 4].map(i => (
           <div key={i} className="h-8 w-24 bg-butler-700 rounded-full" />
         ))}
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="card p-4 space-y-3">
           <div className="h-4 w-16 bg-butler-700 rounded" />
           <div className="h-4 bg-butler-700 rounded" />

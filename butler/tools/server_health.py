@@ -31,13 +31,17 @@ logger = logging.getLogger(__name__)
 DEFAULT_TIMEOUT = 5
 
 # Service definitions keyed by logical name.
-# Each entry has:
-#   url     – health endpoint reachable from the homeserver Docker network
-#   stack   – which compose stack it belongs to (for display grouping)
-#   headers – optional dict of extra request headers (e.g. API key)
+# Each entry has ONE probe kind:
+#   url      – HTTP GET; 2xx is healthy
+#   tcp      – "host:port"; a successful connect is healthy (for Redis etc.)
+#   postgres – True; runs SELECT 1 on the shared pool (Butler's own DB)
+# plus:
+#   stack    – which compose stack it belongs to (for display grouping)
+#   headers  – optional dict of extra request headers (e.g. API key)
 #
-# API-key placeholders like {radarr_api_key} are resolved at init time
-# from the constructor's ``api_keys`` dict.
+# {placeholder} tokens in ``url`` and header values are resolved at init
+# time from the constructor's ``api_keys`` dict; entries with an unresolved
+# placeholder are dropped (the key wasn't configured).
 DEFAULT_SERVICES: dict[str, dict[str, Any]] = {
     # Media stack
     "jellyfin": {
@@ -102,6 +106,16 @@ DEFAULT_SERVICES: dict[str, dict[str, Any]] = {
         "url": "http://nextcloud:80/status.php",
         "stack": "photos-files",
     },
+    # Shared infrastructure Butler itself depends on. Postgres holds Butler's
+    # memory/users/alerts; if it's down, most of the API is down with it.
+    "immich-postgres": {
+        "postgres": True,
+        "stack": "photos-files",
+    },
+    "immich-redis": {
+        "tcp": "immich-redis:6379",
+        "stack": "photos-files",
+    },
     # Smart home stack
     "homeassistant": {
         "url": "http://homeassistant:8123/manifest.json",
@@ -138,6 +152,12 @@ DEFAULT_SERVICES: dict[str, dict[str, Any]] = {
     "dont-lie": {
         "url": "http://dont-lie-app:80/",
         "stack": "apps",
+    },
+    # Ollama — embeddings for semantic memory. Runs natively on the Mac
+    # (Ollama.app), so the URL comes from OLLAMA_URL via {ollama_url}.
+    "ollama": {
+        "url": "{ollama_url}/api/tags",
+        "stack": "butler",
     },
     # Butler stack (self-check via localhost since we're inside butler-api)
     "butler-api": {
@@ -204,6 +224,14 @@ class ServerHealthTool(Tool):
         resolved = {}
         for name, svc in services.items():
             svc_copy = dict(svc)
+            if "url" in svc_copy and "{" in svc_copy["url"]:
+                url = svc_copy["url"]
+                for placeholder, key_val in api_keys.items():
+                    url = url.replace(f"{{{placeholder}}}", key_val)
+                if "{" in url:
+                    logger.debug("Skipping %s: unresolved placeholder in url", name)
+                    continue
+                svc_copy["url"] = url
             if "headers" in svc_copy:
                 resolved_headers = {}
                 for k, v in svc_copy["headers"].items():
@@ -297,6 +325,10 @@ class ServerHealthTool(Tool):
 
     async def _probe(self, svc_name: str, svc: dict[str, Any]) -> dict[str, Any]:
         """Probe a single service and return its status."""
+        if svc.get("postgres"):
+            return await self._probe_postgres(svc_name, svc)
+        if svc.get("tcp"):
+            return await self._probe_tcp(svc_name, svc)
         session = await self._get_session()
         headers = svc.get("headers", {})
         try:
@@ -320,6 +352,41 @@ class ServerHealthTool(Tool):
             return {"name": svc_name, "status": "unreachable",
                     "stack": svc.get("stack", ""),
                     "detail": str(e)}
+
+    async def _probe_tcp(self, svc_name: str, svc: dict[str, Any]) -> dict[str, Any]:
+        """TCP connect check for services without an HTTP endpoint (Redis)."""
+        host, _, port = svc["tcp"].rpartition(":")
+        base = {"name": svc_name, "stack": svc.get("stack", "")}
+        try:
+            _, writer = await asyncio.wait_for(
+                asyncio.open_connection(host, int(port)), timeout=self._timeout.total,
+            )
+            writer.close()
+            try:
+                await writer.wait_closed()
+            except Exception:
+                pass
+            return {**base, "status": "healthy"}
+        except asyncio.TimeoutError:
+            return {**base, "status": "unreachable",
+                    "detail": f"Timeout after {self._timeout.total}s"}
+        except OSError as e:
+            return {**base, "status": "unreachable",
+                    "detail": e.strerror or "Connection refused"}
+
+    async def _probe_postgres(self, svc_name: str, svc: dict[str, Any]) -> dict[str, Any]:
+        """SELECT 1 on Butler's shared pool — proves the DB is up and reachable."""
+        base = {"name": svc_name, "stack": svc.get("stack", "")}
+        try:
+            await asyncio.wait_for(
+                self._db_pool.pool.fetchval("SELECT 1"), timeout=self._timeout.total,
+            )
+            return {**base, "status": "healthy"}
+        except asyncio.TimeoutError:
+            return {**base, "status": "unreachable",
+                    "detail": f"Timeout after {self._timeout.total}s"}
+        except Exception as e:
+            return {**base, "status": "unreachable", "detail": str(e)[:120]}
 
     async def _check_all(self) -> str:
         """Health-check all registered services concurrently."""

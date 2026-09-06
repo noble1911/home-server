@@ -315,3 +315,65 @@ class TestApiKeyResolution:
         )
         assert "radarr" not in tool._services
         assert "plain" in tool._services
+
+
+class TestNonHttpProbes:
+    """tcp / postgres probe kinds and url placeholder resolution."""
+
+    @pytest.mark.asyncio
+    async def test_postgres_probe_uses_pool(self, mock_pool, alert_manager):
+        mock_pool.pool.fetchval = AsyncMock(return_value=1)
+        tool = ServerHealthTool(
+            db_pool=mock_pool, alert_manager=alert_manager,
+            services={"db": {"postgres": True, "stack": "infra"}},
+        )
+        r = await tool._probe("db", tool._services["db"])
+        assert r["status"] == "healthy" and r["stack"] == "infra"
+        mock_pool.pool.fetchval.assert_awaited_once_with("SELECT 1")
+
+    @pytest.mark.asyncio
+    async def test_postgres_probe_reports_failure(self, mock_pool, alert_manager):
+        mock_pool.pool.fetchval = AsyncMock(side_effect=ConnectionError("pool closed"))
+        tool = ServerHealthTool(
+            db_pool=mock_pool, alert_manager=alert_manager,
+            services={"db": {"postgres": True, "stack": "infra"}},
+        )
+        r = await tool._probe("db", tool._services["db"])
+        assert r["status"] == "unreachable" and "pool closed" in r["detail"]
+
+    @pytest.mark.asyncio
+    async def test_tcp_probe_connection_refused(self, mock_pool, alert_manager):
+        # Port 1 on localhost: nothing listens, connect is refused immediately.
+        tool = ServerHealthTool(
+            db_pool=mock_pool, alert_manager=alert_manager,
+            services={"redis": {"tcp": "127.0.0.1:1", "stack": "infra"}}, timeout=2,
+        )
+        r = await tool._probe("redis", tool._services["redis"])
+        assert r["status"] == "unreachable" and r["detail"]
+
+    @pytest.mark.asyncio
+    async def test_tcp_probe_success(self, mock_pool, alert_manager):
+        server = await asyncio.start_server(lambda r, w: w.close(), "127.0.0.1", 0)
+        port = server.sockets[0].getsockname()[1]
+        try:
+            tool = ServerHealthTool(
+                db_pool=mock_pool, alert_manager=alert_manager,
+                services={"redis": {"tcp": f"127.0.0.1:{port}", "stack": "infra"}},
+            )
+            r = await tool._probe("redis", tool._services["redis"])
+            assert r["status"] == "healthy"
+        finally:
+            server.close()
+            await server.wait_closed()
+
+    def test_url_placeholder_resolved_or_dropped(self, mock_pool, alert_manager):
+        services = {"ollama": {"url": "{ollama_url}/api/tags", "stack": "butler"}}
+        with_key = ServerHealthTool(
+            db_pool=mock_pool, alert_manager=alert_manager,
+            api_keys={"ollama_url": "http://host:11434"}, services=services,
+        )
+        assert with_key._services["ollama"]["url"] == "http://host:11434/api/tags"
+        without = ServerHealthTool(
+            db_pool=mock_pool, alert_manager=alert_manager, api_keys={}, services=services,
+        )
+        assert "ollama" not in without._services

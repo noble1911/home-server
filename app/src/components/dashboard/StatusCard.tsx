@@ -4,6 +4,10 @@ interface StatusCardProps {
   detail?: string
 }
 
+/**
+ * Compact service pill. When the service is down, the reason is shown inline
+ * (not just in a hover tooltip) so it's readable on a phone.
+ */
 export default function StatusCard({ name, status, detail }: StatusCardProps) {
   const statusColors = {
     online: 'bg-green-500/20 text-green-400 border-green-500/30',
@@ -17,16 +21,23 @@ export default function StatusCard({ name, status, detail }: StatusCardProps) {
     unknown: '?',
   }
 
+  const showDetail = status !== 'online' && !!detail
+
   return (
     <div
       title={detail ? `${name}: ${detail}` : name}
       className={`
-        inline-flex items-center gap-2 px-3 py-1.5 rounded-full border
+        inline-flex flex-col px-3 py-1.5 rounded-2xl border
         ${statusColors[status]}
       `}
     >
-      <span className="text-xs">{statusIcons[status]}</span>
-      <span className="text-sm font-medium">{name}</span>
+      <div className="inline-flex items-center gap-2">
+        <span className="text-xs">{statusIcons[status]}</span>
+        <span className="text-sm font-medium">{name}</span>
+      </div>
+      {showDetail && (
+        <span className="text-xs opacity-80 mt-0.5 max-w-[16rem] truncate">{detail}</span>
+      )}
     </div>
   )
 }

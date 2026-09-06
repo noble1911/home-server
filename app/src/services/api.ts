@@ -278,6 +278,25 @@ export function getSystemStats(): Promise<SystemStatsResponse> {
   return api.get<SystemStatsResponse>('/system/stats')
 }
 
+export interface AlertInfo {
+  id: number
+  key: string
+  type: string
+  severity: 'info' | 'warning' | 'critical' | string
+  message: string
+  firstTriggeredAt: string | null
+  lastTriggeredAt: string | null
+}
+
+export interface SystemAlertsResponse {
+  alerts: AlertInfo[]
+  summary: { total: number }
+}
+
+export function getSystemAlerts(): Promise<SystemAlertsResponse> {
+  return api.get<SystemAlertsResponse>('/system/alerts')
+}
+
 // ── Downloads (qBittorrent proxy) ────────────────────────────────────
 
 export interface TorrentInfo {
