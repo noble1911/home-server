@@ -18,7 +18,7 @@ import asyncio
 import logging
 import os
 import shutil
-from typing import Any
+from typing import Any, Awaitable, Callable
 
 from .alerting import AlertStateManager
 from .base import Tool
@@ -68,6 +68,7 @@ class StorageMonitorTool(Tool):
         thresholds: tuple[int, ...] = DEFAULT_THRESHOLDS,
         ssd_path: str = "/mnt/host-ssd",
         has_external_drive: bool = False,
+        host_storage: Callable[[], Awaitable[dict[str, Any] | None]] | None = None,
     ):
         """Initialize the storage monitor tool.
 
@@ -85,6 +86,10 @@ class StorageMonitorTool(Tool):
         self._thresholds = tuple(sorted(thresholds))
         self._ssd_path = ssd_path
         self._has_external_drive = has_external_drive
+        # Optional: the host agent's view of *every* drive (Mac SSD, HomeServer,
+        # HomeServer2 ...). The container only has one drive bind-mounted, so
+        # without this the tool can't see the library drive at all.
+        self._host_storage = host_storage
 
     async def close(self) -> None:
         """No resources to release."""
@@ -98,10 +103,11 @@ class StorageMonitorTool(Tool):
     @property
     def description(self) -> str:
         return (
-            "Monitor disk usage on the home server. "
-            "Use 'check_all' for a full report, 'check_external' for the "
-            "external drive with per-category breakdown, 'check_ssd' for "
-            "internal SSD, or 'get_alerts' for active storage alerts."
+            "Disk usage on the home server: the Mac SSD and both 8 TB media drives "
+            "(HomeServer = downloads/anime, HomeServer2 = movies/TV library). "
+            "Use 'check_all' for every drive plus the media pool total, "
+            "'check_external' for the media drives with a per-folder breakdown, "
+            "'check_ssd' for the Mac SSD, or 'get_alerts' for active storage alerts."
         )
 
     @property
@@ -113,10 +119,10 @@ class StorageMonitorTool(Tool):
                     "type": "string",
                     "enum": ["check_all", "check_external", "check_ssd", "get_alerts"],
                     "description": (
-                        "check_all: Report on all volumes. "
-                        "check_external: External drive usage with category breakdown. "
-                        "check_ssd: Internal SSD usage. "
-                        "get_alerts: Show active storage alerts."
+                        "check_all: every drive + media pool total. "
+                        "check_external: media drives (HomeServer, HomeServer2) with folder sizes. "
+                        "check_ssd: Mac SSD. "
+                        "get_alerts: active storage alerts."
                     ),
                 },
             },
@@ -127,6 +133,10 @@ class StorageMonitorTool(Tool):
         action = kwargs.get("action", "")
 
         try:
+            if action in ("check_all", "check_external", "check_ssd"):
+                drives = await self._host_drives()
+                if drives:
+                    return await self._report_from_host(action, drives)
             if action == "check_all":
                 return await self._check_all()
             elif action == "check_external":
@@ -140,6 +150,61 @@ class StorageMonitorTool(Tool):
         except Exception as e:
             logger.exception("Storage check failed")
             return f"Error running storage check: {e}"
+
+    # -- Host agent path (all drives) -----------------------------------------
+
+    async def _host_drives(self) -> list[dict[str, Any]]:
+        if self._host_storage is None:
+            return []
+        try:
+            data = await self._host_storage()
+        except Exception as e:  # never let the agent take the tool down
+            logger.warning("host storage unavailable: %s", e)
+            return []
+        return [d for d in (data or {}).get("drives", []) if d.get("mounted")]
+
+    async def _report_from_host(self, action: str, drives: list[dict[str, Any]]) -> str:
+        """Render check_all / check_external / check_ssd from the host agent's drives."""
+        media = [d for d in drives if d.get("role") in ("downloads", "library")]
+        system = [d for d in drives if d.get("role") == "system"]
+        chosen = {"check_all": drives, "check_external": media, "check_ssd": system}[action]
+        if not chosen:
+            return "No matching drives reported by the host agent."
+
+        lines: list[str] = []
+        if action == "check_all" and media:
+            total = sum(d["total"] for d in media)
+            used = sum(d["used"] for d in media)
+            pct = int(used / total * 100) if total else 0
+            lines.append(
+                f"Media drives together ({' + '.join(d['name'] for d in media)}): "
+                f"{_format_bytes(used)} / {_format_bytes(total)} ({pct}%), "
+                f"{_format_bytes(total - used)} free"
+            )
+
+        for d in chosen:
+            pct = int(d.get("percent") or 0)
+            slug = d["name"].lower().replace(" ", "-")
+            await self._update_threshold_alerts(slug, pct)
+            role = {"downloads": "downloads + anime", "library": "movies/TV library", "system": "macOS + Docker"}.get(d.get("role"), "")
+            lines.append(
+                f"{d['name']}{f' ({role})' if role else ''}: {_format_bytes(d['used'])} / "
+                f"{_format_bytes(d['total'])} ({pct}%), {_format_bytes(d['free'])} free "
+                f"— {self._status_label(pct)}"
+            )
+            if action != "check_all":
+                cats = [c for c in d.get("categories", []) if c.get("exists") and c.get("bytes") is not None and not c.get("linkedTo")]
+                cats.sort(key=lambda c: -(c["bytes"] or 0))
+                if cats:
+                    lines.append("  " + " | ".join(f"{c['label']}: {_format_bytes(c['bytes'])}" for c in cats))
+                linked = [c["label"] for c in d.get("categories", []) if c.get("linkedTo")]
+                if linked:
+                    lines.append(f"  ({', '.join(linked)} on this drive are links to the library drive)")
+
+        if action == "check_all":
+            alerts = await self._alert_manager.get_active_alerts("storage_threshold")
+            lines.append(f"Active Storage Alerts: {len(alerts)}")
+        return "\n".join(lines)
 
     # -- Internals ------------------------------------------------------------
 

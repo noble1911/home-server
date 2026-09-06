@@ -50,6 +50,7 @@ from .display_in_chat import DisplayInChatTool
 from .claude_code import ClaudeCodeTool
 from .display_on_device import DisplayOnDeviceTool
 from .display_image import DisplayImageTool
+from .qbittorrent import QBittorrentTool
 
 __all__ = [
     # Base
@@ -110,4 +111,6 @@ __all__ = [
     "ClaudeCodeTool",
     "DisplayOnDeviceTool",
     "DisplayImageTool",
+    # qBittorrent download client
+    "QBittorrentTool",
 ]

@@ -44,6 +44,7 @@ from tools import (
     WeatherTool,
     SelfUpdateTool,
     WhatsAppTool,
+    QBittorrentTool,
 )
 
 from tools.alerting import NotificationDispatcher
@@ -53,6 +54,7 @@ from .alert_dispatch import start_alert_dispatch, stop_alert_dispatch
 from .push import create_push_channel, create_whatsapp_channel
 from .scheduler import TaskScheduler, seed_default_schedules
 
+from . import host_agent
 from .auth import decode_user_jwt
 from .cleanup import start_cleanup, stop_cleanup
 from .config import settings
@@ -69,7 +71,7 @@ ALWAYS_ALLOWED_TOOLS: set[str] = {
 }
 
 PERMISSION_TOOL_MAP: dict[str, list[str]] = {
-    "media": ["radarr", "seerr", "books", "sonarr", "immich", "jellyfin", "media_files"],
+    "media": ["radarr", "seerr", "books", "sonarr", "immich", "jellyfin", "media_files", "qbittorrent"],
     "home": ["home_assistant", "list_ha_entities"],
     "location": ["phone_location"],
     "calendar": ["google_calendar"],
@@ -184,6 +186,14 @@ async def init_resources() -> None:
             qbit_pass=settings.qbittorrent_password,
         )
 
+    # qBittorrent download client (list/add/pause/resume/delete)
+    if settings.qbittorrent_url:
+        _tools["qbittorrent"] = QBittorrentTool(
+            url=settings.qbittorrent_url,
+            username=settings.qbittorrent_username,
+            password=settings.qbittorrent_password,
+        )
+
     # Only register Immich tool if configured
     if settings.immich_url:
         _tools["immich"] = ImmichTool(
@@ -252,6 +262,8 @@ async def init_resources() -> None:
         thresholds=thresholds,
         ssd_path="/mnt/host-ssd",
         has_external_drive=settings.has_external_drive,
+        # All drives (incl. HomeServer2) via the host agent when it's running
+        host_storage=host_agent.get_storage if host_agent.configured() else None,
     )
 
     # Schedule task tool (always registered — uses DB only)

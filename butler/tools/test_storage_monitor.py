@@ -322,3 +322,49 @@ class TestUnknownAction:
     async def test_unknown_action(self, tool):
         result = await tool.execute(action="bad_action")
         assert "Unknown action" in result
+
+
+class TestHostAgentDrives:
+    """When the host agent answers, the report covers every drive."""
+
+    def _drives(self):
+        return {"drives": [
+            {"name": "Mac SSD", "path": "/", "role": "system", "mounted": True,
+             "total": 460e9, "used": 150e9, "free": 310e9, "percent": 33.0, "categories": []},
+            {"name": "HomeServer", "path": "/Volumes/HomeServer", "role": "downloads", "mounted": True,
+             "total": 8e12, "used": 1.3e12, "free": 6.7e12, "percent": 16.3,
+             "categories": [{"label": "Anime", "bytes": 1.1e12, "exists": True, "linkedTo": None},
+                            {"label": "Movies", "bytes": None, "exists": True, "linkedTo": "/Volumes/HomeServer2/Media/Movies"}]},
+            {"name": "HomeServer2", "path": "/Volumes/HomeServer2", "role": "library", "mounted": True,
+             "total": 8e12, "used": 7.2e12, "free": 0.8e12, "percent": 89.7,
+             "categories": [{"label": "TV Shows", "bytes": 3.7e12, "exists": True, "linkedTo": None}]},
+        ]}
+
+    @pytest.mark.asyncio
+    async def test_check_all_reports_pool_and_every_drive(self, mock_pool, alert_manager):
+        tool = StorageMonitorTool(db_pool=mock_pool, alert_manager=alert_manager,
+                                  host_storage=AsyncMock(return_value=self._drives()))
+        out = await tool.execute(action="check_all")
+        assert "Media drives together (HomeServer + HomeServer2)" in out
+        assert "HomeServer2 (movies/TV library)" in out and "89%" in out and "CRITICAL" in out
+        assert "Mac SSD" in out
+        # 89% crosses the 70 and 80 thresholds for HomeServer2 -> alerts raised
+        keys = [c.kwargs["alert_key"] for c in alert_manager.trigger_alert.call_args_list]
+        assert "storage:homeserver2:80" in keys and "storage:homeserver2:90" not in keys
+
+    @pytest.mark.asyncio
+    async def test_check_external_shows_folders_and_links(self, mock_pool, alert_manager):
+        tool = StorageMonitorTool(db_pool=mock_pool, alert_manager=alert_manager,
+                                  host_storage=AsyncMock(return_value=self._drives()))
+        out = await tool.execute(action="check_external")
+        assert "Anime: 1.0 TB" in out and "TV Shows: 3.4 TB" in out
+        assert "Movies on this drive are links to the library drive" in out
+        assert "Mac SSD" not in out
+
+    @pytest.mark.asyncio
+    async def test_agent_failure_falls_back_to_local_view(self, mock_pool, alert_manager, tmp_path):
+        tool = StorageMonitorTool(db_pool=mock_pool, alert_manager=alert_manager,
+                                  external_drive_path=str(tmp_path), has_external_drive=False,
+                                  host_storage=AsyncMock(side_effect=RuntimeError("down")))
+        out = await tool.execute(action="check_ssd")
+        assert "Data (Mac SSD)" in out

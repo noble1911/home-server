@@ -100,7 +100,7 @@ def _build_tool_definitions(tools: dict[str, Tool], model: str) -> list[dict]:
 ROUTING_CORE_TOOLS: set[str] = {
     "remember_fact", "recall_facts", "get_user",
     "weather", "display_in_chat", "display_on_device", "display_image",
-    "radarr", "seerr", "books", "sonarr",
+    "radarr", "seerr", "books", "sonarr", "qbittorrent",
     # Escalation path for server fixes — keep core so Claude reliably knows it
     # can delegate to a real shell without first round-tripping request_tools.
     "run_claude_code",
