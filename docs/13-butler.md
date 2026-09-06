@@ -94,7 +94,7 @@ curl http://localhost:8000/health
 | Component | URL | Purpose |
 |-----------|-----|---------|
 | Butler API | http://localhost:8000 | PWA, voice, auth, tools, WhatsApp notifications |
-| Model | claude-sonnet-4 | LLM reasoning |
+| Model | claude-opus-5 (`ANTHROPIC_MODEL`; `ROUTING_MODEL` optional, `CHAT_EFFORT` medium) | LLM reasoning + tool use |
 
 ## Database Schema
 

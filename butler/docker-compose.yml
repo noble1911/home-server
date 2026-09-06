@@ -13,7 +13,9 @@ services:
       - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@immich-postgres:5432/immich
       # Claude API
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-sonnet-4-20250514}
+      - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-opus-5}
+      - ROUTING_MODEL=${ROUTING_MODEL:-}
+      - CHAT_EFFORT=${CHAT_EFFORT:-medium}
       # LiveKit (must match voice-stack config)
       - LIVEKIT_URL=ws://livekit:7880
       - LIVEKIT_API_KEY=${LIVEKIT_API_KEY:-devkey}

@@ -60,22 +60,36 @@ def tool_to_anthropic_schema(tool: Tool) -> dict:
     }
 
 
-def _build_tool_definitions(tools: dict[str, Tool]) -> list[dict]:
-    """Build the tools array for the Anthropic API.
+def _web_search_tool(model: str) -> dict:
+    """Server-side web search definition for the model in use.
 
-    Combines custom tool schemas with server-side tools (web search).
-    Server-side tools use a different format — they have a ``type`` key
-    and are executed by Anthropic's servers, not by us.
+    Opus 5 / Sonnet 5 / the 4.6+ family take the dynamic-filtering variant;
+    Haiku 4.5 and older only accept the basic one.
     """
-    defs: list[dict] = [tool_to_anthropic_schema(t) for t in tools.values()]
+    basic = model.startswith("claude-haiku-4-5") or model.startswith("claude-3")
+    return {
+        "type": "web_search_20250305" if basic else "web_search_20260209",
+        "name": "web_search",
+        "max_uses": settings.web_search_max_uses,
+    }
 
+
+def _request_kwargs(model: str) -> dict:
+    """Per-model request options: effort where the model supports it."""
+    if model.startswith("claude-haiku-4-5") or model.startswith("claude-3"):
+        return {}
+    return {"output_config": {"effort": settings.chat_effort}}
+
+
+def _refusal_text() -> str:
+    return "I can't help with that one."
+
+
+def _build_tool_definitions(tools: dict[str, Tool], model: str) -> list[dict]:
+    """Full schemas for `tools` plus web search (no cache marker yet)."""
+    defs = [tool_to_anthropic_schema(t) for t in tools.values()]
     if settings.web_search_enabled:
-        defs.append({
-            "type": "web_search_20250305",
-            "name": "web_search",
-            "max_uses": settings.web_search_max_uses,
-        })
-
+        defs.append(_web_search_tool(model))
     return defs
 
 
@@ -117,32 +131,41 @@ _REQUEST_TOOLS_SCHEMA: dict = {
 }
 
 
-def _build_tool_catalog(tools: dict[str, Tool], core_names: set[str]) -> str:
-    """Build a compact one-line-per-tool catalog for the system prompt.
+def _build_tool_catalog(tools: dict[str, Tool], active_names: set[str]) -> str:
+    """One line per *inactive* tool, for the system prompt.
 
-    Only includes tools NOT in the core set (those already have full schemas).
-    Uses the first sentence of each tool's description to keep it short.
+    Active tools already have full schemas; the rest are listed by name so
+    Claude can activate them with request_tools.
     """
     lines = [
-        "ADDITIONAL TOOLS (call request_tools to activate any you need):",
+        "ADDITIONAL TOOLS (call request_tools to activate any you need, then use them):",
     ]
     for name in sorted(tools):
-        if name in core_names:
+        if name in active_names:
             continue
-        desc = tools[name].description.split(".")[0].strip()
-        lines.append(f"- {name}: {desc}")
+        # Enough of the description to tell what the tool can do (the first
+        # sentence alone hid e.g. Jellyfin's "recently added" and "now playing").
+        desc = " ".join(tools[name].description.split())
+        if len(desc) > 220:
+            desc = desc[:217].rsplit(" ", 1)[0] + "..."
+        actions = (tools[name].parameters or {}).get("properties", {}).get("action", {}).get("enum")
+        suffix = f" [actions: {', '.join(actions)}]" if actions else ""
+        lines.append(f"- {name}: {desc}{suffix}")
     return "\n".join(lines)
 
 
 class _ToolRouter:
-    """Manage two-phase tool routing state across API rounds.
+    """Manage tool routing state across API rounds.
 
-    Phase 1 (routing): Sends core tool schemas + request_tools meta-tool +
-    a lightweight text catalog of all other tools.  If Claude answers
-    directly or only uses core tools, Phase 2 never happens.
+    Round 1 sends full schemas for the small *core* set plus a one-line
+    catalog of everything else and a `request_tools` meta-tool. Tools
+    activated via request_tools (or called directly by name — Claude
+    sometimes skips the meta-tool) get their schemas on later rounds.
 
-    Phase 2 (execution): After Claude calls request_tools, subsequent
-    rounds include only the requested tool schemas (+ core tools).
+    Model choice: if `settings.routing_model` is set, it handles rounds until
+    the first tool is used; the main model always writes the answer. With
+    it unset (the default) the main model does everything, which keeps a
+    single prompt cache.
     """
 
     def __init__(
@@ -152,96 +175,107 @@ class _ToolRouter:
     ) -> None:
         self._all_tools = all_tools
         self._base_blocks = system_blocks
+        self._tools_used = False
 
-        # Decide which tools the user has that are core vs on-demand
         core_names = ROUTING_CORE_TOOLS & set(all_tools)
         non_core_names = set(all_tools) - core_names
-
-        # Only route if there are enough on-demand tools to justify it
         self._enabled = (
             settings.tool_routing_enabled
             and len(non_core_names) >= ROUTING_MIN_TOOLS
         )
+        start = {n: all_tools[n] for n in core_names} if self._enabled else dict(all_tools)
+        self._active_tools: dict[str, Tool] = start
 
-        if self._enabled:
-            self._phase = "routing"
-            self._core_tools = {n: all_tools[n] for n in core_names}
-            self._catalog = _build_tool_catalog(all_tools, core_names)
-            self._active_tools = dict(self._core_tools)
-        else:
-            self._phase = "execution"
-            self._core_tools = all_tools
-            self._active_tools = all_tools
+    # -- state ----------------------------------------------------------
 
     @property
     def model(self) -> str:
-        """Model to use for the current phase."""
-        if self._phase == "routing":
+        if settings.routing_model and not self._tools_used:
             return settings.routing_model
         return settings.anthropic_model
 
     @property
-    def tool_definitions(self) -> list[dict]:
-        """Tool schemas for the current API round."""
-        defs: list[dict]
-        if self._phase == "routing":
-            defs = [tool_to_anthropic_schema(t) for t in self._core_tools.values()]
-            defs.append(_REQUEST_TOOLS_SCHEMA)
-            if settings.web_search_enabled:
-                defs.append({
-                    "type": "web_search_20250305",
-                    "name": "web_search",
-                    "max_uses": settings.web_search_max_uses,
-                })
-        else:
-            defs = _build_tool_definitions(self._active_tools)
+    def request_kwargs(self) -> dict:
+        return _request_kwargs(self.model)
 
-        # Mark the last tool definition for caching — Anthropic caches all
-        # tool schemas up to and including the one with cache_control.
+    @property
+    def active_tools(self) -> dict[str, Tool]:
+        return self._active_tools
+
+    @property
+    def _inactive_names(self) -> set[str]:
+        return set(self._all_tools) - set(self._active_tools)
+
+    def note_tool_use(self) -> None:
+        self._tools_used = True
+
+    # -- request shaping -------------------------------------------------
+
+    @property
+    def tool_definitions(self) -> list[dict]:
+        defs = [tool_to_anthropic_schema(t) for t in self._active_tools.values()]
+        if self._inactive_names:
+            defs.append(_REQUEST_TOOLS_SCHEMA)
+        if settings.web_search_enabled:
+            defs.append(_web_search_tool(self.model))
+        # Anthropic caches all tool schemas up to the one with cache_control.
         if defs:
             defs[-1] = {**defs[-1], "cache_control": {"type": "ephemeral"}}
-
         return defs
 
     @property
     def system_blocks(self) -> list[dict]:
-        """System prompt blocks — includes the tool catalog during routing."""
-        if self._phase == "routing":
-            return self._base_blocks + [{
-                "type": "text",
-                "text": self._catalog,
-                "cache_control": {"type": "ephemeral"},
-            }]
-        return self._base_blocks
+        if not self._inactive_names:
+            return self._base_blocks
+        return self._base_blocks + [{
+            "type": "text",
+            "text": _build_tool_catalog(self._all_tools, set(self._active_tools)),
+            "cache_control": {"type": "ephemeral"},
+        }]
 
-    @property
-    def active_tools(self) -> dict[str, Tool]:
-        """Tools available for execution in the current round."""
-        return self._active_tools
+    # -- activation ------------------------------------------------------
 
     def handle_request_tools(self, tool_names: list[str]) -> str:
-        """Transition from routing to execution phase.
-
-        Adds the requested tools (+ core tools) and returns a confirmation
-        message to send back as the tool result.
-        """
         valid = [n for n in tool_names if n in self._all_tools]
         invalid = [n for n in tool_names if n not in self._all_tools]
-
-        # Build the execution-phase tool set
-        selected = {n: self._all_tools[n] for n in valid}
-        selected.update(self._core_tools)
-        self._active_tools = selected
-        self._phase = "execution"
-
+        for n in valid:
+            self._active_tools[n] = self._all_tools[n]
+        self._tools_used = True
         parts = []
         if valid:
             parts.append(f"Tools activated: {', '.join(valid)}. You can now use them.")
         if invalid:
             parts.append(f"Unknown tools (ignored): {', '.join(invalid)}")
-
         logger.info("Tool routing: requested=%s valid=%s", tool_names, valid)
         return " ".join(parts) or "No valid tools requested."
+
+    def resolve(self, name: str) -> Tool | None:
+        """Tool for a tool_use block, activating it if Claude skipped request_tools."""
+        tool = self._active_tools.get(name)
+        if tool is None and name in self._all_tools:
+            tool = self._all_tools[name]
+            self._active_tools[name] = tool
+            logger.info("Tool routing: auto-activated %s (called without request_tools)", name)
+        return tool
+
+
+async def _run_tool_block(
+    block,
+    router: _ToolRouter,
+    *,
+    db_pool: DatabasePool | None,
+    user_id: str | None,
+    channel: str | None,
+) -> str:
+    """Execute one tool_use block: routing meta-tool or a real tool (audited)."""
+    if block.name == "request_tools":
+        return router.handle_request_tools(block.input.get("tools", []))
+    router.resolve(block.name)
+    router.note_tool_use()
+    return await execute_and_log_tool(
+        block.name, block.input, router.active_tools,
+        db_pool=db_pool, user_id=user_id, channel=channel,
+    )
 
 
 # ── Message building ────────────────────────────────────────────────
@@ -338,14 +372,9 @@ async def _execute_tool_blocks(
     """
     tool_results: list[dict] = []
     for block in tool_use_blocks:
-        if block.name == "request_tools":
-            requested = block.input.get("tools", [])
-            result = router.handle_request_tools(requested)
-        else:
-            result = await execute_and_log_tool(
-                block.name, block.input, router.active_tools,
-                db_pool=db_pool, user_id=user_id, channel=channel,
-            )
+        result = await _run_tool_block(
+            block, router, db_pool=db_pool, user_id=user_id, channel=channel,
+        )
         tool_results.append({
             "type": "tool_result",
             "tool_use_id": block.id,
@@ -401,7 +430,11 @@ async def chat_with_tools(
             system=router.system_blocks,
             tools=router.tool_definitions,
             messages=messages,
+            **router.request_kwargs,
         )
+
+        if response.stop_reason == "refusal":
+            return _refusal_text()
 
         # Extract custom tool use blocks (server-side tools like web_search
         # have type "server_tool_use" and are handled by Anthropic automatically)
@@ -486,6 +519,7 @@ async def stream_chat_with_tools(
             system=router.system_blocks,
             tools=router.tool_definitions,
             messages=messages,
+            **router.request_kwargs,
         ) as stream:
             # Iterate raw events (instead of text_stream) so we can detect
             # server-side tool activity and yield spoken feedback for TTS.
@@ -499,6 +533,10 @@ async def stream_chat_with_tools(
                         yield event.delta.text
 
             response = await stream.get_final_message()
+
+        if response.stop_reason == "refusal":
+            yield _refusal_text()
+            return
 
         # Check if Claude requested custom tool use
         tool_use_blocks = [b for b in response.content if b.type == "tool_use"]
@@ -540,15 +578,9 @@ async def stream_chat_with_tools(
             if block.name == "display_image":
                 yield {"type": "device_image", "svg": block.input.get("svg", "")}
 
-            if block.name == "request_tools":
-                result = router.handle_request_tools(
-                    block.input.get("tools", []),
-                )
-            else:
-                result = await execute_and_log_tool(
-                    block.name, block.input, router.active_tools,
-                    db_pool=db_pool, user_id=user_id, channel=channel,
-                )
+            result = await _run_tool_block(
+                block, router, db_pool=db_pool, user_id=user_id, channel=channel,
+            )
             tool_results.append(
                 {
                     "type": "tool_result",
@@ -600,6 +632,7 @@ async def stream_chat_with_events(
             system=router.system_blocks,
             tools=router.tool_definitions,
             messages=messages,
+            **router.request_kwargs,
         ) as stream:
             # Iterate raw streaming events instead of text_stream so we can
             # detect server-side tool activity (web search) and emit UI events.
@@ -621,6 +654,10 @@ async def stream_chat_with_events(
                 yield {"type": "tool_end", "tool": "web_search"}
 
             response = await stream.get_final_message()
+
+        if response.stop_reason == "refusal":
+            yield {"type": "text_delta", "delta": _refusal_text()}
+            return
 
         tool_use_blocks = [b for b in response.content if b.type == "tool_use"]
 
@@ -655,9 +692,8 @@ async def stream_chat_with_events(
 
             yield {"type": "tool_start", "tool": block.name}
 
-            result = await execute_and_log_tool(
-                block.name, block.input, router.active_tools,
-                db_pool=db_pool, user_id=user_id, channel=channel,
+            result = await _run_tool_block(
+                block, router, db_pool=db_pool, user_id=user_id, channel=channel,
             )
 
             yield {"type": "tool_end", "tool": block.name}

@@ -30,13 +30,40 @@ from .base import Tool
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_TIMEOUT = 15
+DEFAULT_TIMEOUT = 45   # Prowlarr fans out to several indexers; 15 s timed out constantly
 
 # Words to strip from query on fallback retry (format-specific noise)
 _FORMAT_NOISE = re.compile(
     r"\b(audiobook|ebook|e-book|epub|pdf|m4b|mp3|mobi|kindle)\b",
     re.IGNORECASE,
 )
+
+# What a release title looks like per format, and a size sanity band. Public
+# trackers don't categorise books, so title words + size are the only signal:
+# an "ebook" of 90 MB is almost always an audiobook (or a whole collection).
+_FORMAT_HINTS = {
+    "ebook": ("epub", "mobi", "azw3", "azw", "pdf", "ebook", "e-book", "kindle", "retail"),
+    "audiobook": ("m4b", "mp3", "audiobook", "unabridged", "narrated", "audible"),
+}
+_EBOOK_MAX_BYTES = 150 * 1024 ** 2
+_AUDIOBOOK_MIN_BYTES = 60 * 1024 ** 2
+
+
+def _format_score(result: dict, fmt: str) -> int:
+    """Higher = more likely to be the format the user asked for."""
+    title = (result.get("title") or "").lower()
+    size = result.get("size") or 0
+    score = 0
+    if any(h in title for h in _FORMAT_HINTS[fmt]):
+        score += 2
+    other = "audiobook" if fmt == "ebook" else "ebook"
+    if any(h in title for h in _FORMAT_HINTS[other]):
+        score -= 3
+    if fmt == "ebook":
+        score += 1 if size and size <= _EBOOK_MAX_BYTES else -3
+    else:
+        score += 1 if size >= _AUDIOBOOK_MIN_BYTES else -3
+    return score
 
 
 class BookTool(Tool):
@@ -193,39 +220,52 @@ class BookTool(Tool):
         if not self.qbit_url:
             return "Error: QBITTORRENT_URL not configured."
 
-        # 1. Search Prowlarr (unfiltered — public trackers don't use Newznab categories)
+        # 1. Search Prowlarr (unfiltered — public trackers don't use Newznab
+        #    categories). Try the bare title first, then with a format word,
+        #    and pool the results so format scoring sees everything.
         session = await self._get_session()
         search_url = f"{self.prowlarr_url}/api/v1/search"
-        params: dict[str, Any] = {"query": query, "limit": 20}
         headers = {"X-Api-Key": self.prowlarr_api_key}
+        base = re.sub(r"\s{2,}", " ", _FORMAT_NOISE.sub("", query)).strip() or query
+        queries = [base]
+        hint = "epub" if fmt == "ebook" else "audiobook"
+        if hint not in query.lower():
+            queries.append(f"{base} {hint}")
+        if query.lower() != base.lower():
+            queries.insert(0, query)
 
-        async with session.get(search_url, params=params, headers=headers) as resp:
-            if resp.status == 401:
-                return "Error: Invalid Prowlarr API key."
-            if resp.status != 200:
-                return f"Error: Prowlarr returned HTTP {resp.status}"
-            results = await resp.json()
-
-        if not results:
-            # Retry with format-noise words stripped (e.g. "Dune audiobook" → "Dune")
-            cleaned = _FORMAT_NOISE.sub("", query).strip()
-            cleaned = re.sub(r"\s{2,}", " ", cleaned)  # collapse double spaces
-            if cleaned and cleaned.lower() != query.lower():
-                params["query"] = cleaned
-                async with session.get(search_url, params=params, headers=headers) as resp:
-                    if resp.status == 200:
-                        results = await resp.json()
+        results: list[dict] = []
+        seen: set[str] = set()
+        for q in queries:
+            async with session.get(search_url, params={"query": q, "limit": 25}, headers=headers) as resp:
+                if resp.status == 401:
+                    return "Error: Invalid Prowlarr API key."
+                if resp.status != 200:
+                    return f"Error: Prowlarr returned HTTP {resp.status}"
+                for r in await resp.json():
+                    key = r.get("guid") or r.get("downloadUrl") or r.get("title")
+                    if key and key not in seen:
+                        seen.add(key)
+                        results.append(r)
 
         if not results:
             return f"No torrents found for '{query}'. Try a different search term."
 
-        # 2. Pick best result (most seeders with reasonable size)
+        # 2. Pick the best result for the requested format, then by seeders.
         results = [r for r in results if r.get("downloadUrl")]
         if not results:
             return f"Found results but no downloadable torrents for '{query}'."
 
-        results.sort(key=lambda r: r.get("seeders", 0), reverse=True)
+        results.sort(key=lambda r: (_format_score(r, fmt), r.get("seeders", 0) or 0), reverse=True)
         best = results[0]
+        if _format_score(best, fmt) < 0:
+            size_mb = (best.get("size", 0) or 0) / (1024 ** 2)
+            return (
+                f"No {fmt} release found for '{query}'. Closest match was "
+                f"'{best.get('title', '?')}' ({size_mb:.0f} MB), which looks like "
+                f"{'an audiobook or collection' if fmt == 'ebook' else 'an ebook'}. "
+                "Ask the user whether that is acceptable before downloading it."
+            )
 
         title = best.get("title", "Unknown")
         size_mb = (best.get("size", 0) or 0) / (1024 ** 2)
@@ -247,11 +287,16 @@ class BookTool(Tool):
         if add_result is not None:
             return add_result  # Error message
 
+        alternatives = ", ".join(
+            f"{r.get('title', '?')[:60]} ({(r.get('size', 0) or 0) / (1024 ** 2):.0f} MB, {r.get('seeders', 0)} seeders)"
+            for r in results[1:4]
+        )
         return (
             f"Downloading {fmt}: {title}\n"
             f"Size: {size_mb:.1f} MB | Seeders: {seeders} | Source: {indexer}\n"
             f"Sent to qBittorrent (category: {category}). "
             f"It will appear in Audiobookshelf once complete."
+            + (f"\nOther candidates: {alternatives}" if alternatives else "")
         )
 
     # ------------------------------------------------------------------

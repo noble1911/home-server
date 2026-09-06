@@ -21,7 +21,7 @@ from .llm import _get_client
 
 logger = logging.getLogger(__name__)
 
-_EXTRACTION_MODEL = "claude-haiku-4-5-20251001"
+_EXTRACTION_MODEL = "claude-haiku-4-5"
 
 _EXTRACTION_PROMPT = """\
 Analyze this conversation and extract any personal facts about the user.

@@ -243,7 +243,7 @@ async def load_conversation_messages(
     return messages
 
 
-def _build_rules_text(channel: str | None = None) -> str:
+def _build_rules_text_base(channel: str | None = None) -> str:
     """Build the static RULES section of the system prompt.
 
     This content is identical across all users and requests (for a given
@@ -326,3 +326,24 @@ def _build_system_blocks(
     blocks.append({"type": "text", "text": "\n".join(parts)})
 
     return blocks
+
+
+_TOOL_AND_STYLE_RULES = """
+USING TOOLS:
+- When a request needs live information or an action (downloads, movies, TV, books, smart home, server status, storage, weather, photos, reminders), use the relevant tool instead of guessing. If the tool is only listed under ADDITIONAL TOOLS, activate it with request_tools first, then call it.
+- Never say something has been done unless a tool result confirms it. If a tool fails, say so plainly and what you tried.
+- If no tool covers what was asked, say so instead of improvising.
+
+CONVERSATION HISTORY:
+- Earlier turns are shown as text only; the tool calls and tool results behind them are not included. Earlier answers were produced with the same tools — do not assume they were guessed, and do not re-audit or apologise for them.
+
+RESPONSE STYLE:
+- Keep responses focused, brief, and concise. Lead with the answer; keep caveats short. Give a high-level summary unless more detail is asked for.
+- Only correct an earlier statement when the error would change what the user does. State it plainly and move on — no apologies, preambles, or tallies of past mistakes. A follow-up question is not a sign you got something wrong.
+- Latency-sensitive; begin your visible answer immediately.
+"""
+
+
+def _build_rules_text(channel: str | None = None) -> str:
+    """Static rules block: the original rules plus tool-use and style guidance."""
+    return _build_rules_text_base(channel) + _TOOL_AND_STYLE_RULES

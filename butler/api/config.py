@@ -12,9 +12,18 @@ class Settings(BaseSettings):
 
     # Claude API
     anthropic_api_key: str = ""
-    anthropic_model: str = "claude-sonnet-4-20250514"
-    routing_model: str = "claude-haiku-4-5-20251001"
-    max_tokens: int = 4096
+    # Main model. claude-sonnet-4-20250514 was retired and returned 404 from
+    # 2026-09; every request that needed a non-core tool failed with a 500.
+    anthropic_model: str = "claude-opus-5"
+    # Model for the first (tool-routing) round only. Empty = use the main model,
+    # which keeps one prompt cache and lets the main model write the answer.
+    # Set to e.g. claude-haiku-4-5 to route on a cheaper model.
+    routing_model: str = ""
+    # output_config.effort for chat/voice. low/medium are strong on Opus 5 and
+    # keep latency down; ignored on models without effort (Haiku 4.5).
+    chat_effort: str = "medium"
+    # Caps thinking + answer together on Opus 5 (thinking is on by default).
+    max_tokens: int = 16000
     max_history_messages: int = 20
 
     # Web search (Anthropic server-side tool)
