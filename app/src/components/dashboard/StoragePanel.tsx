@@ -42,8 +42,8 @@ export default function StoragePanel({ storage }: { storage: SystemStorageRespon
         <div className="card p-3 mb-4 border-yellow-500/30 bg-yellow-500/10 text-xs text-yellow-200">
           <p className="font-medium">macOS is blocking the host agent from reading the external drives.</p>
           <p className="text-yellow-200/80 mt-1">
-            Folder sizes and moves will work once you grant Full Disk Access: System Settings → Privacy &amp; Security → Full Disk Access → add
-            {' '}<code className="text-yellow-100">{storage.agentPython ?? 'the agent\'s python'}</code>, then restart the agent.
+            Folder sizes and moves will work once you grant Full Disk Access: System Settings → Privacy &amp; Security → Full Disk Access → + → select
+            {' '}<code className="text-yellow-100">{storage.agentPython ?? 'the agent\'s Python.app'}</code> (the app bundle; the bin stub is greyed out), then restart the agent.
           </p>
         </div>
       )}

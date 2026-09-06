@@ -44,8 +44,11 @@ it, the agent's folder-size scan and move jobs block forever on a consent
 prompt you may never see. Grant it once:
 
 1. System Settings → Privacy & Security → **Full Disk Access** → **+**
-2. Press ⌘⇧G and paste the agent's interpreter (printed by `/health` as
-   `pythonBin`, e.g. `/opt/homebrew/Cellar/python@3.12/<ver>/Frameworks/Python.framework/Versions/3.12/Resources/Python.app`)
+2. Select the interpreter's **app bundle** (printed by `/health` as
+   `pythonBin`), e.g. `/opt/homebrew/Cellar/python@3.12/<ver>/Frameworks/Python.framework/Versions/3.12/Resources/Python.app`.
+   Homebrew's `bin/python3.12` is only a stub that launches this bundle and
+   shows greyed out in the picker. Typing `/` in the picker opens a go-to-path
+   sheet if ⌘⇧G doesn't reach the Mac (e.g. over VNC).
 3. Toggle it on, then `launchctl kickstart -k gui/$(id -u)/uk.noblehaus.host-agent`
 
 `/health` reports `diskAccess` per drive; the dashboard's Storage panel shows

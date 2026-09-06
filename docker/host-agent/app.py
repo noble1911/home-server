@@ -142,7 +142,27 @@ DOCKER_BIN = next((p for p in ("/usr/local/bin/docker", "/opt/homebrew/bin/docke
 # with a timeout so we can say so instead of silently hanging du and moves.
 
 DISK_ACCESS: dict[str, bool | None] = {}   # drive path -> True/False/None(unknown)
-PYTHON_BIN = os.path.realpath(sys.executable)
+
+
+def _grant_path() -> str:
+    """What to add in System Settings → Privacy & Security → Full Disk Access.
+
+    Homebrew's bin/python3.x is a stub that execs Python.app inside the
+    framework; macOS attributes the permission to that bundle, and the file
+    picker only lets you select the bundle (the stub shows greyed out).
+    """
+    try:
+        exe = psutil.Process().exe()
+    except Exception:
+        exe = os.path.realpath(sys.executable)
+    parts = exe.split("/")
+    for i, part in enumerate(parts):
+        if part.endswith(".app"):
+            return "/".join(parts[: i + 1])
+    return exe
+
+
+PYTHON_BIN = _grant_path()
 
 
 def _probe_disk_access() -> None:
