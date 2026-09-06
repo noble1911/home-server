@@ -150,7 +150,7 @@ export default function MediaInbox() {
       <div className="card divide-y divide-butler-700/60">
         <div className="p-3 flex flex-wrap items-center gap-2">
           <p className="text-xs text-butler-400 flex-1 min-w-[14rem]">
-            Finished downloads in <span className="text-butler-200">Downloads/Complete</span>.
+            Finished downloads still sitting in <span className="text-butler-200">Downloads/Complete</span> (not torrents — see Downloads for those).
             {sm && (
               <>
                 {' '}<span className="text-butler-200">{sm.importable}</span> new,{' '}
@@ -176,19 +176,28 @@ export default function MediaInbox() {
         {error && <p className="p-3 text-xs text-red-300">{error}</p>}
 
         {(activeCommands.length > 0 || activeMoves.length > 0) && (
-          <div className="p-3 space-y-2">
+          <div className="p-3 space-y-2 bg-butler-900/40">
+            <p className="text-[11px] text-butler-400 uppercase tracking-wide">
+              In progress — {activeCommands.length > 0 && `${activeCommands.length} import${activeCommands.length === 1 ? '' : 's'} via Sonarr/Radarr`}
+              {activeCommands.length > 0 && activeMoves.length > 0 && ', '}
+              {activeMoves.length > 0 && `${activeMoves.filter(m => m.status === 'running').length} moving, ${activeMoves.filter(m => m.status === 'queued').length} waiting`}
+            </p>
             {activeCommands.map(c => (
-              <ProgressRow key={`c-${c.commandId}`} label={`${c.app === 'sonarr' ? 'Sonarr' : 'Radarr'} · ${c.name}`} status={c.status} />
+              <ProgressRow key={`c-${c.commandId}`} label={`${c.app === 'sonarr' ? 'Sonarr' : 'Radarr'} importing · ${c.name}`} status={c.status} />
             ))}
-            {activeMoves.map(m => (
-              <ProgressRow
-                key={m.id}
-                label={`${m.destination.includes('/Trash/') ? 'Trash' : 'Move'} · ${m.source.split('/').pop()}`}
-                status={m.status}
-                percent={m.totalBytes ? Math.round((m.copiedBytes / m.totalBytes) * 100) : 0}
-                detail={`${formatBytes(m.copiedBytes)} of ${formatBytes(m.totalBytes)} · ${m.filesDone}/${m.files} files`}
-              />
-            ))}
+            {activeMoves.map(m => {
+              const toTrash = m.destination.includes('/Trash/')
+              const target = toTrash ? 'Trash' : m.destination.split('/').slice(-2, -1)[0]
+              return (
+                <ProgressRow
+                  key={m.id}
+                  label={`${m.status === 'queued' ? 'Waiting to move' : 'Moving'} to ${target} · ${m.source.split('/').pop()}`}
+                  status={m.status}
+                  percent={m.status === 'queued' ? undefined : m.totalBytes ? Math.round((m.copiedBytes / m.totalBytes) * 100) : 0}
+                  detail={m.status === 'queued' ? undefined : `${formatBytes(m.copiedBytes)} of ${formatBytes(m.totalBytes)} · ${m.filesDone}/${m.files} files`}
+                />
+              )
+            })}
           </div>
         )}
 
@@ -331,7 +340,7 @@ function ProgressRow({ label, status, percent, detail }: { label: string; status
       <div className="flex justify-between text-xs">
         <span className="text-butler-200 truncate pr-3">{label}</span>
         <span className={`tabular-nums ${failed ? 'text-red-300' : done ? 'text-green-400' : 'text-butler-400'}`}>
-          {percent !== undefined ? `${percent}%` : status}
+          {percent !== undefined ? `${percent}%` : status === 'queued' ? 'waiting' : status === 'started' ? 'running' : status}
         </span>
       </div>
       {percent !== undefined && (

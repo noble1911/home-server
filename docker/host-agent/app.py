@@ -456,12 +456,64 @@ def _within(path: str, roots: list[str]) -> bool:
     return any(real == os.path.realpath(r) or real.startswith(os.path.realpath(r) + os.sep) for r in roots)
 
 
+def _same_device(a: str, b: str) -> bool:
+    """True when both paths live on the same filesystem (rename is possible)."""
+    try:
+        # b may not exist yet — climb to the nearest existing ancestor
+        while not os.path.exists(b):
+            parent = os.path.dirname(b)
+            if parent == b:
+                return False
+            b = parent
+        return os.stat(a).st_dev == os.stat(b).st_dev
+    except OSError:
+        return False
+
+
+def _tree_size(path: str) -> int:
+    if os.path.isfile(path):
+        return os.path.getsize(path)
+    total = 0
+    for root, _d, files in os.walk(path):
+        for f in files:
+            try:
+                total += os.path.getsize(os.path.join(root, f))
+            except OSError:
+                pass
+    return total
+
+
+def _tree_files(path: str) -> int:
+    if os.path.isfile(path):
+        return 1
+    return sum(len(files) for _r, _d, files in os.walk(path))
+
+
 def _run_move(job: MoveJob) -> None:
     """Copy file-by-file (progress), verify sizes, then delete the source."""
     src, dst = job.source, job.destination
     job.status = "running"
     logger.info("Move job %s started: %s", job.id, src)
     try:
+        # Same volume? Then a rename is atomic and instant — no copying TBs
+        # around just to change a path. Only fall back to copy+verify+delete
+        # when the destination is on another device.
+        if _same_device(src, os.path.dirname(dst)):
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            if os.path.exists(dst):
+                # Leftover from an interrupted earlier copy: park it, don't merge
+                dst_old = f"{dst}.partial-{int(time.time())}"
+                os.rename(dst, dst_old)
+                logger.warning("Move job %s: destination existed, parked as %s", job.id, dst_old)
+            job.totalBytes = _tree_size(src)
+            job.files = _tree_files(src)
+            os.rename(src, dst)
+            job.copiedBytes = job.totalBytes
+            job.filesDone = job.files
+            job.status = "done"
+            logger.info("Move job %s done (rename, same volume)", job.id)
+            return
+
         if os.path.isfile(src):
             pairs = [(src, dst)]
         else:
