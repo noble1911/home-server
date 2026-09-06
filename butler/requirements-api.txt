@@ -8,9 +8,14 @@ asyncpg>=0.29.0
 
 # HTTP client (used by HomeAssistantTool)
 aiohttp>=3.9.0
+# httpx is imported directly by api/routes/downloads.py. It used to arrive
+# transitively via the anthropic SDK; anthropic 1.x dropped it and the
+# 2026-09-06 rebuild crash-looped on ModuleNotFoundError.
+httpx>=0.27,<1
 
-# Claude API
-anthropic>=0.52.0
+# Claude API. Upper-bounded: 1.x is a breaking release (different HTTP
+# stack, changed types); bump deliberately and re-run the suite.
+anthropic>=0.80,<1
 
 # Auth
 PyJWT>=2.8.0

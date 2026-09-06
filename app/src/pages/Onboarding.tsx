@@ -37,6 +37,7 @@ export default function Onboarding() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [provisioningResults, setProvisioningResults] = useState<ServiceAccountResult[] | null>(null)
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   const { setOnboardingComplete } = useAuthStore()
   const { fetchProfile } = useUserStore()
@@ -60,6 +61,7 @@ export default function Onboarding() {
     servicePassword === confirmPassword
 
   const handleComplete = async () => {
+    setSubmitError(null)
     setIsSubmitting(true)
 
     try {
@@ -100,9 +102,11 @@ export default function Onboarding() {
 
       // All good — proceed
       setOnboardingComplete(true)
-    } catch {
-      // For development: allow mock completion
-      setOnboardingComplete(true)
+    } catch (err: unknown) {
+      // Stay on this step so the user can retry. Marking onboarding complete
+      // here would leave them with no profile, no soul config and no service
+      // accounts, and no way back into the wizard.
+      setSubmitError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
     } finally {
       setIsSubmitting(false)
     }
@@ -383,6 +387,9 @@ export default function Onboarding() {
             <p className="text-butler-400 mb-8">
               {butlerNameInput} is ready to help you, {userName}.
             </p>
+            {submitError && (
+              <p className="text-sm text-red-400 mb-4" role="alert">{submitError}</p>
+            )}
             <button
               onClick={handleComplete}
               disabled={isSubmitting}

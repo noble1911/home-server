@@ -18,6 +18,8 @@ from croniter import croniter
 
 from tools import DatabasePool, Tool
 
+from .audit import execute_and_log_tool
+
 logger = logging.getLogger(__name__)
 
 POLL_INTERVAL_SECONDS = 60
@@ -106,7 +108,7 @@ class TaskScheduler:
             if action_type == "reminder":
                 await self._send_reminder(action, user_id)
             elif action_type == "automation":
-                await self._run_automation(action)
+                await self._run_automation(action, user_id)
             elif action_type == "check":
                 await self._run_check(action, user_id)
             else:
@@ -139,26 +141,57 @@ class TaskScheduler:
             category=action.get("category", "general"),
         )
 
-    async def _run_automation(self, action: dict) -> None:
-        """Execute a tool with the given parameters."""
+    async def _tools_for_user(self, user_id: str) -> dict[str, Tool]:
+        """Tools the task owner is permitted to use right now."""
+        from .deps import get_user_tools  # lazy: deps imports this module
+
+        return await get_user_tools(user_id, self._tools, self._db_pool)
+
+    async def _execute_tool_as_user(self, action: dict, user_id: str) -> str | None:
+        """Run action["tool"] with the owner's permissions and audit logging.
+
+        Scheduled tasks must not be a way around per-user tool filtering: the
+        owner's permissions are re-read at execution time, so a task keeps
+        working only while its creator is still allowed that tool, and
+        execute_and_log_tool pins ``user_id`` to the owner and writes the
+        audit row exactly as an interactive call would.
+
+        Returns None (after logging) if the tool is missing or not permitted.
+        """
         tool_name = action.get("tool")
         if not tool_name or tool_name not in self._tools:
-            logger.error("Automation tool not found: %s", tool_name)
-            return
+            logger.error("Scheduled tool not found: %s", tool_name)
+            return None
 
-        params = action.get("params", {})
-        result = await self._tools[tool_name].execute(**params)
-        logger.info("Automation '%s' result: %s", tool_name, result[:200])
+        user_tools = await self._tools_for_user(user_id)
+        if tool_name not in user_tools:
+            logger.error(
+                "Scheduled tool '%s' is not permitted for user %s; skipping",
+                tool_name, user_id,
+            )
+            return None
+
+        params = dict(action.get("params") or {})
+        return await execute_and_log_tool(
+            tool_name,
+            params,
+            user_tools,
+            db_pool=self._db_pool,
+            user_id=user_id,
+            channel="scheduler",
+        )
+
+    async def _run_automation(self, action: dict, user_id: str) -> None:
+        """Execute a tool with the given parameters, as the task's owner."""
+        result = await self._execute_tool_as_user(action, user_id)
+        if result is not None:
+            logger.info("Automation '%s' result: %s", action.get("tool"), result[:200])
 
     async def _run_check(self, action: dict, user_id: str) -> None:
-        """Run a health check tool and notify if threshold breached."""
-        tool_name = action.get("tool")
-        if not tool_name or tool_name not in self._tools:
-            logger.error("Check tool not found: %s", tool_name)
+        """Run a health check tool (as the owner) and notify if threshold breached."""
+        result = await self._execute_tool_as_user(action, user_id)
+        if result is None:
             return
-
-        params = action.get("params", {})
-        result = await self._tools[tool_name].execute(**params)
 
         notify_on = action.get("notifyOn", "warning")
         result_lower = result.lower()

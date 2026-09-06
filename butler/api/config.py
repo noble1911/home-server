@@ -145,7 +145,11 @@ class Settings(BaseSettings):
     vapid_private_key: str = ""
     vapid_subject: str = "mailto:admin@homeserver.local"
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    # extra="ignore": butler/.env on the server also holds keys for other
+    # stacks (DB_PASSWORD, GROQ_API_KEY, ...). pydantic-settings' default
+    # "forbid" made `python -m api` / pytest fail at import when run from
+    # butler/, echoing those values into the terminal.
+    model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
 
 settings = Settings()

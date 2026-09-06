@@ -55,7 +55,7 @@ function buildHeaders(token: string | null, extra?: HeadersInit): Record<string,
 // Refresh lock — prevents multiple concurrent refresh attempts
 let refreshPromise: Promise<boolean> | null = null
 
-async function tryRefresh(): Promise<boolean> {
+export async function tryRefresh(): Promise<boolean> {
   if (refreshPromise) {
     // Another request is already refreshing — wait for it
     return refreshPromise

@@ -47,8 +47,12 @@ class TestHomeAssistantTool:
         assert "parameters" in schema["function"]
 
     @pytest.mark.asyncio
-    async def test_missing_config(self):
+    async def test_missing_config(self, monkeypatch):
         """Error when URL/token not configured."""
+        # The tool falls back to env vars when args are empty; make the test
+        # independent of whatever HOME_ASSISTANT_* the host/container has set.
+        monkeypatch.delenv("HOME_ASSISTANT_URL", raising=False)
+        monkeypatch.delenv("HOME_ASSISTANT_TOKEN", raising=False)
         tool = HomeAssistantTool(base_url="", token="")
         result = await tool.execute(action="get_state", entity_id="light.test")
         assert "must be configured" in result

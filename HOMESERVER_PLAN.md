@@ -434,7 +434,7 @@ Butler then **auto-provisions accounts** on each configured service:
 
 Provisioning details:
 - Each service is provisioned via its admin API (Jellyfin REST, Audiobookshelf REST, Nextcloud OCS, Immich REST)
-- Credentials are **encrypted at rest** using Fernet (AES-128-CBC + HMAC-SHA256, keyed from JWT_SECRET)
+- Credentials are **encrypted at rest** using Fernet (AES-128-CBC + HMAC-SHA256), keyed from a dedicated `ENCRYPTION_KEY` (set on the server 2026-09-06; rows were re-encrypted with `python -m api.rotate_encryption_key`). `JWT_SECRET` is only a fallback for deployments that never set it — keep the two separate so they can rotate independently
 - Stored in `butler.service_credentials` table with `UNIQUE(user_id, service)` for idempotency
 - Services are skipped gracefully if admin credentials aren't configured (env vars)
 - Users can view their service accounts (with show/hide password toggle) on the Settings page

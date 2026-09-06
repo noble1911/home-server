@@ -161,7 +161,11 @@ class TestRunCheck:
             db_pool=mock_pool, tools={"server_health": health_tool},
         )
         action = {"type": "check", "tool": "server_health", "notifyOn": "warning"}
-        await scheduler._run_check(action, "system")
+        with patch.object(
+            TaskScheduler, "_tools_for_user",
+            new=AsyncMock(return_value={"server_health": health_tool}),
+        ):
+            await scheduler._run_check(action, "system")
 
         mock_push.assert_awaited_once()
         assert "WARNING" in mock_push.call_args.kwargs["body"]
@@ -177,9 +181,62 @@ class TestRunCheck:
             db_pool=mock_pool, tools={"server_health": health_tool},
         )
         action = {"type": "check", "tool": "server_health", "notifyOn": "warning"}
-        await scheduler._run_check(action, "system")
+        with patch.object(
+            TaskScheduler, "_tools_for_user",
+            new=AsyncMock(return_value={"server_health": health_tool}),
+        ):
+            await scheduler._run_check(action, "system")
 
         mock_push.assert_not_awaited()
+
+
+class TestScheduledToolPermissions:
+    """Scheduled automations/checks run with the owner's permissions, not the global tool set."""
+
+    @pytest.mark.asyncio
+    async def test_automation_refused_when_tool_not_permitted(self, mock_pool):
+        """A user who lost (or never had) a permission cannot run that tool via a task."""
+        claude = MagicMock()
+        claude.execute = AsyncMock(return_value="ran")
+        scheduler = TaskScheduler(db_pool=mock_pool, tools={"run_claude_code": claude})
+        action = {"type": "automation", "tool": "run_claude_code", "params": {"task": "rm -rf"}}
+
+        with patch.object(TaskScheduler, "_tools_for_user", new=AsyncMock(return_value={})):
+            await scheduler._run_automation(action, "guest")
+
+        claude.execute.assert_not_awaited()
+        mock_pool.pool.execute.assert_not_awaited()  # no audit row for a refused call
+
+    @pytest.mark.asyncio
+    async def test_automation_runs_permitted_tool_as_owner_and_audits(self, mock_pool):
+        """Permitted tool runs with user_id pinned to the owner and an audit row written."""
+        memory = MagicMock()
+        memory.execute = AsyncMock(return_value="stored")
+        scheduler = TaskScheduler(db_pool=mock_pool, tools={"memory": memory})
+        # The stored params claim another user; the owner must win.
+        action = {"type": "automation", "tool": "memory",
+                  "params": {"user_id": "someone_else", "action": "store", "fact": "x"}}
+
+        with patch.object(
+            TaskScheduler, "_tools_for_user", new=AsyncMock(return_value={"memory": memory}),
+        ):
+            await scheduler._run_automation(action, "owner")
+
+        memory.execute.assert_awaited_once()
+        assert memory.execute.call_args.kwargs["user_id"] == "owner"
+        mock_pool.pool.execute.assert_awaited_once()
+        sql, *params = mock_pool.pool.execute.call_args.args
+        assert "butler.tool_usage" in sql
+        assert params[0] == "owner" and params[1] == "memory"
+        assert params[-1] == "scheduler"
+
+    @pytest.mark.asyncio
+    async def test_unknown_tool_is_skipped_before_permission_lookup(self, mock_pool):
+        scheduler = TaskScheduler(db_pool=mock_pool, tools={})
+        lookup = AsyncMock(return_value={})
+        with patch.object(TaskScheduler, "_tools_for_user", new=lookup):
+            await scheduler._run_automation({"type": "automation", "tool": "nope"}, "u")
+        lookup.assert_not_awaited()
 
 
 if __name__ == "__main__":

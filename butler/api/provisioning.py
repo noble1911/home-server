@@ -10,6 +10,8 @@ from __future__ import annotations
 import asyncio
 import base64
 import logging
+import re
+from contextlib import asynccontextmanager
 from typing import Callable, Awaitable
 
 import aiohttp
@@ -306,49 +308,86 @@ async def _provision_immich(username: str, password: str, *, email: str | None =
             return data.get("id", "")
 
 
-async def _provision_homeassistant(username: str, password: str) -> str:
-    """Create Home Assistant user via WebSocket API. Returns the HA user ID."""
-    # Convert HTTP URL to WebSocket URL
+def _ha_ws_url() -> str:
     ws_url = settings.home_assistant_url.replace("https://", "wss://").replace(
         "http://", "ws://"
     )
-    ws_url = f"{ws_url}/api/websocket"
+    return f"{ws_url}/api/websocket"
 
-    # Use a longer timeout for the WebSocket handshake + user creation
+
+def _ha_error(msg: dict) -> str:
+    """Short, secret-free description of a failed HA websocket command.
+
+    HA's schema validator echoes the offending values ("... Got 'hunter2'"),
+    and this text ends up in service_credentials.error_message and the
+    Settings page, so cut anything after the first "Got".
+    """
+    error = msg.get("error", {}).get("message") or msg.get("error", {}).get("code") or "unknown error"
+    error = re.split(r"\.?\s*Got\s", str(error), maxsplit=1)[0]
+    return error.strip()[:200]
+
+
+async def _ha_ws_call(ws: aiohttp.ClientWebSocketResponse, msg_id: int, payload: dict) -> dict:
+    """Send one websocket command and return its result; raise on failure."""
+    await ws.send_json({"id": msg_id, **payload})
+    while True:
+        msg = await ws.receive_json()
+        if msg.get("id") != msg_id:
+            continue  # unrelated event
+        if not msg.get("success"):
+            raise RuntimeError(_ha_error(msg))
+        return msg.get("result") or {}
+
+
+@asynccontextmanager
+async def _ha_ws_session():
+    """Authenticated HA websocket, yielded as an aiohttp websocket object."""
     ws_timeout = aiohttp.ClientTimeout(total=30)
-
     async with aiohttp.ClientSession(timeout=ws_timeout) as session:
-        async with session.ws_connect(ws_url) as ws:
-            # 1. Wait for auth_required
+        async with session.ws_connect(_ha_ws_url()) as ws:
             msg = await ws.receive_json()
             if msg.get("type") != "auth_required":
                 raise RuntimeError(f"HA WebSocket unexpected: {msg.get('type')}")
-
-            # 2. Authenticate with long-lived access token
-            await ws.send_json({
-                "type": "auth",
-                "access_token": settings.home_assistant_token,
-            })
+            await ws.send_json({"type": "auth", "access_token": settings.home_assistant_token})
             msg = await ws.receive_json()
             if msg.get("type") != "auth_ok":
-                raise RuntimeError(f"HA WebSocket auth failed: {msg}")
+                raise RuntimeError(f"HA WebSocket auth failed: {msg.get('message', msg.get('type'))}")
+            yield ws
 
-            # 3. Create user (non-admin, system-users group)
-            await ws.send_json({
-                "id": 1,
-                "type": "config/auth/create",
-                "name": username,
+
+async def _provision_homeassistant(username: str, password: str) -> str:
+    """Create a Home Assistant user + login. Returns the HA user ID.
+
+    HA's ``config/auth/create`` only takes name/group_ids/local_only; the
+    username/password live on the auth provider and are added with a second
+    ``config/auth_provider/homeassistant/create`` call. Sending them in one
+    message is rejected with "extra keys not allowed" (HA 2026.x).
+    """
+    async with _ha_ws_session() as ws:
+        result = await _ha_ws_call(ws, 1, {
+            "type": "config/auth/create",
+            "name": username,
+            "group_ids": ["system-users"],
+            "local_only": False,
+        })
+        user_id = (result.get("user") or {}).get("id", "")
+        if not user_id:
+            raise RuntimeError("HA user creation returned no user id")
+        try:
+            await _ha_ws_call(ws, 2, {
+                "type": "config/auth_provider/homeassistant/create",
+                "user_id": user_id,
                 "username": username,
                 "password": password,
-                "group_ids": ["system-users"],
-                "local_only": False,
             })
-            msg = await ws.receive_json()
-            if not msg.get("success"):
-                error = msg.get("error", {}).get("message", str(msg))
-                raise RuntimeError(f"HA user creation failed: {error}")
-
-            return msg.get("result", {}).get("user", {}).get("id", "")
+        except Exception as e:
+            # Don't leave a login-less orphan behind (mirrors the Jellyfin cleanup)
+            try:
+                await _ha_ws_call(ws, 3, {"type": "config/auth/delete", "user_id": user_id})
+            except Exception:
+                logger.warning("Could not remove orphaned HA user %s after login failure", user_id)
+            raise RuntimeError(f"HA login creation failed: {e}") from e
+        return user_id
 
 
 # Dispatch table
@@ -454,25 +493,8 @@ async def _deprovision_immich(external_id: str, _username: str) -> None:
 
 
 async def _deprovision_homeassistant(external_id: str, _username: str) -> None:
-    ws_url = settings.home_assistant_url.replace("https://", "wss://").replace(
-        "http://", "ws://"
-    )
-    ws_url = f"{ws_url}/api/websocket"
-    ws_timeout = aiohttp.ClientTimeout(total=30)
-    async with aiohttp.ClientSession(timeout=ws_timeout) as session:
-        async with session.ws_connect(ws_url) as ws:
-            msg = await ws.receive_json()
-            if msg.get("type") != "auth_required":
-                raise RuntimeError(f"HA WebSocket unexpected: {msg.get('type')}")
-            await ws.send_json({"type": "auth", "access_token": settings.home_assistant_token})
-            msg = await ws.receive_json()
-            if msg.get("type") != "auth_ok":
-                raise RuntimeError(f"HA WebSocket auth failed: {msg}")
-            await ws.send_json({"id": 1, "type": "config/auth/delete", "user_id": external_id})
-            msg = await ws.receive_json()
-            if not msg.get("success"):
-                error = msg.get("error", {}).get("message", str(msg))
-                raise RuntimeError(f"HA user deletion failed: {error}")
+    async with _ha_ws_session() as ws:
+        await _ha_ws_call(ws, 1, {"type": "config/auth/delete", "user_id": external_id})
 
 
 _DEPROVISIONERS: dict[str, Callable[[str, str], Awaitable[None]]] = {
@@ -589,10 +611,20 @@ async def _change_password_immich(external_id: str, _username: str, new_password
                 raise RuntimeError(f"Immich password change failed: HTTP {resp.status}")
 
 
+async def _change_password_homeassistant(external_id: str, _username: str, new_password: str) -> None:
+    """Admin-side password reset for an HA local login (needs an admin token)."""
+    async with _ha_ws_session() as ws:
+        await _ha_ws_call(ws, 1, {
+            "type": "config/auth_provider/homeassistant/admin_change_password",
+            "user_id": external_id,
+            "password": new_password,
+        })
+
+
 _PASSWORD_CHANGERS: dict[str, Callable[[str, str, str], Awaitable[None]]] = {
     "jellyfin": _change_password_jellyfin,
     "audiobookshelf": _change_password_audiobookshelf,
     "nextcloud": _change_password_nextcloud,
     "immich": _change_password_immich,
-    # Home Assistant: no admin API to change another user's password
+    "homeassistant": _change_password_homeassistant,
 }

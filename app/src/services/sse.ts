@@ -6,7 +6,7 @@
  *  - Custom Authorization headers (for JWT auth)
  */
 
-import { ApiError, getAuthToken } from './api'
+import { ApiError, getAuthToken, tryRefresh } from './api'
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api'
 
@@ -29,23 +29,35 @@ export async function streamSSE<T>(
   callbacks: SSECallbacks<T>,
   signal?: AbortSignal,
 ): Promise<void> {
-  const token = await getAuthToken()
-
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  }
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
-  }
-
-  let response: Response
-  try {
-    response = await fetch(`${API_BASE}${endpoint}`, {
+  const doFetch = (token: string | null): Promise<Response> => {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    }
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`
+    }
+    return fetch(`${API_BASE}${endpoint}`, {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
       signal,
     })
+  }
+
+  let response: Response
+  try {
+    response = await doFetch(getAuthToken())
+
+    // Access tokens last an hour; a chat tab left open would otherwise fail
+    // its next message with a bare 401. Mirror api.ts: refresh once, retry.
+    if (response.status === 401) {
+      const refreshed = await tryRefresh()
+      if (!refreshed) {
+        callbacks.onError?.(new ApiError(401, 'Session expired'))
+        return
+      }
+      response = await doFetch(getAuthToken())
+    }
   } catch (err: unknown) {
     if (err instanceof DOMException && err.name === 'AbortError') {
       callbacks.onDone?.()
