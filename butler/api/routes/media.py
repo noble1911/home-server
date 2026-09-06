@@ -5,6 +5,8 @@ POST /api/media/inbox/import          {names: [...]} → Sonarr/Radarr ManualImp
 POST /api/media/inbox/move            {name, destination} → host-agent move into a library root
 GET  /api/media/inbox/jobs            *arr command status + host-agent move jobs
 POST /api/media/library/refresh       ask Jellyfin to rescan
+GET  /api/media/trash                 what's in Downloads/Trash
+POST /api/media/trash/empty           delete its contents (host agent; nothing else is touched)
 
 All admin-only: these move terabytes around.
 """
@@ -75,3 +77,19 @@ async def inbox_jobs(_admin: str = Depends(get_admin_user)) -> dict[str, Any]:
 @router.post("/media/library/refresh")
 async def library_refresh(_admin: str = Depends(get_admin_user)) -> dict[str, Any]:
     return {"ok": await media_inbox.refresh_jellyfin()}
+
+
+@router.get("/media/trash")
+async def trash_summary(_admin: str = Depends(get_admin_user)) -> dict[str, Any]:
+    t = await host_agent.get_trash()
+    if t is None:
+        raise HTTPException(503, "host agent not reachable")
+    return t
+
+
+@router.post("/media/trash/empty")
+async def trash_empty(_admin: str = Depends(get_admin_user)) -> dict[str, Any]:
+    try:
+        return await host_agent.empty_trash()
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))

@@ -5,12 +5,16 @@ import {
   moveInboxItem,
   getInboxJobs,
   refreshJellyfinLibrary,
+  getTrash,
+  emptyTrash,
   type InboxItem,
+  type TrashSummary,
   type InboxResponse,
   type ArrCommandStatus,
   type MoveJob,
 } from '../../services/api'
 import { formatAge, formatBytes } from '../../utils/format'
+import ConfirmDialog from '../ConfirmDialog'
 import Section from './Section'
 
 const JOB_POLL_MS = 5_000
@@ -36,7 +40,33 @@ export default function MediaInbox() {
   const [dest, setDest] = useState<Record<string, string>>({})
   const [commands, setCommands] = useState<ArrCommandStatus[]>([])
   const [moves, setMoves] = useState<MoveJob[]>([])
+  const [trash, setTrash] = useState<TrashSummary | null>(null)
+  const [confirmEmpty, setConfirmEmpty] = useState(false)
+  const [emptying, setEmptying] = useState(false)
+  const [trashNote, setTrashNote] = useState('')
   const pollRef = useRef<number | null>(null)
+
+  const loadTrash = useCallback(async () => {
+    try {
+      setTrash(await getTrash())
+    } catch {
+      setTrash(null)
+    }
+  }, [])
+
+  const doEmptyTrash = async () => {
+    setConfirmEmpty(false)
+    setEmptying(true)
+    try {
+      const r = await emptyTrash()
+      setTrashNote(`Deleted ${r.removed} item${r.removed === 1 ? '' : 's'}, freed ${formatBytes(r.freedBytes)}`)
+    } catch (e) {
+      setTrashNote(e instanceof Error ? e.message : 'Could not empty the trash')
+    } finally {
+      setEmptying(false)
+      loadTrash()
+    }
+  }
 
   const load = useCallback(async () => {
     try {
@@ -63,6 +93,7 @@ export default function MediaInbox() {
         window.clearInterval(pollRef.current)
         pollRef.current = null
         load() // things moved — rescan
+        loadTrash()
       }
     } catch {
       /* transient */
@@ -77,11 +108,12 @@ export default function MediaInbox() {
 
   useEffect(() => {
     load()
+    loadTrash()
     pollJobs()
     return () => {
       if (pollRef.current) window.clearInterval(pollRef.current)
     }
-  }, [load, pollJobs])
+  }, [load, loadTrash, pollJobs])
 
   const withBusy = async (names: string[], fn: () => Promise<void>) => {
     setBusy(prev => new Set([...prev, ...names]))
@@ -204,6 +236,32 @@ export default function MediaInbox() {
         {!loading && items.length === 0 && !error && (
           <p className="p-3 text-sm text-butler-500">Inbox is empty — everything has been filed.</p>
         )}
+
+        {/* Trash — the holding pen; only this button deletes anything */}
+        <div className="p-3 flex flex-wrap items-center gap-2 bg-butler-900/40">
+          <p className="text-xs text-butler-400 flex-1 min-w-[14rem]">
+            <span className="text-butler-200">Trash</span> (Downloads/Trash):{' '}
+            {trash ? (
+              trash.items === 0 ? 'empty' : `${trash.items} item${trash.items === 1 ? '' : 's'} · ${formatBytes(trash.bytes)}`
+            ) : '--'}
+            {trashNote && <span className="text-butler-500"> · {trashNote}</span>}
+          </p>
+          <button
+            className="btn text-xs py-1.5 bg-red-900/40 text-red-300 hover:bg-red-900/70 disabled:opacity-50"
+            disabled={!trash || trash.items === 0 || emptying}
+            onClick={() => setConfirmEmpty(true)}
+          >
+            {emptying ? 'Emptying…' : 'Empty Trash'}
+          </button>
+        </div>
+        <ConfirmDialog
+          open={confirmEmpty}
+          title="Empty the Trash?"
+          description={`Permanently deletes ${trash?.items ?? 0} item${trash?.items === 1 ? '' : 's'} (${formatBytes(trash?.bytes ?? 0)}) from Downloads/Trash on the HomeServer drive. Nothing else is touched.`}
+          confirmLabel="Delete permanently"
+          onConfirm={doEmptyTrash}
+          onCancel={() => setConfirmEmpty(false)}
+        />
 
         {items.map(item => (
           <InboxRow

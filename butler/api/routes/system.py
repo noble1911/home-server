@@ -112,6 +112,20 @@ async def system_alerts(
     return {"alerts": alerts, "summary": {"total": len(alerts)}}
 
 
+@router.get("/system/stats/history")
+async def system_stats_history(
+    minutes: int = Query(60, ge=1, le=60),
+    _user_id: str = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Last N minutes of Mac CPU/memory/swap and container totals, for charts."""
+    data = await host_agent.get_history(minutes)
+    if not data:
+        return {"intervalSeconds": None, "host": [], "docker": []}
+    for row in data.get("docker", []):
+        row["memoryFormatted"] = _format_bytes(row.get("memory") or 0)
+    return data
+
+
 @router.get("/system/storage")
 async def system_storage(
     _user_id: str = Depends(get_current_user),

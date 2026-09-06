@@ -1,6 +1,14 @@
-import type { ContainerUsage, ProcessUsage, SystemStatsResponse } from '../../services/api'
+import { useState } from 'react'
+import type { ContainerUsage, ProcessUsage, StatsHistoryResponse, SystemStatsResponse } from '../../services/api'
+import HistoryChart from './HistoryChart'
 import Meter from './Meter'
 import Section from './Section'
+
+// Series colours: two hues that stay apart for colour-blind readers; the
+// legend + tooltip name them, so hue is never the only cue.
+const C_MAC = '#60a5fa'       // accent-light
+const C_DOCKER = '#f59e0b'    // amber
+const C_SWAP = '#a78bfa'      // violet
 
 /**
  * Compute — the Mac itself next to the Docker VM inside it.
@@ -9,8 +17,36 @@ import Section from './Section'
  * its own RAM ceiling, while Jellyfin, Ollama and OrbStack's own VM process
  * run natively. Both are shown so "why is the Mac slow" has an answer.
  */
-export default function ComputePanel({ stats }: { stats: SystemStatsResponse | null }) {
+export default function ComputePanel({
+  stats,
+  history,
+  minutes,
+  onMinutes,
+}: {
+  stats: SystemStatsResponse | null
+  history: StatsHistoryResponse | null
+  minutes: number
+  onMinutes: (m: number) => void
+}) {
   const host = stats?.host ?? null
+  const [tab, setTab] = useState<'cpu' | 'memory'>('cpu')
+  const hostPts = history?.host ?? []
+  const dockerPts = history?.docker ?? []
+  const hostMemTotal = host?.memory.total ?? null
+  const cpuSeries = [
+    { key: 'mac', label: 'Mac CPU', color: C_MAC, points: hostPts.map(p => ({ t: p.t, v: p.cpu })) },
+    { key: 'docker', label: 'Containers CPU', color: C_DOCKER, points: dockerPts.map(p => ({ t: p.t, v: p.cpu })) },
+  ]
+  const memSeries = [
+    { key: 'mac', label: 'Mac memory', color: C_MAC, points: hostPts.map(p => ({ t: p.t, v: p.memory })) },
+    {
+      key: 'docker',
+      label: 'Containers memory',
+      color: C_DOCKER,
+      points: hostMemTotal ? dockerPts.map(p => ({ t: p.t, v: Math.round((p.memory / hostMemTotal) * 1000) / 10 })) : [],
+    },
+    { key: 'swap', label: 'Swap', color: C_SWAP, points: hostPts.map(p => ({ t: p.t, v: p.swap })) },
+  ]
   const vmMem = stats?.memory ?? null
   const vmShare = host?.memory.total && vmMem ? Math.round((vmMem.dockerTotal / host.memory.total) * 100) : null
 
@@ -73,6 +109,36 @@ export default function ComputePanel({ stats }: { stats: SystemStatsResponse | n
           </div>
         </div>
       </div>
+
+      {host && (
+        <div className="card p-4 mt-4">
+          <div className="flex items-start justify-between gap-3 mb-2">
+            <CardTitle title="History" subtitle="Spikes show here even if they're gone by the next refresh" />
+            <div className="flex items-center gap-1">
+              {(['cpu', 'memory'] as const).map(k => (
+                <button
+                  key={k}
+                  onClick={() => setTab(k)}
+                  className={`px-2 py-1 rounded text-[11px] ${tab === k ? 'bg-butler-700 text-butler-100' : 'text-butler-400 hover:text-butler-200'}`}
+                >
+                  {k === 'cpu' ? 'CPU' : 'Memory'}
+                </button>
+              ))}
+              <span className="w-px h-4 bg-butler-700 mx-1" />
+              {[10, 30, 60].map(m => (
+                <button
+                  key={m}
+                  onClick={() => onMinutes(m)}
+                  className={`px-2 py-1 rounded text-[11px] tabular-nums ${minutes === m ? 'bg-butler-700 text-butler-100' : 'text-butler-400 hover:text-butler-200'}`}
+                >
+                  {m}m
+                </button>
+              ))}
+            </div>
+          </div>
+          <HistoryChart series={tab === 'cpu' ? cpuSeries : memSeries} minutes={minutes} />
+        </div>
+      )}
 
       {host && (host.apps.length > 0 || host.containers.length > 0) && (
         <div className="card p-4 mt-4">

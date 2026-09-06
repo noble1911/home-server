@@ -12,7 +12,9 @@ import {
   getSystemStats,
   getSystemAlerts,
   getDownloads,
+  getStatsHistory,
   type ServiceStatus,
+  type StatsHistoryResponse,
   type SystemHealthResponse,
   type SystemStorageResponse,
   type SystemStatsResponse,
@@ -162,6 +164,10 @@ export default function Dashboard() {
   const [health, setHealth] = useState<SystemHealthResponse | null>(null)
   const [storage, setStorage] = useState<SystemStorageResponse | null>(null)
   const [stats, setStats] = useState<SystemStatsResponse | null>(null)
+  const [history, setHistory] = useState<StatsHistoryResponse | null>(null)
+  const [historyMinutes, setHistoryMinutes] = useState<number>(() => {
+    try { return Number(localStorage.getItem('dash-history-minutes')) || 10 } catch { return 10 }
+  })
   const [alerts, setAlerts] = useState<AlertInfo[]>([])
   const [torrents, setTorrents] = useState<TorrentInfo[]>([])
   const [loadState, setLoadState] = useState<LoadState>('loading')
@@ -177,12 +183,13 @@ export default function Dashboard() {
     try {
       // Each source is independent: qBittorrent being down must not blank
       // the whole dashboard. Health is the one we treat as required.
-      const [h, st, sg, al, dl] = await Promise.allSettled([
+      const [h, st, sg, al, dl, hi] = await Promise.allSettled([
         getSystemHealth(),
         getSystemStats(),
         getSystemStorage(),
         getSystemAlerts(),
         getDownloads(),
+        getStatsHistory(60),
       ])
 
       if (h.status === 'fulfilled') {
@@ -197,6 +204,7 @@ export default function Dashboard() {
       if (sg.status === 'fulfilled') setStorage(sg.value)
       if (al.status === 'fulfilled') setAlerts(al.value.alerts)
       if (dl.status === 'fulfilled') setTorrents(dl.value.torrents)
+      if (hi.status === 'fulfilled') setHistory(hi.value)
       setUpdatedAt(new Date())
     } finally {
       inFlight.current = false
@@ -276,7 +284,15 @@ export default function Dashboard() {
         )}
       </Section>
 
-      <ComputePanel stats={stats} />
+      <ComputePanel
+        stats={stats}
+        history={history}
+        minutes={historyMinutes}
+        onMinutes={m => {
+          setHistoryMinutes(m)
+          try { localStorage.setItem('dash-history-minutes', String(m)) } catch { /* ignore */ }
+        }}
+      />
 
       <StoragePanel storage={storage} />
 

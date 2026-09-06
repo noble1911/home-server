@@ -70,3 +70,21 @@ async def start_move(source: str, destination: str) -> dict[str, Any]:
             if resp.status not in (200, 202):
                 raise RuntimeError(f"host agent refused move: {resp.reason} ({resp.status})")
             return await resp.json()
+
+
+async def get_history(minutes: int = 60) -> dict[str, Any] | None:
+    return await _get("/history", minutes=str(minutes))
+
+
+async def get_trash() -> dict[str, Any] | None:
+    return await _get("/trash")
+
+
+async def empty_trash() -> dict[str, Any]:
+    if not configured():
+        raise RuntimeError("host agent not configured")
+    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=600)) as session:
+        async with session.post(f"{settings.host_agent_url}/trash/empty", headers=_headers()) as resp:
+            if resp.status != 200:
+                raise RuntimeError(f"host agent refused: {resp.reason} ({resp.status})")
+            return await resp.json()

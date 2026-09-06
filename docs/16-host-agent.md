@@ -10,6 +10,11 @@ launchd) and gives the dashboard what the container can't see:
 - Every drive — Mac SSD, HomeServer, HomeServer2 — with usage and a cached
   size per category folder (symlinked folders are reported as links, not
   double-counted).
+- An hour of CPU / memory / swap samples (every 5 s) and container totals
+  (every 20 s) for the dashboard's history charts (`/history`). In memory:
+  restarting the agent clears it.
+- `/trash` and `/trash/empty`: the only thing on the box that deletes files,
+  and it only ever deletes the *contents* of `Downloads/Trash`.
 - Move jobs: copy-verify-delete a folder from an allow-listed source
   (`Downloads/Complete`) into an allow-listed library root, with progress.
   Used by the media inbox for items Sonarr/Radarr don't recognise.

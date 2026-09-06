@@ -469,6 +469,46 @@ export function refreshJellyfinLibrary(): Promise<{ ok: boolean }> {
   return api.post('/media/library/refresh')
 }
 
+export interface TrashSummary {
+  path: string
+  items: number
+  bytes: number
+}
+
+export function getTrash(): Promise<TrashSummary> {
+  return api.get<TrashSummary>('/media/trash')
+}
+
+export function emptyTrash(): Promise<{ removed: number; freedBytes: number }> {
+  return api.post('/media/trash/empty')
+}
+
+// ── Metrics history (host agent) ─────────────────────────────────────
+
+export interface HostHistoryPoint {
+  t: number
+  cpu: number
+  memory: number
+  swap: number
+}
+
+export interface DockerHistoryPoint {
+  t: number
+  cpu: number
+  memory: number
+  memoryFormatted: string
+}
+
+export interface StatsHistoryResponse {
+  intervalSeconds: number | null
+  host: HostHistoryPoint[]
+  docker: DockerHistoryPoint[]
+}
+
+export function getStatsHistory(minutes = 60): Promise<StatsHistoryResponse> {
+  return api.get<StatsHistoryResponse>(`/system/stats/history?minutes=${minutes}`)
+}
+
 // ── Downloads (qBittorrent proxy) ────────────────────────────────────
 
 export interface TorrentInfo {

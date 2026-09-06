@@ -8,6 +8,9 @@ tiny aiohttp service fills that gap from the host side:
     GET  /health            liveness + what's enabled
     GET  /metrics           host CPU/RAM/swap/load, top processes, per-container stats
     GET  /storage           every configured drive: usage + category sizes (cached du)
+    GET  /history           last hour of host cpu/mem/swap + container totals (for charts)
+    GET  /trash             items + bytes in the inbox Trash
+    POST /trash/empty       delete the Trash's contents (and nothing else)
     POST /move              start a move job (allow-listed source -> destination)
     GET  /jobs              recent move jobs with progress
     GET  /jobs/{id}         one job
@@ -39,6 +42,7 @@ import subprocess
 import sys
 import time
 import uuid
+from collections import deque
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -110,6 +114,9 @@ DEFAULT_DRIVES: list[dict[str, Any]] = [
 ]
 
 DEFAULT_MOVE_SOURCES = ["/Volumes/HomeServer/Downloads/Complete"]
+# The inbox's holding pen. /trash/empty deletes its *contents* and nothing else.
+TRASH_DIR = os.environ.get("HOST_AGENT_TRASH_DIR", "/Volumes/HomeServer/Downloads/Trash")
+HISTORY_SECONDS = 60 * 60     # keep an hour of samples for the charts
 DEFAULT_MOVE_DESTINATIONS = [
     "/Volumes/HomeServer2/Media",
     "/Volumes/HomeServer/Media",
@@ -228,6 +235,9 @@ class Sampler:
         self.category_sizes: dict[str, dict[str, int | None]] = {}
         self.categories_at: float = 0.0
         self._procs: dict[int, psutil.Process] = {}
+        # (t, cpu%, mem%, swap%) every METRICS_INTERVAL; (t, cpu%, mem bytes) per docker sample
+        self.history: deque[tuple[float, float, float, float]] = deque(maxlen=HISTORY_SECONDS // METRICS_INTERVAL)
+        self.docker_history: deque[tuple[float, float, int]] = deque(maxlen=HISTORY_SECONDS // DOCKER_STATS_INTERVAL)
 
     # -- metrics --
 
@@ -241,6 +251,9 @@ class Sampler:
         net_io = psutil.net_io_counters()
 
         procs = self._sample_processes()
+
+        mem_pct = round((vm.total - vm.available) / vm.total * 100, 1) if vm.total else 0
+        self.history.append((time.time(), round(cpu_percent, 1), mem_pct, round(swap.percent, 1)))
 
         self.metrics = {
             "sampledAt": time.time(),
@@ -340,6 +353,11 @@ class Sampler:
             })
         self.containers = sorted(rows, key=lambda r: -(r["memory"] or 0))
         self.containers_at = time.time()
+        self.docker_history.append((
+            time.time(),
+            round(sum(r["cpu"] or 0 for r in rows), 1),
+            sum(r["memory"] or 0 for r in rows),
+        ))
 
     # -- storage --
 
@@ -592,6 +610,78 @@ async def storage(request: web.Request) -> web.Response:
     return web.json_response(sampler.storage)
 
 
+async def history(request: web.Request) -> web.Response:
+    """Samples for the last N minutes (default 60, max 60)."""
+    try:
+        minutes = max(1, min(60, int(request.query.get("minutes", "60"))))
+    except ValueError:
+        minutes = 60
+    since = time.time() - minutes * 60
+    cores = psutil.cpu_count(logical=True) or 1
+    return web.json_response({
+        "intervalSeconds": METRICS_INTERVAL,
+        "host": [
+            {"t": round(t), "cpu": c, "memory": m, "swap": sw}
+            for t, c, m, sw in sampler.history if t >= since
+        ],
+        "docker": [
+            # docker stats reports CPU as % of one core summed; normalise to whole-machine %
+            {"t": round(t), "cpu": round(c / cores, 1), "memory": mem}
+            for t, c, mem in sampler.docker_history if t >= since
+        ],
+    })
+
+
+def _trash_summary() -> dict[str, Any]:
+    if not os.path.isdir(TRASH_DIR):
+        return {"path": TRASH_DIR, "items": 0, "bytes": 0}
+    names = [n for n in os.listdir(TRASH_DIR) if not n.startswith(".")]
+    return {
+        "path": TRASH_DIR,
+        "items": len(names),
+        "bytes": sum(_tree_size(os.path.join(TRASH_DIR, n)) for n in names),
+    }
+
+
+async def trash(request: web.Request) -> web.Response:
+    return web.json_response(await asyncio.get_running_loop().run_in_executor(None, _trash_summary))
+
+
+def _empty_trash() -> dict[str, Any]:
+    """Delete everything inside TRASH_DIR. Refuses to touch anything else."""
+    real = os.path.realpath(TRASH_DIR)
+    if not real.endswith("/Trash") or not os.path.isdir(real):
+        raise RuntimeError(f"refusing to empty {real}")
+    if not _disk_ok(real):
+        raise RuntimeError("no permission to read the drive")
+    freed = 0
+    removed = 0
+    for n in os.listdir(real):
+        if n.startswith("."):
+            continue
+        p = os.path.join(real, n)
+        if os.path.islink(p):
+            os.unlink(p)
+            removed += 1
+            continue
+        freed += _tree_size(p)
+        if os.path.isdir(p):
+            shutil.rmtree(p)
+        else:
+            os.remove(p)
+        removed += 1
+    logger.info("Emptied trash: %d item(s), %d bytes", removed, freed)
+    return {"removed": removed, "freedBytes": freed}
+
+
+async def empty_trash(request: web.Request) -> web.Response:
+    try:
+        result = await asyncio.get_running_loop().run_in_executor(MOVE_EXECUTOR, _empty_trash)
+    except RuntimeError as e:
+        raise web.HTTPServiceUnavailable(reason=str(e))
+    return web.json_response(result)
+
+
 async def start_move(request: web.Request) -> web.Response:
     body = await request.json()
     src = str(body.get("source", ""))
@@ -673,6 +763,9 @@ def make_app() -> web.Application:
     app.router.add_get("/health", health)
     app.router.add_get("/metrics", metrics)
     app.router.add_get("/storage", storage)
+    app.router.add_get("/history", history)
+    app.router.add_get("/trash", trash)
+    app.router.add_post("/trash/empty", empty_trash)
     app.router.add_post("/move", start_move)
     app.router.add_get("/jobs", list_jobs)
     app.router.add_get("/jobs/{id}", get_job)
