@@ -67,7 +67,7 @@ services:
   # ── home-server: download-stack ──────────────────────────────────
   - { name: qbittorrent, project: home-server, container: qbittorrent, host_port: 8081 }  # WebUI
   - { name: qbittorrent-torrent, project: home-server, container: qbittorrent, host_port: 50413 }  # torrent tcp/udp (moved off blacklisted 6881)
-  - { name: flaresolverr,project: home-server, container: flaresolverr,host_port: 8191 }  # image: byparr (flaresolverr-compatible); leaks browser PIDs, see notes
+  - { name: flaresolverr,project: home-server, container: flaresolverr,host_port: 8191 }  # image: byparr (flaresolverr-compatible); leaks browser PIDs AND playwright profiles in container /tmp (54GB by 2026-09-06 — recreate to reclaim), see notes
   - { name: autoheal,    project: home-server, container: autoheal }  # restarts unhealthy autoheal=true containers (byparr); internal only, no host port
 
   # ── home-server: books-stack ─────────────────────────────────────
@@ -86,7 +86,7 @@ services:
   # ── vector-llm ───────────────────────────────────────────────────
   # vector-llm itself runs as a host Python process (no container). Its compose
   # provides ollama:
-  - { name: ollama, project: vector-llm, container: ollama, host_port: 11434, shared: true, status: stopped }  # ollama/ollama — embeddings + qwen; start vector-llm stack
+  - { name: ollama, project: vector-llm, container: ollama, host_port: 11434, shared: true, status: stopped }  # container stopped; native /Applications/Ollama.app serves :11434 on the host instead (launchd com.ollama.ollama). butler reaches it via host.docker.internal:11434 (OLLAMA_URL in butler/.env)
 
   # ── claude-esp ───────────────────────────────────────────────────
   - name: esp-gateway

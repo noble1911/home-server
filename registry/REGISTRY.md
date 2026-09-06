@@ -12,7 +12,7 @@ Cloudflare dashboard (domain `noblehaus.uk`) — mirror them here so they're dis
 | Project | Path (server) | Repo (local) | What it is |
 |---|---|---|---|
 | **home-server** | `~/home-server` | `~/random/HomeServer` | Umbrella: butler (AI brain+PWA+voice) + media/photos/books/smart-home/download stacks. Public via `cloudflared`. |
-| **vector-llm** | `~/vector-llm` | `~/random/vector-llm` | Always-on-mic LLM brain for the Anki Vector robot. Runs as a **host Python process** (`python src/main.py`): host mic → faster-whisper STT → Ollama (qwen) → Kokoro TTS; escalates to butler; shares Postgres as user `vector-robot`. Its compose **provides the `ollama` container** (:11434). **Paused 2026-05-25** — host process stopped. |
+| **vector-llm** | `~/vector-llm` | `~/random/vector-llm` | Always-on-mic LLM brain for the Anki Vector robot. Runs as a **host Python process** (`python src/main.py`): host mic → faster-whisper STT → Ollama (qwen) → Kokoro TTS; escalates to butler; shares Postgres as user `vector-robot`. Its compose **provides the `ollama` container** (:11434). **Paused 2026-05-25** — host process stopped. Its launchd job `com.vector-llm` (RunAtLoad+KeepAlive) came back on the 2026-08-06 reboot and crash-looped ~11k times against an offline robot; **disabled 2026-09-06** (`launchctl enable gui/501/com.vector-llm` + bootstrap to resume). |
 | **claude-esp** | `~/esp-gateway` | `~/random/claude-esp` | ESP32 AMOLED voice device. `esp-gateway` container (:8770) bridges device ↔ Groq STT ↔ butler ↔ Kokoro; Claude draws cards via `display_on_device`. **Deployed & running** from `~/esp-gateway`. |
 | **dont-lie** | `~/dont-lie` | — | "Don't Lie" web game — Expo/React-Native app (`App.tsx`, `app.json`, `eas.json`) built into an nginx image serving on **:3001** (`dont-lie-app`), on the `homeserver` net. |
 | **wire-pod-backup** | `~/wire-pod-backup` | — | Backup/escrow data for wire-pod (Anki Vector auth), supporting vector-llm. **Not a running service.** |
@@ -23,7 +23,7 @@ Cloudflare dashboard (domain `noblehaus.uk`) — mirror them here so they're dis
 | Service | Host port | Notes |
 |---|---|---|
 | **Jellyfin** | `8096` | `/Applications/Jellyfin.app` — runs natively (uses Apple VideoToolbox for HW transcode, which the Linux container can't). Reach from containers via `host.docker.internal:8096`. Container retired 2026-05-25. |
-| **wire-pod** | — | WirePod macOS app (Anki Vector auth/server), supporting vector-llm. |
+| **wire-pod** | — | WirePod macOS app (Anki Vector auth/server), supporting vector-llm. **Not running as of 2026-09-06** (only its mDNS helper launchd job is up). |
 
 ## Shared services (the contracts every project should reuse, not duplicate)
 
@@ -32,7 +32,7 @@ Cloudflare dashboard (domain `noblehaus.uk`) — mirror them here so they're dis
 | **butler-api** | `http://butler-api:8000` | `http://192.168.1.117:8000` | Brain + per-user memory + tools. Auth: `X-API-Key: $INTERNAL_API_KEY` (internal → `user_id` in body) or user JWT. Memory is keyed by `user_id`. |
 | **Kokoro TTS** | `http://kokoro-tts:8880` | `:8880` | OpenAI-compatible `/v1/audio/speech` (wav/mp3). |
 | **Postgres** | `immich-postgres:5432` | `:5432` | DB `immich`, schema `butler` (+pgvector). Shared by butler & vector-llm. |
-| **Ollama** | `http://ollama:11434` | `:11434` | Container defined by **vector-llm's** compose (`ollama/ollama`). Embeddings (`nomic-embed-text`) + qwen brain. **Currently stopped** — start vector-llm's stack to use it; ensure it joins the `homeserver` net so butler can reach it for embeddings. |
+| **Ollama** | `http://ollama:11434` | `:11434` | Embeddings (`nomic-embed-text`) + qwen brain. The `ollama` **container** (from vector-llm's compose) is stopped; since 2026-09-06 the **native `/Applications/Ollama.app`** serves `:11434` on the host and butler reaches it via `http://host.docker.internal:11434` (`OLLAMA_URL` in `butler/.env`). Containers must use `host.docker.internal`, not `ollama`, until the container is brought back on the `homeserver` net. |
 | **LiveKit** | `ws://livekit:7880` | `:7880-7882` | WebRTC for PWA voice. **LAN-only** — media (UDP/7882, TCP/7881) does NOT traverse the Cloudflare tunnel. |
 | **Groq** (cloud) | — | — | Whisper STT. Key in `~/home-server/docker/voice-stack/.env`. |
 | **homeserver** (Docker network) | — | — | `external: true`. How containers reach each other by name. |
