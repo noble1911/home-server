@@ -46,6 +46,13 @@ services:
       - "8191:8191"
     networks:
       - homeserver
+    # Resolve external names directly rather than through OrbStack -> macOS
+    # resolver (whose first nameserver is the ISP router's IPv6 address). That
+    # path stalled intermittently on 2026-09-06; the browser is the only thing in
+    # this container that resolves names, and it never needs container names.
+    dns:
+      - 1.1.1.1
+      - 1.0.0.1
     restart: unless-stopped
     # Cap PIDs: the headless-browser solver can leak processes over time
     # (observed ~48k, which exhausted the OrbStack VM's process capacity and
@@ -59,12 +66,20 @@ services:
     # recreated empty. Supported by byparr >= 3.0.2 (#391).
     tmpfs:
       - /tmp:size=512m
+    # Health: byparr's /health is a real Firefox navigation to google.com. Upstream
+    # probes it every 15m with a 30s timeout; we used to probe every 30s with 10s,
+    # and any DNS stall on the Mac (2026-09-05/06, VM-wide) made three probes hang,
+    # autoheal then restarted a container that was serving Prowlarr fine (eight
+    # times in two hours). The script only reports unhealthy when the API is dead,
+    # or the browser can't load a page WHILE plain curl can reach the internet.
+    volumes:
+      - ./byparr-healthcheck.sh:/healthcheck.sh:ro
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:8191/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
+      test: ["CMD", "sh", "/healthcheck.sh"]
+      interval: 2m
+      timeout: 70s      # script's curls add up to ~58s worst case
+      retries: 3        # so a genuinely wedged browser is restarted within ~6 min
+      start_period: 90s
 
   prowlarr:
     image: lscr.io/linuxserver/prowlarr:2.3.0
@@ -102,6 +117,10 @@ services:
       - AUTOHEAL_CONTAINER_LABEL=autoheal
       - AUTOHEAL_INTERVAL=15        # seconds between checks
       - AUTOHEAL_START_PERIOD=60    # grace after a container starts
+      # `docker restart` of byparr takes 10s stop + up to ~45s browser start; the
+      # default 30s API timeout logged "Restarting container failed" and led to
+      # a second restart a few minutes later.
+      - CURL_TIMEOUT=90
       - TZ=Europe/London
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
