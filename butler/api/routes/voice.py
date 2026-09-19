@@ -260,3 +260,7 @@ def _should_end_turn(response: str) -> bool:
 
 
 
+
+# Little Meadow has its own personality, validation and scoped memory tools.
+from .pet import router as pet_router
+router.include_router(pet_router)
