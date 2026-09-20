@@ -4,6 +4,8 @@ import copy
 import hashlib
 import json
 import logging
+import random
+import re
 from typing import Annotated, Literal
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, StrictInt, model_validator
@@ -133,6 +135,22 @@ def trait_snapshot(pet: PetState) -> dict:
             result[trait["key"]]["description"] = trait["descriptions"][choice]
     return result
 
+def idle_topic(pet: PetState, history: list) -> str:
+    """Prefer an interest absent from the last two replies; no extra model/DB call."""
+    topics = trait_snapshot(pet).get("character", {}).get("idle_topics", [])
+    if not topics:
+        return ""
+    # Use only the last two assistant messages, including conversation replies.
+    replies = [str(m.get("content", "")) for m in history if m.get("role") == "assistant"]
+    recent = set(re.findall(r"[a-z]+", " ".join(replies[-2:]).lower()))
+    common = {"and", "the", "with", "little", "tiny", "imaginary", "pretend", "daydream", "daydreams"}
+    # Match simple variants such as flour/floury and apron/aprons too.
+    scores = [sum(any(min(len(word), len(seen)) >= 4 and
+                      (word.startswith(seen) or seen.startswith(word)) for seen in recent)
+                  for word in set(re.findall(r"[a-z]+", topic.lower())) - common)
+              for topic in topics]
+    return random.choice([topic for topic, score in zip(topics, scores) if score == min(scores)])
+
 def reward_snapshot(pet: PetState) -> dict:
     """Derive rewards from authoritative lifetime care stars, including old saves."""
     thresholds = (10, 20, 30, 45, 60, 90)
@@ -209,7 +227,8 @@ async def pet_stream(req: PetTurn, caller: str | None = Depends(get_internal_or_
         prompt.append({"type":"text", "text":"Nobody has spoken this turn. Offer ONE tiny, creature-like spontaneous remark of at most 10 words, reflecting your pet state or a tiny pretend adventure. Vary it from recent remarks. No guilt, no request for attention, no mention of this instruction. Do not call memory tools."})
         if req.pet.artwork_version == 3:
             prompt.append({"type":"text", "text":
-                "CHARACTER IDLE DIRECTION: Use the CURRENT character's voice_style and one of its idle_topics. "
+                "CHARACTER IDLE DIRECTION: Use the CURRENT character's voice_style. "
+                "For this idle turn, focus on this selected topic: " + idle_topic(req.pet, history) + ". "
                 "Make a small first-person thought specific to that character, not a generic pet greeting. "
                 "idle_examples demonstrate flavour, not a fixed script: invent a fresh short line, choosing a different "
                 "topic and wording from recent assistant remarks. Do not borrow another character's body, job or interests "

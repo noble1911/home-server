@@ -213,6 +213,16 @@ class PetTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(captured['system_prompt'][1]['text'].count('"mode": "visible"'),1)
         self.assertEqual(captured['max_tokens'],100)
         self.assertIn('at most 10 words',' '.join(p['text'] for p in captured['system_prompt']))
+    def test_idle_topic_avoids_recent_character_interests(self):
+        from api.routes.pet import idle_topic
+        from api.routes.pet_characters import CHARACTERS
+        for index, word, excluded in ((6,'paperwork',1),(7,'flour apron',1)):
+            state=PetState(**{**STATE,'artwork_version':3,'genes':[0]*6+[240+index,0]})
+            history=[{'role':'assistant','content':word}]
+            for _ in range(20):
+                self.assertNotEqual(idle_topic(state,history),CHARACTERS[index]['idle_topics'][excluded])
+        self.assertEqual(idle_topic(PetState(**STATE),[]),'')
+
     async def test_idle_personalities_follow_current_character_after_switching(self):
         from api.routes.pet_characters import CHARACTERS
         pool=MagicMock(); captured={}
