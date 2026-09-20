@@ -378,6 +378,9 @@ async def pet_playdate_chat(req: PlaydateChat, caller: str | None = Depends(get_
             user_message=json.dumps({'pets':profiles}),tools={},history=[],
             model_override=PET_MODEL,allow_web_search=False,max_tokens=700,max_tool_rounds=1):
         if isinstance(chunk,str): text+=chunk
+    text=text.strip()
+    fenced=re.fullmatch(r'```(?:json)?\s*\n([\s\S]*?)\n```',text)
+    if fenced:text=fenced.group(1)
     try:
         return PlaydateDialogue.model_validate_json(text)
     except ValueError:

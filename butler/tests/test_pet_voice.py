@@ -333,7 +333,7 @@ class PlaydateChatTests(unittest.IsolatedAsyncioTestCase):
         captured={};pool=MagicMock();pool.pool.fetchval=AsyncMock(return_value={'profile':'virtual_pet'})
         async def brain(**kwargs):
             captured.update(kwargs)
-            yield json.dumps({'lines':['Hello little friend, shall we imagine a picnic?']*8})
+            yield '```json\n'+json.dumps({'lines':['Hello little friend, shall we imagine a picnic?']*8})+'\n```'
         with patch('api.routes.pet.stream_chat_with_tools',brain),patch('api.routes.pet._load_facts',AsyncMock()) as facts,patch('api.routes.pet.load_conversation_messages',AsyncMock()) as history:
             result=await pet_playdate_chat(self.request(),None,pool)
             self.assertIsInstance(result,PlaydateDialogue)
@@ -353,7 +353,7 @@ class PlaydateChatTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_chat_rejects_malformed_or_long_generated_dialogue(self):
         from api.routes.pet import pet_playdate_chat,PlaydateDialogue
-        for lines in (['Hello']*7,['Hello']*9,['word '*21]*8,['[waves] Hello']*8):
+        for lines in (['Hello']*7,['Hello']*9,['word '*21]*8,['[waves] Hello']*8,['Hi\x00friend']*8,['é'*100]*8):
             with self.assertRaises(ValidationError):PlaydateDialogue(lines=lines)
         pool=MagicMock();pool.pool.fetchval=AsyncMock(return_value={'profile':'virtual_pet'})
         async def bad(**kwargs):yield 'not json'
