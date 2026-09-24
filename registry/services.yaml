@@ -85,6 +85,8 @@ services:
 
   # ── other projects ───────────────────────────────────────────────
   - { name: dont-lie-app, project: dont-lie, container: dont-lie-app, host_port: 3001 }  # "Don't Lie" web game (Expo app via nginx)
+  - { name: super-skidmarks, project: super-skidmarks, container: super-skidmarks, host_port: 3002 }  # Super Skidmarks web game + WebSocket relay (/ws); ~/super-skidmarks, docker compose
+  - { name: skidmarks-quicktunnel, project: super-skidmarks, container: skidmarks-quicktunnel }  # TEMPORARY cloudflared quick tunnel (random trycloudflare.com URL) — remove once skidmarks.noblehaus.uk is routed
   # gunpey: browser game in ~/gunpey (gunpey.html + multiplayer/server.js Node server).
   #   No host port bound / not currently running — start with `node multiplayer/server.js` if needed.
 

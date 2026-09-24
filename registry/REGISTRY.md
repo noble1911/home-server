@@ -17,6 +17,7 @@ Cloudflare dashboard (domain `noblehaus.uk`) — mirror them here so they're dis
 | **dont-lie** | `~/dont-lie` | — | "Don't Lie" web game — Expo/React-Native app (`App.tsx`, `app.json`, `eas.json`) built into an nginx image serving on **:3001** (`dont-lie-app`), on the `homeserver` net. |
 | **wire-pod-backup** | `~/wire-pod-backup` | — | Backup/escrow data for wire-pod (Anki Vector auth), supporting vector-llm. **Not a running service.** |
 | **gunpey** | `~/gunpey` | — | Browser game (`gunpey.html`) with a Node multiplayer server (`multiplayer/server.js`). Files present on the box but **not currently running** (no container, no host process). |
+| **super-skidmarks** | `~/super-skidmarks` | `~/IdeaProjects/super-skidmarks` | Web remake of Super Skidmarks — the built game and its WebSocket relay (`/ws`) in one Node container `super-skidmarks` on **:3002** (`docker compose up -d --build` in `~/super-skidmarks`; source is rsynced from the local repo, which has no remote). Public via a **temporary** quick tunnel until the dashboard route below exists. |
 
 ## Native (host) services — not Docker
 
@@ -49,6 +50,8 @@ See `services.yaml` for the full machine-readable port map (the source of truth 
 | `butler.noblehaus.uk` | `butler-app:80` (PWA) |
 | `butler-api.noblehaus.uk` | `butler-api:8000` |
 | `esp-gateway.noblehaus.uk` | `esp-gateway:8770` *(gateway deployed & running; confirm route exists in dashboard)* |
+| `skidmarks.noblehaus.uk` *(to add in the dashboard)* | `super-skidmarks:3002` (plain HTTP; the game's WebSocket is `/ws` on the same origin) |
+| *temporary:* random `*.trycloudflare.com` | container `skidmarks-quicktunnel` — a cloudflared **quick tunnel** (no account, not the main tunnel) to `super-skidmarks:3002`. Its URL is in `docker logs skidmarks-quicktunnel` and changes if it restarts. Remove it (`docker rm -f skidmarks-quicktunnel`) once the route above exists. |
 | _…(add the rest from the dashboard: photos, jellyfin, ha, etc.)_ | |
 
 > `doctor.sh` can verify host ports against live containers, but it **cannot** see
