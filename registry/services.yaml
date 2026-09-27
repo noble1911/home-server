@@ -89,9 +89,9 @@ services:
   - { name: dont-lie-app, project: dont-lie, container: dont-lie-app, host_port: 3001 }  # "Word Poker" web game (Expo app via nginx) — games.noblehaus.uk/dont-lie/
   - { name: super-skidmarks, project: super-skidmarks, container: super-skidmarks, host_port: 3002 }  # Super Skidmarks game + WebSocket relay (/ws) — games.noblehaus.uk/skidmarks/
   - { name: gunpey, project: gunpey, container: gunpey, host_port: 3003 }  # Gunpey 99 multiplayer server + game — games.noblehaus.uk/gunpey/
+  - { name: modern-combat, project: modern-combat, container: modern-combat, host_port: 3004 }  # Modern Combat game + multiplayer relay (/ws) — games.noblehaus.uk/modern-combat/
   - { name: skidmarks-quicktunnel, project: super-skidmarks, container: skidmarks-quicktunnel }  # TEMPORARY cloudflared quick tunnel — remove once games.noblehaus.uk is routed
   # tycoon-town: static files in ~/games-static/tycoon-town, served by games-gateway (no container, no port)
-  # modern-combat: static files in ~/games-static/modern-combat, served by games-gateway (no container, no port)
 
   # ── vector-llm ───────────────────────────────────────────────────
   # vector-llm itself runs as a host Python process (no container). Its compose

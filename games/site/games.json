@@ -38,7 +38,7 @@
     "name": "Modern Combat",
     "path": "modern-combat/",
     "tagline": "Close Combat-style real-time tactics with modern armour, infantry and drones.",
-    "players": "Single player · campaign and quick battles vs AI",
+    "players": "Single player vs AI · online 1v1 and co-op",
     "image": "img/modern-combat.jpg",
     "repo": "https://github.com/noble1911/modern-combat"
   }

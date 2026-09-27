@@ -10,7 +10,7 @@ adding a game never touches Cloudflare. Script: `scripts/17-games.sh`. Config: `
 | Word Poker | `/dont-lie/` | container `dont-lie-app` (LAN `:3001`) | `~/dont-lie` (not a git repo) |
 | Gunpey 99 | `/gunpey/` | container `gunpey` (LAN `:3003`) | `~/gunpey` ← [noble1911/gunpey](https://github.com/noble1911/gunpey) |
 | Tycoon Town | `/tycoon-town/` | static files in `~/games-static/tycoon-town/` | `~/IdeaProjects/tycoon-town` on the laptop |
-| Modern Combat | `/modern-combat/` | static files in `~/games-static/modern-combat/` | `~/IdeaProjects/modern-combat` ← [noble1911/modern-combat](https://github.com/noble1911/modern-combat) |
+| Modern Combat | `/modern-combat/` | container `modern-combat` (LAN `:3004`) | `~/modern-combat` ← `~/IdeaProjects/modern-combat` ([noble1911/modern-combat](https://github.com/noble1911/modern-combat)) |
 
 On the LAN the whole site is at `http://192.168.1.117:3010/`.
 
@@ -22,14 +22,14 @@ browser ─https─▶ Cloudflare ─tunnel─▶ cloudflared ─http─▶ game
                                                            ├─ /skidmarks/*    → super-skidmarks:3002
                                                            ├─ /dont-lie/*     → dont-lie-app:80
                                                            ├─ /gunpey/*       → gunpey:3000
-                                                           ├─ /tycoon-town/*  → ~/games-static/tycoon-town/
-                                                           └─ /modern-combat/* → ~/games-static/modern-combat/
+                                                           ├─ /modern-combat/* → modern-combat:3000
+                                                           └─ /tycoon-town/*  → ~/games-static/tycoon-town/
 ```
 
 - **The gateway strips the prefix.** A request for `/skidmarks/assets/app.js` reaches the game as
   `/assets/app.js`, so a game doesn't need to know where it's mounted. It only has to use relative
   URLs (see [Make it work under a path](#1-make-it-work-under-a-path)).
-- **WebSockets pass straight through** (skidmarks' and gunpey's multiplayer), Cloudflare included.
+- **WebSockets pass straight through** (skidmarks', gunpey's and modern-combat's multiplayer), Cloudflare included.
 - **`/<name>` redirects to `/<name>/`**: relative URLs resolve against the trailing slash.
 - **A game that's down** (its container stopped) gets `games/site/down.html` with a 502, and its
   card on the hub says *Resting* instead of *Online*.
@@ -94,7 +94,7 @@ the site's root:
       build: .
       container_name: mygame
       ports:
-        - "3004:3000"          # optional LAN port: take a free one from registry/services.yaml
+        - "3005:3000"          # optional LAN port: take a free one from registry/services.yaml
       networks:
         - homeserver
       restart: unless-stopped
@@ -150,7 +150,7 @@ row to the table at the top of this page. Run `registry/doctor.sh`.
 | Word Poker | On the box: `cd ~/dont-lie && docker compose up -d --build`. Not a git repo: back files up before editing (the 2026-09-27 path change left copies in `.backup-2026-09-27/`). |
 | Gunpey 99 | On the box: `cd ~/gunpey && git pull && docker compose up -d --build`. |
 | Tycoon Town | From the laptop, a committed version: `git archive HEAD index.html style.css $(git ls-tree --name-only HEAD \| grep '\.js$') assets/custom \| tar -x -C /tmp/tt --exclude '*.blend' --exclude '*.jpg' --exclude '*.md'`, then `rsync -a --delete /tmp/tt/ 192.168.1.117:games-static/tycoon-town/`. `~/games-static/tycoon-town/.deployed-commit` records which commit is live. |
-| Modern Combat | From the laptop, a committed version: `npm run deploy` in the repo (`scripts/deploy.sh`: exports `HEAD`, `npm ci && npm run build`, rsyncs `dist/` to `192.168.1.117:games-static/modern-combat/`, checks the gateway). `~/games-static/modern-combat/.deployed-commit` records which commit is live. |
+| Modern Combat | From the laptop, a committed version: `npm run deploy` in the repo (`scripts/deploy.sh`: exports `HEAD` to `192.168.1.117:modern-combat/`, runs `docker compose up -d --build` there, waits for the healthcheck, then checks the page and a multiplayer socket through the gateway). No git on the box: `~/modern-combat/.deployed-commit` records which commit is live. |
 | The hub | Edit `games/`, then re-run `scripts/17-games.sh`. |
 
 ## Testing

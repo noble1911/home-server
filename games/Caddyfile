@@ -19,7 +19,7 @@
 	# ── Games with a server of their own ─────────────────────────────────────────
 	# handle_path strips the prefix: each game sees itself at /. The redirect adds the
 	# trailing slash, which the games' relative asset and socket URLs rely on.
-	# WebSockets (skidmarks, gunpey multiplayer) pass straight through reverse_proxy.
+	# WebSockets (skidmarks, gunpey, modern-combat multiplayer) pass straight through reverse_proxy.
 
 	redir /skidmarks /skidmarks/ 308
 	handle_path /skidmarks/* {
@@ -36,17 +36,16 @@
 		reverse_proxy gunpey:3000
 	}
 
+	redir /modern-combat /modern-combat/ 308
+	handle_path /modern-combat/* {
+		reverse_proxy modern-combat:3000
+	}
+
 	# ── Static games: files in ~/games-static/<name>/ ────────────────────────────
 
 	redir /tycoon-town /tycoon-town/ 308
 	handle_path /tycoon-town/* {
 		root * /srv/static/tycoon-town
-		file_server
-	}
-
-	redir /modern-combat /modern-combat/ 308
-	handle_path /modern-combat/* {
-		root * /srv/static/modern-combat
 		file_server
 	}
 
