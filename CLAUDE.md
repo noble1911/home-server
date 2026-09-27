@@ -131,6 +131,7 @@ port or adding a service**, and run `registry/doctor.sh` to check for drift agai
 | **dont-lie** | `~/dont-lie` | "Word Poker" ("Don't Lie") web game — Expo/React-Native app served via nginx, port 3001 (`dont-lie-app`); at games.noblehaus.uk/dont-lie/ | Running |
 | **gunpey** | `~/gunpey` | Gunpey 99 — Node multiplayer server + game in a container, port 3003 (`gunpey`); at games.noblehaus.uk/gunpey/ | Running |
 | **super-skidmarks** | `~/super-skidmarks` | Super Skidmarks web remake — game + WebSocket relay in one container, port 3002 (`super-skidmarks`); at games.noblehaus.uk/skidmarks/ | Running |
+| **modern-combat** | `~/modern-combat` | Modern Combat — Close Combat-style tactics; Node game server + multiplayer relay in one container, port 3004 (`modern-combat`); at games.noblehaus.uk/modern-combat/ | Running |
 | **tycoon-town** | `~/games-static/tycoon-town` | Tycoon Town — static browser game served by the games gateway at games.noblehaus.uk/tycoon-town/ (no container) | Running |
 | **vector-llm** | `~/vector-llm` | Always-on-mic LLM brain for the Anki Vector robot (host Python process; its compose provides the shared `ollama` container) | Paused (2026-05-25) |
 | **wire-pod-backup** | `~/wire-pod-backup` | Backup/escrow data for wire-pod (Anki Vector auth) | Not a service |
@@ -263,4 +264,4 @@ home-server/
 - **Create issues for discovered work** — don't let insights get lost between sessions
 - **BookTool replaced Readarr** — uses Open Library for search, Prowlarr + qBit for downloads
 - **CI/CD exists** — `.github/workflows/` has build-and-push and CI pipelines
-- **`registry/` is the source of truth for the shared box** — every project on the Mac Mini, its host ports, shared-service contracts, and Cloudflare routes. Update `REGISTRY.md` + `services.yaml` and run `registry/doctor.sh` when you add/move/remove a service. Co-hosted projects: esp-gateway (:8770), the games site (games-gateway :3010 → dont-lie :3001, super-skidmarks :3002, gunpey :3003, tycoon-town static; `docs/17-games.md`), vector-llm (paused)
+- **`registry/` is the source of truth for the shared box** — every project on the Mac Mini, its host ports, shared-service contracts, and Cloudflare routes. Update `REGISTRY.md` + `services.yaml` and run `registry/doctor.sh` when you add/move/remove a service. Co-hosted projects: esp-gateway (:8770), the games site (games-gateway :3010 → dont-lie :3001, super-skidmarks :3002, gunpey :3003, modern-combat :3004, tycoon-town static; `docs/17-games.md`), vector-llm (paused)
