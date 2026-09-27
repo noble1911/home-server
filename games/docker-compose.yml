@@ -1,0 +1,27 @@
+# The games site: games.noblehaus.uk (Cloudflare tunnel → games-gateway:80), LAN :3010.
+# A hub page at /, and each game under its own path (/skidmarks/, /gunpey/, …).
+# The games are their own projects; this only routes to them. See docs/17-games.md.
+services:
+  games-gateway:
+    image: caddy:2.10-alpine
+    container_name: games-gateway
+    ports:
+      - "3010:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./site:/srv/hub:ro
+      # Static games (no server of their own): ~/games-static/<name>/ is served at /<name>/
+      - ${HOME}/games-static:/srv/static:ro
+    networks:
+      - homeserver
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:80/healthz"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+
+networks:
+  homeserver:
+    external: true

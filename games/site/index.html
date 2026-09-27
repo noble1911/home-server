@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>noblehaus games</title>
+<meta name="description" content="The games running on the noblehaus home server.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<!-- The list of games is site/games.json; this page draws a card for each and checks it's up. -->
+<style>
+  :root {
+    --bg: #140c24;
+    --card: #21163b;
+    --card-hi: #2a1c4b;
+    --line: rgba(255, 255, 255, 0.08);
+    --ink: #f6f1ff;
+    --muted: #b3a8c9;
+    --accent: #ffb000;
+    --ok: #3ddc84;
+    --off: #6f6585;
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--bg); }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    color: var(--ink);
+    font: 16px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background:
+      radial-gradient(900px 520px at 8% -12%, rgba(255, 106, 61, 0.22), transparent 60%),
+      radial-gradient(900px 620px at 108% 6%, rgba(122, 82, 255, 0.24), transparent 60%),
+      var(--bg);
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 48px 16px 64px; }
+  header { display: flex; align-items: center; gap: 16px; margin-bottom: 12px; }
+  header img { width: 56px; height: 56px; flex: none; }
+  .brand { font-size: 13px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); }
+  h1 { margin: 0; font-size: clamp(36px, 7vw, 56px); line-height: 1; letter-spacing: -0.03em; }
+  .lede { margin: 0 0 32px; color: var(--muted); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 20px; }
+  .card {
+    display: flex; flex-direction: column; overflow: hidden;
+    background: var(--card); border: 1px solid var(--line); border-radius: 18px;
+    color: inherit; text-decoration: none;
+    transition: transform 0.15s, border-color 0.15s, background 0.15s;
+  }
+  .card:hover, .card:focus-visible { transform: translateY(-3px); border-color: rgba(255, 176, 0, 0.6); background: var(--card-hi); outline: none; }
+  .shot { position: relative; aspect-ratio: 16 / 10; background: linear-gradient(135deg, #ff6a3d, #7a52ff); }
+  /* The screenshot sits over the initial, which only shows when there's no screenshot. */
+  .shot img { position: relative; z-index: 1; display: block; width: 100%; height: 100%; object-fit: cover; }
+  .shot .initial { position: absolute; inset: 0; display: grid; place-items: center; font-size: 56px; font-weight: 800; color: rgba(255, 255, 255, 0.85); }
+  .status {
+    position: absolute; top: 10px; left: 10px; z-index: 2;
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px; border-radius: 999px;
+    background: rgba(12, 8, 24, 0.78); font-size: 12px; font-weight: 600;
+  }
+  .status i { width: 8px; height: 8px; border-radius: 50%; background: var(--off); }
+  .status.up i { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+  .body { flex: 1; display: flex; flex-direction: column; gap: 6px; padding: 16px 18px 18px; }
+  h2 { margin: 0; font-size: 21px; letter-spacing: -0.01em; }
+  .tagline { margin: 0; color: var(--muted); font-size: 15px; }
+  .meta { margin-top: auto; padding-top: 10px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .players { font-size: 13px; color: #d8cff0; }
+  .play { flex: none; padding: 7px 16px; border-radius: 999px; background: var(--accent); color: #1b1030; font-size: 14px; font-weight: 800; }
+  .card.down .play { background: var(--off); color: var(--ink); }
+  .empty { color: var(--muted); }
+  footer { margin-top: 40px; color: var(--muted); font-size: 13px; }
+  @media (prefers-reduced-motion: reduce) {
+    .card { transition: none; }
+    .card:hover, .card:focus-visible { transform: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <img src="favicon.svg" alt="">
+    <div>
+      <div class="brand">noblehaus</div>
+      <h1>Games</h1>
+    </div>
+  </header>
+  <p class="lede">Pick something to play. Everything here runs on the home server.</p>
+  <main class="grid" id="games" aria-live="polite"></main>
+  <footer>Adding a game: <code>docs/17-games.md</code> in the home-server repo.</footer>
+</div>
+<script>
+  const grid = document.getElementById('games');
+
+  function card(game) {
+    const a = document.createElement('a');
+    a.className = 'card';
+    a.href = game.path;
+    a.innerHTML = `
+      <div class="shot"><span class="initial"></span><img alt="" loading="lazy">
+        <span class="status"><i></i><span>Checking…</span></span></div>
+      <div class="body">
+        <h2></h2>
+        <p class="tagline"></p>
+        <div class="meta"><span class="players"></span><span class="play">Play</span></div>
+      </div>`;
+    // Text goes in as text: games.json is ours, but there's no reason to parse it as HTML.
+    a.querySelector('h2').textContent = game.name;
+    a.querySelector('.tagline').textContent = game.tagline ?? '';
+    a.querySelector('.players').textContent = game.players ?? '';
+    a.querySelector('.initial').textContent = game.name.slice(0, 1);
+    const img = a.querySelector('img');
+    img.onerror = () => img.remove(); // no screenshot yet: the gradient and initial show instead
+    if (game.image) img.src = game.image; else img.remove();
+    return a;
+  }
+
+  // Up if the game's page answers; a stopped game gets the gateway's "taking a break" page (502).
+  async function check(game, el) {
+    let up = false;
+    try {
+      up = (await fetch(game.path, { method: 'HEAD', cache: 'no-store' })).ok;
+    } catch {
+      up = false;
+    }
+    el.classList.toggle('down', !up);
+    const status = el.querySelector('.status');
+    status.classList.toggle('up', up);
+    status.lastElementChild.textContent = up ? 'Online' : 'Resting';
+  }
+
+  fetch('games.json', { cache: 'no-store' })
+    .then((r) => r.json())
+    .then((games) => {
+      for (const game of games) {
+        const el = card(game);
+        grid.append(el);
+        check(game, el);
+      }
+    })
+    .catch(() => {
+      grid.innerHTML = '<p class="empty">The list of games didn’t load. Try refreshing.</p>';
+    });
+</script>
+</body>
+</html>

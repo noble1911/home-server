@@ -14,9 +14,12 @@ Cloudflare dashboard (domain `noblehaus.uk`) — mirror them here so they're dis
 | **home-server** | `~/home-server` | `~/random/HomeServer` | Umbrella: butler (AI brain+PWA+voice) + media/photos/books/smart-home/download stacks. Public via `cloudflared`. |
 | **vector-llm** | `~/vector-llm` | `~/random/vector-llm` | Always-on-mic LLM brain for the Anki Vector robot. Runs as a **host Python process** (`python src/main.py`): host mic → faster-whisper STT → Ollama (qwen) → Kokoro TTS; escalates to butler; shares Postgres as user `vector-robot`. Its compose **provides the `ollama` container** (:11434). **Paused 2026-05-25** — host process stopped. Its launchd job `com.vector-llm` (RunAtLoad+KeepAlive) came back on the 2026-08-06 reboot and crash-looped ~11k times against an offline robot; **disabled 2026-09-06** (`launchctl enable gui/501/com.vector-llm` + bootstrap to resume). |
 | **claude-esp** | `~/esp-gateway` | `~/random/claude-esp` | ESP32 AMOLED voice device. `esp-gateway` container (:8770) bridges device ↔ Groq STT ↔ butler ↔ Kokoro; Claude draws cards via `display_on_device`. **Deployed & running** from `~/esp-gateway`. |
-| **dont-lie** | `~/dont-lie` | — | "Don't Lie" web game — Expo/React-Native app (`App.tsx`, `app.json`, `eas.json`) built into an nginx image serving on **:3001** (`dont-lie-app`), on the `homeserver` net. |
+| **games site** | `~/home-server/games` | this repo, `games/` | `games-gateway` (Caddy) on **:3010**: **https://games.noblehaus.uk/** — a hub page, and each game below under its own path (`/skidmarks/`, `/dont-lie/`, `/gunpey/`, `/tycoon-town/`). Adding a game needs no Cloudflare change: `docs/17-games.md`. |
+| **dont-lie** | `~/dont-lie` | — (not a git repo) | "Word Poker" web game — Expo/React-Native app (`App.tsx`, `app.json`, `eas.json`) built into an nginx image serving on **:3001** (`dont-lie-app`), on the `homeserver` net. Built with Expo `baseUrl` `/dont-lie` for the games site. |
 | **wire-pod-backup** | `~/wire-pod-backup` | — | Backup/escrow data for wire-pod (Anki Vector auth), supporting vector-llm. **Not a running service.** |
-| **gunpey** | `~/gunpey` | — | Browser game (`gunpey.html`) with a Node multiplayer server (`multiplayer/server.js`). Files present on the box but **not currently running** (no container, no host process). |
+| **gunpey** | `~/gunpey` | [noble1911/gunpey](https://github.com/noble1911/gunpey) | Gunpey 99 — the Node multiplayer server (which also serves the game) in a container `gunpey` on **:3003** (`git pull && docker compose up -d --build` in `~/gunpey`). |
+| **super-skidmarks** | `~/super-skidmarks` | `~/IdeaProjects/super-skidmarks` ([noble1911/super-skidmarks](https://github.com/noble1911/super-skidmarks), private) | Web remake of Super Skidmarks — the built game and its WebSocket relay (`/ws`) in one Node container `super-skidmarks` on **:3002**. Source is rsynced from the laptop (never `reference/`), then `docker compose up -d --build`. |
+| **tycoon-town** | `~/games-static/tycoon-town` | `~/IdeaProjects/tycoon-town` (laptop, no remote) | Tycoon Town — a static browser game (no server); the games gateway serves the files. `.deployed-commit` in that folder records which commit is live. |
 
 ## Native (host) services — not Docker
 
@@ -49,6 +52,8 @@ See `services.yaml` for the full machine-readable port map (the source of truth 
 | `butler.noblehaus.uk` | `butler-app:80` (PWA) |
 | `butler-api.noblehaus.uk` | `butler-api:8000` |
 | `esp-gateway.noblehaus.uk` | `esp-gateway:8770` *(gateway deployed & running; confirm route exists in dashboard)* |
+| `games.noblehaus.uk` | `games-gateway:80` — every game, under its own path (`docs/17-games.md`). **New games need no route of their own.** |
+| *temporary:* random `*.trycloudflare.com` | container `skidmarks-quicktunnel`, a cloudflared quick tunnel (no account, not the main tunnel) to `super-skidmarks:3002`, from before the games site. Remove it (`docker rm -f skidmarks-quicktunnel`) once `games.noblehaus.uk` is routed. |
 | _…(add the rest from the dashboard: photos, jellyfin, ha, etc.)_ | |
 
 > `doctor.sh` can verify host ports against live containers, but it **cannot** see
