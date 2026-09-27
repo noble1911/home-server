@@ -17,6 +17,7 @@ behind one Caddy container (`games-gateway`, LAN :3010). **Full guide: `docs/17-
 | Word Poker | `/dont-lie/` | `dont-lie-app` :3001, `~/dont-lie` (no git) | `docker compose up -d --build` in `~/dont-lie` |
 | Gunpey 99 | `/gunpey/` | `gunpey` :3003, `~/gunpey` | `git pull && docker compose up -d --build` |
 | Tycoon Town | `/tycoon-town/` | static, `~/games-static/tycoon-town` | copy a commit's game files from the laptop |
+| Modern Combat | `/modern-combat/` | static, `~/games-static/modern-combat` | `npm run deploy` in the laptop repo (builds and ships a commit) |
 
 **Add a game:** make it work under a path (relative asset and socket URLs, prefixed storage keys),
 run it on the `homeserver` network (or drop static files in `~/games-static/<name>/`), add its route

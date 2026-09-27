@@ -44,6 +44,12 @@
 		file_server
 	}
 
+	redir /modern-combat /modern-combat/ 308
+	handle_path /modern-combat/* {
+		root * /srv/static/modern-combat
+		file_server
+	}
+
 	# ── The hub ──────────────────────────────────────────────────────────────────
 
 	# Browsers ask every page's site root for /favicon.ico; games without an icon get ours.

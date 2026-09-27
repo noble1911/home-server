@@ -32,5 +32,14 @@
     "tagline": "Buy, run and flip a town's property against three AI rivals.",
     "players": "Single player",
     "image": "img/tycoon-town.jpg"
+  },
+  {
+    "id": "modern-combat",
+    "name": "Modern Combat",
+    "path": "modern-combat/",
+    "tagline": "Close Combat-style real-time tactics with modern armour, infantry and drones.",
+    "players": "Single player · campaign and quick battles vs AI",
+    "image": "img/modern-combat.jpg",
+    "repo": "https://github.com/noble1911/modern-combat"
   }
 ]

@@ -91,6 +91,7 @@ services:
   - { name: gunpey, project: gunpey, container: gunpey, host_port: 3003 }  # Gunpey 99 multiplayer server + game — games.noblehaus.uk/gunpey/
   - { name: skidmarks-quicktunnel, project: super-skidmarks, container: skidmarks-quicktunnel }  # TEMPORARY cloudflared quick tunnel — remove once games.noblehaus.uk is routed
   # tycoon-town: static files in ~/games-static/tycoon-town, served by games-gateway (no container, no port)
+  # modern-combat: static files in ~/games-static/modern-combat, served by games-gateway (no container, no port)
 
   # ── vector-llm ───────────────────────────────────────────────────
   # vector-llm itself runs as a host Python process (no container). Its compose
