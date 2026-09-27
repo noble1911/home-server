@@ -1,0 +1,63 @@
+# games.noblehaus.uk — the hub at /, each game under its own path. See docs/17-games.md.
+#
+# Adding a game = one route below + one entry in site/games.json. Then:
+#   docker exec games-gateway caddy reload --config /etc/caddy/Caddyfile
+# Cloudflare doesn't change: the tunnel sends all of games.noblehaus.uk here.
+
+{
+	# TLS ends at Cloudflare; the tunnel reaches this container over plain HTTP.
+	auto_https off
+}
+
+:80 {
+	encode zstd gzip
+
+	handle /healthz {
+		respond "ok" 200
+	}
+
+	# ── Games with a server of their own ─────────────────────────────────────────
+	# handle_path strips the prefix: each game sees itself at /. The redirect adds the
+	# trailing slash, which the games' relative asset and socket URLs rely on.
+	# WebSockets (skidmarks, gunpey multiplayer) pass straight through reverse_proxy.
+
+	redir /skidmarks /skidmarks/ 308
+	handle_path /skidmarks/* {
+		reverse_proxy super-skidmarks:3002
+	}
+
+	redir /dont-lie /dont-lie/ 308
+	handle_path /dont-lie/* {
+		reverse_proxy dont-lie-app:80
+	}
+
+	redir /gunpey /gunpey/ 308
+	handle_path /gunpey/* {
+		reverse_proxy gunpey:3000
+	}
+
+	# ── Static games: files in ~/games-static/<name>/ ────────────────────────────
+
+	redir /tycoon-town /tycoon-town/ 308
+	handle_path /tycoon-town/* {
+		root * /srv/static/tycoon-town
+		file_server
+	}
+
+	# ── The hub ──────────────────────────────────────────────────────────────────
+
+	# Browsers ask every page's site root for /favicon.ico; games without an icon get ours.
+	rewrite /favicon.ico /favicon.png
+
+	handle {
+		root * /srv/hub
+		file_server
+	}
+
+	# A game that's down (its container stopped) gets a friendly page, not a bare 502.
+	handle_errors 502 503 504 {
+		root * /srv/hub
+		rewrite * /down.html
+		file_server
+	}
+}

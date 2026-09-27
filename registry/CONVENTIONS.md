@@ -35,6 +35,10 @@ Add a Cloudflare Tunnel route in the dashboard (`<name>.noblehaus.uk → http://
 and mirror it in `REGISTRY.md`. Note: WebRTC/UDP media does **not** traverse the tunnel — use
 WSS/HTTP for anything that must work off-LAN (this is why claude-esp uses a WS gateway, not LiveKit).
 
+**Games don't get a subdomain.** Put a game under `games.noblehaus.uk/<name>/` instead: one route in
+`games/Caddyfile` and an entry in `games/site/games.json`, no dashboard change. The game must work under a
+path (relative asset and socket URLs, prefixed storage keys). Checklist: `docs/17-games.md`.
+
 ## 6. Container hygiene
 `restart: unless-stopped` + a `healthcheck`. Prefer the shared Postgres over standing up a new DB.
 

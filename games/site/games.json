@@ -1,0 +1,36 @@
+[
+  {
+    "id": "skidmarks",
+    "name": "Super Skidmarks",
+    "path": "skidmarks/",
+    "tagline": "Slidey isometric racing with cows, caravans and hay bales.",
+    "players": "1–4 on one screen · up to 8 online",
+    "image": "img/skidmarks.jpg",
+    "repo": "https://github.com/noble1911/super-skidmarks"
+  },
+  {
+    "id": "word-poker",
+    "name": "Word Poker",
+    "path": "dont-lie/",
+    "tagline": "A parlour game of letters and lies.",
+    "players": "Solo against the house · up to 6 at a table",
+    "image": "img/word-poker.jpg"
+  },
+  {
+    "id": "gunpey",
+    "name": "Gunpey 99",
+    "path": "gunpey/",
+    "tagline": "Connect lines from left to right before the rows bury you.",
+    "players": "Solo · online rooms",
+    "image": "img/gunpey.jpg",
+    "repo": "https://github.com/noble1911/gunpey"
+  },
+  {
+    "id": "tycoon-town",
+    "name": "Tycoon Town",
+    "path": "tycoon-town/",
+    "tagline": "Buy, run and flip a town's property against three AI rivals.",
+    "players": "Single player",
+    "image": "img/tycoon-town.jpg"
+  }
+]

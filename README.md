@@ -124,6 +124,9 @@ Decide which services you want accessible remotely. Example mapping:
 | `ha.yourdomain.com` | Home Assistant | 8123 |
 | `lazylibrarian.yourdomain.com` | LazyLibrarian | 5299 |
 | `requests.yourdomain.com` | Seerr | 5055 |
+| `games.yourdomain.com` | Games site: a hub page, every game under its own path | 3010 |
+
+Games get **paths** under the one `games` subdomain, not subdomains of their own: see [docs/17-games.md](docs/17-games.md).
 
 You'll configure these routes in the Cloudflare dashboard after `setup.sh` has deployed the services.
 
@@ -277,6 +280,7 @@ Now that services are running, go back to the Cloudflare dashboard and add route
 | `ha` | `http://homeassistant:8123` | Home Assistant |
 | `lazylibrarian` | `http://lazylibrarian:5299` | LazyLibrarian |
 | `requests` | `http://seerr:5055` | Seerr |
+| `games` | `http://games-gateway:80` | Games site (hub + every game; set up with `scripts/17-games.sh`, see [docs/17-games.md](docs/17-games.md)) |
 
 > **Important:** Use Docker container names (not `localhost`) because `cloudflared` runs inside Docker where `localhost` refers to the container itself, not the host machine.
 
