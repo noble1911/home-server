@@ -132,6 +132,7 @@ port or adding a service**, and run `registry/doctor.sh` to check for drift agai
 | **gunpey** | `~/gunpey` | Gunpey 99 — Node multiplayer server + game in a container, port 3003 (`gunpey`); at games.noblehaus.uk/gunpey/ | Running |
 | **super-skidmarks** | `~/super-skidmarks` | Super Skidmarks web remake — game + WebSocket relay in one container, port 3002 (`super-skidmarks`); at games.noblehaus.uk/skidmarks/ | Running |
 | **tycoon-town** | `~/games-static/tycoon-town` | Tycoon Town — static browser game served by the games gateway at games.noblehaus.uk/tycoon-town/ (no container) | Running |
+| **froths-party** | `~/froths-party` | Froths Party — Jackbox-style party games for phones (Node + Socket.IO), port 3006 (`froths-party`); at games.noblehaus.uk/froths/ | Running |
 | **vector-llm** | `~/vector-llm` | Always-on-mic LLM brain for the Anki Vector robot (host Python process; its compose provides the shared `ollama` container) | Paused (2026-05-25) |
 | **wire-pod-backup** | `~/wire-pod-backup` | Backup/escrow data for wire-pod (Anki Vector auth) | Not a service |
 

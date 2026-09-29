@@ -36,6 +36,11 @@
 		reverse_proxy gunpey:3000
 	}
 
+	redir /froths /froths/ 308
+	handle_path /froths/* {
+		reverse_proxy froths-party:3000
+	}
+
 	# ── Static games: files in ~/games-static/<name>/ ────────────────────────────
 
 	redir /tycoon-town /tycoon-town/ 308
