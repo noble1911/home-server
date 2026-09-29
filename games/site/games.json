@@ -32,5 +32,14 @@
     "tagline": "Buy, run and flip a town's property against three AI rivals.",
     "players": "Single player",
     "image": "img/tycoon-town.jpg"
+  },
+  {
+    "id": "froths",
+    "name": "Froths Party",
+    "path": "froths/",
+    "tagline": "Six party games on your phones: quips, trivia, porkies, an imposter, letters & numbers and pub debates.",
+    "players": "3–10 on their phones · TV optional",
+    "image": "img/froths.jpg",
+    "repo": "https://github.com/noble1911/froths-party"
   }
 ]
