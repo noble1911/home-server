@@ -3,6 +3,10 @@
 
   "permissions": {
     "defaultMode": "dontAsk",
+    "allow": [
+	"Bash(docker *)",
+	"Bash(docker compose *)"
+    ],
     "deny": [
       "Bash(sudo *)",
       "Bash(sudo)",
@@ -36,8 +40,7 @@
       "Bash(git reset --hard *)",
       "Bash(git clean -f*)",
       "Bash(git filter-branch *)",
-      "Edit(./docker/claude-code-shim/**)",
-      "Write(./docker/claude-code-shim/**)"
+      "Edit(./docker/claude-code-shim/**)"
     ]
   },
 
@@ -61,6 +64,7 @@
       ]
     },
     "network": {
+      "allowLocalBinding": true,
       "allowUnixSockets": [
         "~/.orbstack/run/docker.sock",
         "/var/run/docker.sock"
