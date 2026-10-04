@@ -62,6 +62,30 @@ See README section 4.3. In short: install the `claude` CLI + `claude login`,
 create the venv, generate a token (`openssl rand -hex 32`) and set it on both
 sides, then load the launchd job.
 
+### Re-login when the subscription token expires
+
+The shim runs in your GUI login session, so `claude` reads the token from the
+macOS **login keychain**. Over plain SSH that keychain is locked and `claude login`
+silently writes to `~/.claude/.credentials.json` instead — the shim keeps using
+the stale keychain entry and reports "Not logged in". Unlock the keychain first:
+
+```bash
+ssh -t ron@192.168.1.117
+security unlock-keychain ~/Library/Keychains/login.keychain-db   # your Mac password
+claude login
+```
+
+Or log in from Terminal over Screen Sharing. Check with
+`security find-generic-password -s "Claude Code-credentials" | grep mdat` and
+then exercise the shim (`/health` does **not** test the Claude login, only the
+shim token):
+
+```bash
+TOKEN=$(grep CLAUDE_CODE_SHIM_TOKEN ~/home-server/butler/.env | cut -d= -f2)
+curl -s -N -X POST http://localhost:7100/run -H "Content-Type: application/json" \
+  -H "X-Shim-Token: $TOKEN" -d '{"message":"reply with the single word ok"}'
+```
+
 ## Tuning the sandbox
 
 The policy errs on the side of safety, so a legitimate repair command may
