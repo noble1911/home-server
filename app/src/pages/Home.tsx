@@ -32,6 +32,7 @@ export default function Home() {
     startListening,
     stopListening,
     disconnect,
+    stopSpeaking,
     audioLevels,
     connectionError,
   } = useLiveKitVoice()
@@ -287,11 +288,25 @@ export default function Home() {
 
         <ApprovalCards />
 
+        {voiceStatus === 'speaking' && (
+          <div className="flex justify-center pb-2">
+            <button
+              onClick={stopSpeaking}
+              className="flex items-center gap-2 px-4 py-1.5 rounded-full text-sm bg-butler-700 text-butler-100 hover:bg-butler-600"
+              aria-label="Stop Butler speaking"
+            >
+              <span className="inline-block w-2.5 h-2.5 rounded-sm bg-current" aria-hidden />
+              Stop speaking
+            </button>
+          </div>
+        )}
+
         <ChatInput
           voiceStatus={voiceStatus}
           isRecording={isRecording}
           onStartListening={startListening}
           onStopListening={stopListening}
+          onSend={stopSpeaking}
           claudeCodeMode={claudeCodeMode}
           onToggleClaudeCode={canUseClaudeCode ? () => setClaudeCodeMode(m => !m) : undefined}
         />

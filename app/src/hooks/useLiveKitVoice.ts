@@ -6,6 +6,9 @@ import { useSettingsStore } from '../stores/settingsStore'
 import { getLiveKitToken } from '../services/api'
 import type { LiveKitDataMessage } from '../types/conversation'
 
+/** Data topic the voice agent listens on for controls such as interrupt. */
+const CONTROL_TOPIC = 'butler-control'
+
 function getLiveKitUrl(): string {
   if (import.meta.env.VITE_LIVEKIT_URL) return import.meta.env.VITE_LIVEKIT_URL
   // Route through the same origin via nginx /livekit/ proxy
@@ -22,6 +25,8 @@ interface UseLiveKitVoiceReturn {
   startListening: () => Promise<void>
   stopListening: () => void
   disconnect: () => void
+  /** Stop Butler talking now (the agent drops the rest of its reply). */
+  stopSpeaking: () => void
   audioLevels: number[]
   connectionError: string | null
   isLiveKitConnected: boolean
@@ -30,7 +35,7 @@ interface UseLiveKitVoiceReturn {
 export function useLiveKitVoice(): UseLiveKitVoiceReturn {
   const { setRecording, setVoiceStatus, setConnectionStatus, addMessage } =
     useConversationStore()
-  const { audioInputDevice } = useSettingsStore()
+  const { audioInputDevice, speakReplies } = useSettingsStore()
 
   const [audioLevels, setAudioLevels] = useState<number[]>(() => Array(BARS).fill(0))
   const [connectionError, setConnectionError] = useState<string | null>(null)
@@ -46,6 +51,7 @@ export function useLiveKitVoice(): UseLiveKitVoiceReturn {
   const idleTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined)
   const demoTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined)
   const agentAudioElRef = useRef<HTMLAudioElement | null>(null)
+  const speakRepliesRef = useRef(speakReplies)
 
   // --- Audio analysis ---
 
@@ -132,9 +138,12 @@ export function useLiveKitVoice(): UseLiveKitVoiceReturn {
         })
         break
       case 'agent_state':
+        // The agent reports its real state now, so the "no reply" safety timer can go.
+        if (idleTimeoutRef.current) clearTimeout(idleTimeoutRef.current)
         if (message.state === 'thinking') setVoiceStatus('processing')
         else if (message.state === 'speaking') setVoiceStatus('speaking')
-        else if (message.state === 'idle') setVoiceStatus('idle')
+        // Ignore "idle" while the mic is held (the agent goes idle when you talk over it)
+        else if (message.state === 'idle' && !useConversationStore.getState().isRecording) setVoiceStatus('idle')
         break
     }
   }, [addMessage, setVoiceStatus])
@@ -253,6 +262,8 @@ export function useLiveKitVoice(): UseLiveKitVoiceReturn {
       const room = new Room()
       setupRoomEvents(room)
       await room.connect(LIVEKIT_URL, livekit_token)
+      // Tell the agent whether to read replies aloud (it skips TTS when off)
+      await room.localParticipant.setAttributes({ speak_replies: String(speakRepliesRef.current) })
 
       // Publish local mic track (muted initially)
       await room.localParticipant.setMicrophoneEnabled(true)
@@ -273,7 +284,24 @@ export function useLiveKitVoice(): UseLiveKitVoiceReturn {
     }
   }, [setConnectionStatus, setupRoomEvents])
 
+  // Keep the agent in step when "Read replies aloud" changes mid-conversation
+  useEffect(() => {
+    speakRepliesRef.current = speakReplies
+    const room = roomRef.current
+    if (room?.state === ConnectionState.Connected) {
+      room.localParticipant.setAttributes({ speak_replies: String(speakReplies) }).catch(() => {})
+    }
+  }, [speakReplies])
+
   // --- Public API ---
+
+  const stopSpeaking = useCallback(() => {
+    const room = roomRef.current
+    if (room?.state !== ConnectionState.Connected) return
+    const payload = new TextEncoder().encode(JSON.stringify({ type: 'interrupt' }))
+    room.localParticipant.publishData(payload, { reliable: true, topic: CONTROL_TOPIC }).catch(() => {})
+    if (useConversationStore.getState().voiceStatus === 'speaking') setVoiceStatus('idle')
+  }, [setVoiceStatus])
 
   const startListening = useCallback(async () => {
     setRecording(true)
@@ -282,6 +310,8 @@ export function useLiveKitVoice(): UseLiveKitVoiceReturn {
     const connected = await connect()
 
     if (connected && roomRef.current) {
+      // Talking over Butler stops it straight away (don't wait for voice detection)
+      stopSpeaking()
       // LiveKit mode: unmute local mic
       await roomRef.current.localParticipant.setMicrophoneEnabled(true)
       const micTrack = roomRef.current.localParticipant.audioTrackPublications.values().next().value
@@ -296,7 +326,7 @@ export function useLiveKitVoice(): UseLiveKitVoiceReturn {
     startAudioLevelMonitoring()
   }, [
     setRecording, setVoiceStatus, connect, enterDemoMode,
-    connectAnalyserToTrack, startAudioLevelMonitoring,
+    connectAnalyserToTrack, startAudioLevelMonitoring, stopSpeaking,
   ])
 
   const stopListening = useCallback(() => {
@@ -386,6 +416,7 @@ export function useLiveKitVoice(): UseLiveKitVoiceReturn {
     startListening,
     stopListening,
     disconnect,
+    stopSpeaking,
     audioLevels,
     connectionError,
     isLiveKitConnected,

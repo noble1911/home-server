@@ -305,11 +305,23 @@ function VoiceAssistantUI() {
 
 ---
 
+## App ↔ Agent Controls
+
+The app and the LiveKit agent also talk over the room's data channel (`butler/livekit-agent/agent.py`):
+
+| Direction | Message | Effect |
+|-----------|---------|--------|
+| agent → app | `{"type": "agent_state", "state": "thinking" \| "speaking" \| "idle"}` | Drives the voice status; "speaking" shows a **Stop speaking** button |
+| agent → app | `user_transcript` / `assistant_transcript` / `visual_content` | Puts the conversation in the chat (`butler_llm.py`); a reply cut short is still posted |
+| app → agent | `{"type": "interrupt"}` on topic `butler-control` | Stops the current reply. Sent by Stop speaking, pressing the mic, or sending a typed message |
+| app → agent | participant attribute `speak_replies="false"` | **Settings → Read replies aloud** off: answers come back as text only (TTS is skipped, not muted). Can change mid-conversation |
+
+---
+
 ## Future Enhancements (Not in Scope)
 
 - **Wake word detection** - Currently push-to-talk only; Porcupine integration later
 - **Voice identification** - Currently JWT-based; speaker recognition optional
-- **Interruption handling** - Can user interrupt Butler mid-response?
 - **Multi-turn streaming** - Currently request/response; could stream partial responses
 
 ---

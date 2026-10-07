@@ -14,9 +14,12 @@ interface SettingsState {
   voiceMode: VoiceMode
   audioInputDevice: string | null
   audioOutputDevice: string | null
+  // Read Butler's voice replies aloud; off = answers appear as text only
+  speakReplies: boolean
 
   // Actions
   setVoiceMode: (mode: VoiceMode) => void
+  setSpeakReplies: (enabled: boolean) => void
   setAudioInputDevice: (deviceId: string | null) => void
   setAudioOutputDevice: (deviceId: string | null) => void
 }
@@ -27,8 +30,10 @@ export const useSettingsStore = create<SettingsState>()(
       voiceMode: 'push-to-talk',
       audioInputDevice: null,
       audioOutputDevice: null,
+      speakReplies: true,
 
       setVoiceMode: (voiceMode) => set({ voiceMode }),
+      setSpeakReplies: (speakReplies) => set({ speakReplies }),
       setAudioInputDevice: (audioInputDevice) => set({ audioInputDevice }),
       setAudioOutputDevice: (audioOutputDevice) => set({ audioOutputDevice }),
     }),

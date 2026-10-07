@@ -37,7 +37,7 @@ interface AdminUserListResponse {
 export default function Settings() {
   const { logout, role } = useAuthStore()
   const { profile, updateProfile, updateButlerName, updateSoul, updateNotifications, clearAllFacts, clearProfile, isLoading } = useUserStore()
-  const { voiceMode, setVoiceMode } = useSettingsStore()
+  const { voiceMode, setVoiceMode, speakReplies, setSpeakReplies } = useSettingsStore()
   const { clearMessages } = useConversationStore()
   const push = usePushNotifications()
   const isAdmin = role === 'admin'
@@ -1065,6 +1065,24 @@ export default function Settings() {
           <p className="text-xs text-butler-500 mt-2">
             This setting only applies to this device.
           </p>
+        </div>
+        <div className="mt-4 flex items-start justify-between gap-3">
+          <div>
+            <label htmlFor="speak-replies" className="block text-sm text-butler-300">Read replies aloud</label>
+            <p className="text-xs text-butler-500 mt-0.5">
+              Off: talk to Butler as usual, but answers appear as text only. You can also tap
+              Stop speaking, press the mic, or type to cut a reply short.
+            </p>
+          </div>
+          <button
+            id="speak-replies"
+            role="switch"
+            aria-checked={speakReplies}
+            onClick={() => setSpeakReplies(!speakReplies)}
+            className={`relative shrink-0 w-11 h-6 rounded-full transition-colors ${speakReplies ? 'bg-accent' : 'bg-butler-600'}`}
+          >
+            <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${speakReplies ? 'translate-x-5' : ''}`} />
+          </button>
         </div>
       </section>
 

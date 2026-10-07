@@ -18,6 +18,8 @@ interface ChatInputProps {
   onStopListening?: () => void
   claudeCodeMode?: boolean
   onToggleClaudeCode?: () => void
+  /** Called as a typed message is sent (e.g. to stop Butler talking). */
+  onSend?: () => void
 }
 
 export default function ChatInput({
@@ -27,6 +29,7 @@ export default function ChatInput({
   onStopListening,
   claudeCodeMode = false,
   onToggleClaudeCode,
+  onSend,
 }: ChatInputProps) {
   const { voiceMode } = useSettingsStore()
   const [message, setMessage] = useState('')
@@ -113,6 +116,7 @@ export default function ChatInput({
     if ((!message.trim() && !pendingImage) || isStreaming) return
 
     const text = message.trim() || 'What is this?'
+    onSend?.()
     sendMessage(
       text,
       pendingImage ? { data: pendingImage.data, mediaType: pendingImage.mediaType } : undefined,
@@ -121,7 +125,7 @@ export default function ChatInput({
     setMessage('')
     setPendingImage(null)
     setImageError(null)
-  }, [message, pendingImage, isStreaming, sendMessage, claudeCodeMode])
+  }, [message, pendingImage, isStreaming, sendMessage, claudeCodeMode, onSend])
 
   return (
     <div>

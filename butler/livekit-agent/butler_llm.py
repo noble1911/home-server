@@ -133,7 +133,21 @@ class ButlerLLMStream(llm.LLMStream):
         headers["Content-Type"] = "application/json"
 
         spoken_parts: list[str] = []
+        try:
+            await self._stream_reply(payload, headers, spoken_parts)
+        finally:
+            # Publish the reply so it appears in chat, even if the user stopped
+            # Butler mid-answer (an interrupt cancels this stream)
+            full_spoken = "".join(spoken_parts)
+            if full_spoken:
+                await self._publish_data({
+                    "type": "assistant_transcript",
+                    "text": full_spoken,
+                    "isFinal": True,
+                })
 
+    async def _stream_reply(self, payload: dict, headers: dict, spoken_parts: list[str]) -> None:
+        """POST the transcript to Butler API and forward its SSE deltas to TTS."""
         try:
             timeout = aiohttp.ClientTimeout(total=90)
             async with aiohttp.ClientSession(timeout=timeout) as session:
@@ -209,15 +223,6 @@ class ButlerLLMStream(llm.LLMStream):
                     ),
                 )
             )
-
-        # Publish assistant transcript so it appears in chat
-        full_spoken = "".join(spoken_parts)
-        if full_spoken:
-            await self._publish_data({
-                "type": "assistant_transcript",
-                "text": full_spoken,
-                "isFinal": True,
-            })
 
 
 class ButlerLLM(llm.LLM):
