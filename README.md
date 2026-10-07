@@ -338,6 +338,24 @@ Claude Code mode adds a terminal icon toggle to the Butler chat. When active, me
 
 # Log in with your Claude account (opens browser)
 claude login
+```
+
+> **Logging in over SSH (first time or when the login expires):** Claude Code stores
+> the subscription token in the macOS **login keychain**. In a plain SSH session that
+> keychain is locked, so `claude login` silently falls back to `~/.claude/.credentials.json`
+> — which the shim (a GUI-session launchd job) never reads. Unlock the keychain first:
+>
+> ```bash
+> ssh -t ron@192.168.1.117
+> security unlock-keychain ~/Library/Keychains/login.keychain-db   # your Mac password
+> claude login   # prints a URL; open it in your local browser, paste the code back
+> ```
+>
+> Or run `claude login` in Terminal via Screen Sharing. Verify with
+> `security find-generic-password -s "Claude Code-credentials" | grep mdat` (today's date).
+> No shim restart is needed.
+
+```bash
 
 # Create a venv for the shim (avoids macOS "externally managed" pip error)
 python3 -m venv ~/home-server/docker/claude-code-shim/.venv
