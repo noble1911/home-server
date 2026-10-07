@@ -36,6 +36,7 @@ from tools import (
     RememberFactTool,
     GetUserTool,
     ScheduleTaskTool,
+    SendToKindleTool,
     ServerHealthTool,
     SonarrTool,
     StorageMonitorTool,
@@ -85,6 +86,8 @@ PERMISSION_TOOL_MAP: dict[str, list[str]] = {
     # tap-to-approve before anything is sent or changed (api/approvals.py).
     "calendar_write": ["google_calendar"],
     "email_send": ["gmail"],
+    # Emails library ebooks to the user's own saved Kindle address only (#213).
+    "kindle": ["send_to_kindle"],
     "automation": ["schedule_task"],
     "communication": ["whatsapp"],
     "admin": ["self_update"],
@@ -95,7 +98,7 @@ PERMISSION_TOOL_MAP: dict[str, list[str]] = {
 
 ALL_PERMISSION_GROUPS: list[str] = sorted(PERMISSION_TOOL_MAP.keys())
 
-DEFAULT_PERMISSIONS: list[str] = ["media", "location", "calendar", "email", "automation", "communication"]
+DEFAULT_PERMISSIONS: list[str] = ["media", "location", "calendar", "email", "automation", "communication", "kindle"]
 
 # Module-level state, set during lifespan startup
 _db_pool: DatabasePool | None = None
@@ -470,5 +473,7 @@ async def get_user_tools(
             user_tools["gmail"] = GmailTool(
                 db_pool, user_id, can_read=can_read_mail, can_send=can_send_mail,
             )
+        if "kindle" in user_perms:
+            user_tools["send_to_kindle"] = SendToKindleTool(db_pool, user_id)
 
     return user_tools

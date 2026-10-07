@@ -91,4 +91,4 @@ jobs:
           pip install pytest pytest-asyncio
 
       - name: Run tests
-        run: python -m pytest tools/ api/ -v
+        run: python -m pytest tools/ api/ tests/ ebook_convert/ -v

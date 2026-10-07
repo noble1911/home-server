@@ -8,6 +8,7 @@ export type ToolPermission =
   | 'calendar_write'
   | 'email'
   | 'email_send'
+  | 'kindle'
   | 'automation'
   | 'communication'
   | 'claude_code'
@@ -16,6 +17,7 @@ export interface User {
   id: string
   name: string
   email?: string
+  kindleEmail?: string | null
   phone?: string
   butlerName: string
   role: UserRole
@@ -143,6 +145,7 @@ export const PERMISSION_INFO: Record<ToolPermission, { label: string; descriptio
   calendar_write: { label: 'Calendar: edit', description: 'Add, move and delete events (you approve each change)' },
   email: { label: 'Email', description: 'Gmail' },
   email_send: { label: 'Email: send', description: 'Send emails and replies (you approve each one)' },
+  kindle: { label: 'Send to Kindle', description: 'Email library ebooks to their own Kindle' },
   automation: { label: 'Automation', description: 'Scheduled tasks' },
   communication: { label: 'Communication', description: 'WhatsApp messages' },
   claude_code: { label: 'Claude Code', description: 'Run agentic tasks using Claude Code on the server' },

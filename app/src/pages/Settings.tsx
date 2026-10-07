@@ -33,7 +33,7 @@ interface AdminUserListResponse {
 
 export default function Settings() {
   const { logout, role } = useAuthStore()
-  const { profile, updateButlerName, updateSoul, updateNotifications, clearAllFacts, clearProfile, isLoading } = useUserStore()
+  const { profile, updateProfile, updateButlerName, updateSoul, updateNotifications, clearAllFacts, clearProfile, isLoading } = useUserStore()
   const { voiceMode, setVoiceMode } = useSettingsStore()
   const { clearMessages } = useConversationStore()
   const push = usePushNotifications()
@@ -85,6 +85,28 @@ export default function Settings() {
   useEffect(() => {
     setPhoneInput(profile?.phone || '')
   }, [profile?.phone])
+
+  // Send to Kindle address (Butler only ever emails books here)
+  const [kindleInput, setKindleInput] = useState(profile?.kindleEmail || '')
+  const [kindleStatus, setKindleStatus] = useState<{ type: 'error' | 'saved'; text: string } | null>(null)
+  useEffect(() => {
+    setKindleInput(profile?.kindleEmail || '')
+  }, [profile?.kindleEmail])
+
+  async function saveKindleEmail() {
+    const value = kindleInput.trim().toLowerCase()
+    if (value === (profile?.kindleEmail || '')) return
+    if (value && !/^[a-z0-9._%+-]+@(free\.)?kindle\.com$/.test(value)) {
+      setKindleStatus({ type: 'error', text: 'Use your Send-to-Kindle address, ending in @kindle.com' })
+      return
+    }
+    await updateProfile({ kindleEmail: value })
+    // updateProfile reverts (rather than throws) on failure
+    const saved = (useUserStore.getState().profile?.kindleEmail || '') === value
+    setKindleStatus(saved
+      ? { type: 'saved', text: value ? 'Saved' : 'Removed' }
+      : { type: 'error', text: "Couldn't save — try again" })
+  }
 
   // Deletion state
   const [showClearFactsConfirm, setShowClearFactsConfirm] = useState(false)
@@ -426,6 +448,33 @@ export default function Settings() {
               <div className="text-accent text-sm">Admin</div>
             </div>
           )}
+
+          {/* Send to Kindle */}
+          <div>
+            <label htmlFor="kindle-email" className="block text-sm text-butler-300 mb-1">Kindle address</label>
+            <input
+              id="kindle-email"
+              type="email"
+              inputMode="email"
+              autoCapitalize="none"
+              value={kindleInput}
+              onChange={(e) => { setKindleInput(e.target.value); setKindleStatus(null) }}
+              onBlur={saveKindleEmail}
+              onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
+              placeholder="you_123@kindle.com"
+              className="input w-full text-sm"
+            />
+            <p className="text-xs text-butler-500 mt-1">
+              Ask Butler to “send <em>a book</em> to my Kindle”. Find this address in Amazon under
+              Manage Your Content and Devices → Preferences → Personal Document Settings, and add
+              your Gmail address to the approved senders list there.
+            </p>
+            {kindleStatus && (
+              <p className={`text-xs mt-1 ${kindleStatus.type === 'error' ? 'text-red-400' : 'text-green-400'}`}>
+                {kindleStatus.text}
+              </p>
+            )}
+          </div>
 
           {/* Change service password */}
           {!credentialsLoading && serviceCredentials.length > 0 && (

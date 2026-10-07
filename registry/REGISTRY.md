@@ -37,6 +37,7 @@ Cloudflare dashboard (domain `noblehaus.uk`) — mirror them here so they're dis
 | Service | Internal address (homeserver net) | LAN address | Notes |
 |---|---|---|---|
 | **butler-api** | `http://butler-api:8000` | `http://192.168.1.117:8000` | Brain + per-user memory + tools. Auth: `X-API-Key: $INTERNAL_API_KEY` (internal → `user_id` in body) or user JWT. Memory is keyed by `user_id`. |
+| **ebook-convert** | `http://ebook-convert:8080` | — (no host port) | Calibre `ebook-convert` behind `POST /convert {"path", "to": "epub"}` for Send to Kindle (#213). `Books/eBooks` mounted read-only; `X-Convert-Token` = `EBOOK_CONVERT_TOKEN` in `butler/.env`. Built from `butler/ebook_convert/` with butler-api. |
 | **Kokoro TTS** | `http://kokoro-tts:8880` | `:8880` | OpenAI-compatible `/v1/audio/speech` (wav/mp3). |
 | **Postgres** | `immich-postgres:5432` | `:5432` | DB `immich`, schema `butler` (+pgvector). Shared by butler & vector-llm. |
 | **Ollama** | `http://ollama:11434` | `:11434` | Embeddings (`nomic-embed-text`) + qwen brain. The `ollama` **container** (from vector-llm's compose) is stopped; since 2026-09-06 the **native `/Applications/Ollama.app`** serves `:11434` on the host and butler reaches it via `http://host.docker.internal:11434` (`OLLAMA_URL` in `butler/.env`). Containers must use `host.docker.internal`, not `ollama`, until the container is brought back on the `homeserver` net. |

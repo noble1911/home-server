@@ -123,6 +123,7 @@ class UserProfile(BaseModel):
     id: str
     name: str
     email: str | None = None
+    kindleEmail: str | None = None
     phone: str | None = None
     butlerName: str = "Butler"
     role: str = "user"
@@ -136,6 +137,10 @@ class UserProfile(BaseModel):
 class UpdateProfileRequest(BaseModel):
     name: str | None = None
     email: str | None = None
+    # Amazon Send to Kindle address; "" clears it.
+    kindleEmail: str | None = Field(
+        None, pattern=r"^$|^[A-Za-z0-9._%+-]+@(free\.)?kindle\.com$", max_length=254,
+    )
 
 
 class UpdateNotificationsRequest(BaseModel):

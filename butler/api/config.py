@@ -114,6 +114,10 @@ class Settings(BaseSettings):
 
     # Health & storage monitoring
     external_drive_path: str = "/mnt/external"
+
+    # Send to Kindle (#213): Calibre sidecar that converts MOBI/AZW3 etc. to EPUB
+    ebook_convert_url: str = "http://ebook-convert:8080"
+    ebook_convert_token: str = ""
     storage_thresholds: str = "70,80,90"
     health_check_timeout: int = 5
     prowlarr_url: str = ""

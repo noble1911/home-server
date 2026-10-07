@@ -98,6 +98,9 @@ services:
       # CLAUDE_SHIM_TOKEN on the host shim so butler-api can authenticate.
       - CLAUDE_CODE_SHIM_URL=${CLAUDE_CODE_SHIM_URL:-http://host.docker.internal:7100}
       - CLAUDE_CODE_SHIM_TOKEN=${CLAUDE_CODE_SHIM_TOKEN:-}
+      # Send to Kindle converter (the ebook-convert service below)
+      - EBOOK_CONVERT_URL=${EBOOK_CONVERT_URL:-http://ebook-convert:8080}
+      - EBOOK_CONVERT_TOKEN=${EBOOK_CONVERT_TOKEN:-}
     volumes:
       - ./api:/app/api:ro
       - ./tools:/app/tools:ro
@@ -115,6 +118,22 @@ services:
       timeout: 10s
       retries: 3
       start_period: 15s
+    restart: unless-stopped
+
+  # Calibre's ebook-convert behind a tiny HTTP API, for Send to Kindle (#213).
+  # Converts MOBI/AZW3/etc. to EPUB (Amazon stopped accepting MOBI by email).
+  # Separate image so Calibre's Qt stack stays out of butler-api. No host port.
+  ebook-convert:
+    build:
+      context: ./ebook_convert
+    container_name: ebook-convert
+    environment:
+      - CONVERT_TOKEN=${EBOOK_CONVERT_TOKEN:-}
+    volumes:
+      - ${DRIVE_PATH:-/Volumes/HomeServer}/Books/eBooks:/books:ro
+    networks:
+      - homeserver
+    mem_limit: 1g
     restart: unless-stopped
 
 networks:

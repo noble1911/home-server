@@ -19,6 +19,8 @@ services:
     project: home-server
     container: butler-app
     host_port: 3000                 # PWA (nginx)
+  # Calibre converter for Send to Kindle (#213); butler/docker-compose.yml. Internal only (ebook-convert:8080).
+  - { name: ebook-convert, project: home-server, container: ebook-convert }
 
   # ── home-server: voice-stack ─────────────────────────────────────
   - name: kokoro-tts

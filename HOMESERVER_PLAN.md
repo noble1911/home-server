@@ -718,6 +718,7 @@ Custom Python tools interface directly with PostgreSQL (not Butler API's built-i
 | **Home Assistant** | Control heating, lights, devices | Read-write |
 | **Radarr/Sonarr** | Add movies & TV to library | Read-write |
 | **BookTool** | Search & download books (Open Library + Prowlarr + qBit) | Read-write |
+| **Send to Kindle** | Email a library ebook to the user's own saved Kindle address from their Gmail; MOBI/AZW3 → EPUB via the `ebook-convert` Calibre sidecar (Amazon dropped MOBI by email in 2022) — #213, `docs/kindle-email-setup.md` | Send to own Kindle only |
 | **Jellyfin** | Playback control | Read-write |
 | **Immich** | Photo search | Read-only |
 | **WhatsApp** | Send notifications to users | Write-only (outbound) |
@@ -727,6 +728,7 @@ Custom Python tools interface directly with PostgreSQL (not Butler API's built-i
 | Command | What Happens |
 |---------|--------------|
 | *"Turn the heating on 2 days before I get back from Japan"* | Reads calendar → finds return date → schedules HA automation |
+| *"Send Project Hail Mary to my Kindle"* | Send to Kindle: find in `Books/eBooks` → convert to EPUB if needed → Gmail → `…@kindle.com` |
 | *"Find the new Dune audiobook"* | BookTool search (Open Library) → Prowlarr → qBittorrent → WhatsApp notification when done |
 | *"Is anyone home?"* | Checks both phone locations → responds accordingly |
 | *"What's the weather like for my trip?"* | Reads calendar for trip dates → fetches weather forecast |

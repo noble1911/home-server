@@ -71,7 +71,7 @@ async def _get_profile(user_id: str, pool: DatabasePool) -> UserProfile:
     db = pool.pool
 
     user = await db.fetchrow(
-        "SELECT id, name, email, soul, role, permissions, phone, notification_prefs, created_at "
+        "SELECT id, name, email, kindle_email, soul, role, permissions, phone, notification_prefs, created_at "
         "FROM butler.users WHERE id = $1",
         user_id,
     )
@@ -97,6 +97,7 @@ async def _get_profile(user_id: str, pool: DatabasePool) -> UserProfile:
         id=user["id"],
         name=user["name"],
         email=user["email"],
+        kindleEmail=user["kindle_email"],
         phone=user["phone"],
         butlerName=soul.get("butler_name", "Butler"),
         role=user["role"],
@@ -138,7 +139,7 @@ async def update_profile(
     user_id: str = Depends(get_current_user),
     pool: DatabasePool = Depends(get_db_pool),
 ):
-    """Update basic profile fields (name, email)."""
+    """Update basic profile fields (name, email, Kindle address)."""
     db = pool.pool
     if req.name:
         await db.execute(
@@ -147,6 +148,11 @@ async def update_profile(
     if req.email is not None:
         await db.execute(
             "UPDATE butler.users SET email = $2 WHERE id = $1", user_id, req.email or None
+        )
+    if req.kindleEmail is not None:
+        await db.execute(
+            "UPDATE butler.users SET kindle_email = $2 WHERE id = $1",
+            user_id, req.kindleEmail.strip().lower() or None,
         )
     return await _get_profile(user_id, pool)
 

@@ -85,7 +85,8 @@ Replace `yourdomain.com` with the domain you configured in your Cloudflare Tunne
 | "I read a lot and want the best experience" | Download + dedicated reader app |
 | "I'm going on a flight with no internet" | Download to device beforehand |
 | "I listen to audiobooks on my commute" | Audiobookshelf app |
-| "I have an e-ink Kindle or Kobo" | Download EPUB and sideload |
+| "I have an e-ink Kindle" | Ask Butler to "send it to my Kindle" ([setup](./kindle-email-setup.md)) |
+| "I have a Kobo or other e-reader" | Download EPUB and sideload |
 
 ## Troubleshooting
 

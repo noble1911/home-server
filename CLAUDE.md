@@ -187,8 +187,7 @@ home-server/
     ├── 01-homebrew.md ... 15-alexa-haaska.md
     ├── VOICE_ARCHITECTURE.md
     ├── google-oauth-setup.md
-    ├── kindle-email-setup.md
-    ├── opds-setup.md
+    ├── kindle-email-setup.md   # Send to Kindle via Butler (#213)
     ├── ebook-reading-guide.md
     └── prowlarr-indexers.md
 ```

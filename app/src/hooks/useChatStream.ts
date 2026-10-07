@@ -21,6 +21,7 @@ const TOOL_LABELS: Record<string, string> = {
   immich: 'Searching photos...',
   google_calendar: 'Checking calendar...',
   gmail: 'Working on email...',
+  send_to_kindle: 'Sending to your Kindle...',
   server_health: 'Checking server health...',
   storage_monitor: 'Checking storage...',
   whatsapp: 'Sending WhatsApp message...',
