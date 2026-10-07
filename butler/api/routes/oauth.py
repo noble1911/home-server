@@ -42,6 +42,7 @@ router = APIRouter()
 async def google_authorize(
     user_id: str = Depends(get_current_user),
     origin: str = Query(default=None),
+    client: str = Query(default=None, pattern="^app$"),
 ):
     """Start the Google OAuth flow.
 
@@ -67,7 +68,9 @@ async def google_authorize(
     effective_uri = redirect_uri or settings.google_redirect_uri
     logger.info("OAuth authorize: redirect_uri=%s (origin=%s)", effective_uri, origin)
 
-    state = create_oauth_state(user_id, redirect_uri=redirect_uri, frontend_url=frontend_url)
+    # client=app: the Android app opens consent in the system browser, which isn't
+    # signed in to Butler, so the callback shows "return to the app" instead.
+    state = create_oauth_state(user_id, redirect_uri=redirect_uri, frontend_url=frontend_url, client=client)
     authorize_url = build_google_authorize_url(state, redirect_uri=redirect_uri)
     return OAuthAuthorizeResponse(authorizeUrl=authorize_url)
 
@@ -89,35 +92,39 @@ async def google_callback(
     """
     frontend_url = settings.oauth_frontend_url.rstrip("/")
 
+    # Verify state JWT to get user_id and dynamic URLs
+    state_data = None
+    if state:
+        try:
+            state_data = verify_oauth_state(state)
+        except pyjwt.InvalidTokenError as e:
+            logger.warning("Invalid OAuth state: %s", e)
+    client = state_data.get("client") if state_data else None
+    if state_data and state_data.get("frontend_url"):
+        # Use URLs from state if available (set when PWA passed its origin)
+        frontend_url = state_data["frontend_url"].rstrip("/")
+
+    def finish(status: str, message: str | None = None) -> HTMLResponse:
+        if client == "app":
+            return _app_done_html(status == "success", message)
+        params = {"oauth": "google", "status": status, **({"message": message} if message else {})}
+        return _redirect_html(f"{frontend_url}/settings?{urlencode(params)}")
+
     # Google may redirect with an error (user denied consent)
     if error:
-        params = urlencode({"oauth": "google", "status": "error", "message": error})
-        return _redirect_html(f"{frontend_url}/settings?{params}")
-
+        return finish("error", error)
     if not code or not state:
-        params = urlencode({"oauth": "google", "status": "error", "message": "Missing code or state"})
-        return _redirect_html(f"{frontend_url}/settings?{params}")
-
-    # Verify state JWT to get user_id and dynamic URLs
-    try:
-        state_data = verify_oauth_state(state)
-        user_id = state_data["user_id"]
-        # Use URLs from state if available (set when PWA passed its origin)
-        redirect_uri = state_data.get("redirect_uri")
-        if state_data.get("frontend_url"):
-            frontend_url = state_data["frontend_url"].rstrip("/")
-    except pyjwt.InvalidTokenError as e:
-        logger.warning("Invalid OAuth state: %s", e)
-        params = urlencode({"oauth": "google", "status": "error", "message": "Invalid or expired state"})
-        return _redirect_html(f"{frontend_url}/settings?{params}")
+        return finish("error", "Missing code or state")
+    if state_data is None:
+        return finish("error", "Invalid or expired state")
+    user_id = state_data["user_id"]
 
     # Exchange authorization code for tokens (redirect_uri must match authorize request)
     try:
-        token_data = await exchange_google_code(code, redirect_uri=redirect_uri)
+        token_data = await exchange_google_code(code, redirect_uri=state_data.get("redirect_uri"))
     except RuntimeError as e:
         logger.error("Google code exchange failed: %s", e)
-        params = urlencode({"oauth": "google", "status": "error", "message": "Token exchange failed"})
-        return _redirect_html(f"{frontend_url}/settings?{params}")
+        return finish("error", "Token exchange failed")
 
     # Fetch Google email for display
     email = await get_google_user_email(token_data["access_token"])
@@ -125,8 +132,7 @@ async def google_callback(
     # Store tokens
     await store_tokens(pool, user_id, "google", token_data, account_id=email)
 
-    params = urlencode({"oauth": "google", "status": "success"})
-    return _redirect_html(f"{frontend_url}/settings?{params}")
+    return finish("success")
 
 
 @router.get("/connections", response_model=OAuthConnectionsResponse)
@@ -159,6 +165,22 @@ async def disconnect_provider(
     deleted = await delete_connection(pool, user_id, provider)
     if not deleted:
         raise HTTPException(404, f"No connection found for provider: {provider}")
+
+
+def _app_done_html(ok: bool, message: str | None = None) -> HTMLResponse:
+    """End page for the Android app's flow, shown in the system browser."""
+    if ok:
+        heading, detail = "Google connected", "You can close this tab and go back to the Butler app."
+    else:
+        heading = "Couldn't connect Google"
+        detail = html_lib.escape(message or "Something went wrong.") + " Go back to the Butler app and try again."
+    html = f"""<!DOCTYPE html>
+<html><head><meta name="viewport" content="width=device-width, initial-scale=1"><title>Butler</title>
+<style>body{{font-family:system-ui,sans-serif;background:#0f172a;color:#e2e8f0;display:flex;
+align-items:center;justify-content:center;min-height:100vh;margin:0;text-align:center;padding:24px}}
+h1{{font-size:1.4rem}}p{{color:#94a3b8}}</style></head>
+<body><div><h1>{"✓ " if ok else ""}{heading}</h1><p>{detail}</p></div></body></html>"""
+    return HTMLResponse(content=html)
 
 
 def _redirect_html(url: str) -> HTMLResponse:

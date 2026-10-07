@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .config import settings
 from .deps import cleanup_resources, get_db_pool, init_resources
 from .ratelimit import RateLimitConfig, RateLimitMiddleware, SlidingWindowStore
-from .routes import admin, approvals, auth, chat, downloads, media, oauth, openai_compat, push, system, tasks, users, voice, webhooks
+from .routes import admin, approvals, auth, chat, devices, downloads, media, oauth, openai_compat, push, system, tasks, users, voice, webhooks
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +72,7 @@ app.include_router(media.router, prefix="/api", tags=["media"])
 app.include_router(webhooks.router, prefix="/api/webhooks", tags=["webhooks"])
 app.include_router(push.router, prefix="/api/push", tags=["push"])
 app.include_router(approvals.router, prefix="/api/approvals", tags=["approvals"])
+app.include_router(devices.router, prefix="/api", tags=["devices"])
 app.include_router(openai_compat.router, prefix="/api/openai", tags=["openai"])
 
 

@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { useAuthStore } from './stores/authStore'
+import { ButlerNotifications, disablePhoneNotifications, isNativeApp } from './native/butlerNative'
 import { useUserStore } from './stores/userStore'
 import Layout from './components/layout/Layout'
 import Home from './pages/Home'
@@ -26,6 +27,28 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+/** Android app only: open the page a tapped notification points at, and stop
+ *  this phone's notifications if the session ends (e.g. it expired). */
+function NativeBridge() {
+  const navigate = useNavigate()
+  useEffect(() => {
+    if (!isNativeApp) return
+    const opened = ButlerNotifications.addListener('notificationOpened', ({ url }) => {
+      navigate(url && url.startsWith('/') ? url : '/')
+    })
+    const unsubscribe = useAuthStore.subscribe((state, prev) => {
+      if (prev.isAuthenticated && !state.isAuthenticated) {
+        void disablePhoneNotifications({ unregister: false })
+      }
+    })
+    return () => {
+      void opened.then(handle => handle.remove())
+      unsubscribe()
+    }
+  }, [navigate])
+  return null
+}
+
 function AppContent() {
   const { isAuthenticated, hasCompletedOnboarding } = useAuthStore()
   const { fetchProfile, profile } = useUserStore()
@@ -38,32 +61,35 @@ function AppContent() {
   }, [isAuthenticated, hasCompletedOnboarding, profile, fetchProfile])
 
   return (
-    <Routes>
-      <Route path="/login" element={
-        isAuthenticated ? <Navigate to="/" replace /> : <Login />
-      } />
+    <>
+      <NativeBridge />
+      <Routes>
+        <Route path="/login" element={
+          isAuthenticated ? <Navigate to="/" replace /> : <Login />
+        } />
 
-      <Route path="/onboarding" element={
-        !isAuthenticated ? <Navigate to="/login" replace /> :
-        hasCompletedOnboarding ? <Navigate to="/" replace /> :
-        <Onboarding />
-      } />
+        <Route path="/onboarding" element={
+          !isAuthenticated ? <Navigate to="/login" replace /> :
+          hasCompletedOnboarding ? <Navigate to="/" replace /> :
+          <Onboarding />
+        } />
 
-      <Route element={
-        <ProtectedRoute>
-          <Layout />
-        </ProtectedRoute>
-      }>
-        <Route path="/" element={<Home />} />
-        <Route path="/services" element={<Services />} />
-        <Route path="/downloads" element={<Downloads />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/tutorial" element={<Tutorial />} />
-        <Route path="/settings" element={<Settings />} />
-      </Route>
+        <Route element={
+          <ProtectedRoute>
+            <Layout />
+          </ProtectedRoute>
+        }>
+          <Route path="/" element={<Home />} />
+          <Route path="/services" element={<Services />} />
+          <Route path="/downloads" element={<Downloads />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/tutorial" element={<Tutorial />} />
+          <Route path="/settings" element={<Settings />} />
+        </Route>
 
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </>
   )
 }
 

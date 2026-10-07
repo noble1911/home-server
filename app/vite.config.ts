@@ -10,6 +10,9 @@ export default defineConfig({
       srcDir: 'src',
       filename: 'sw.ts',
       registerType: 'autoUpdate',
+      // Registered in main.tsx, and only in browsers: the Android app gets
+      // notifications natively and shouldn't cache the live site it loads.
+      injectRegister: false,
       includeAssets: ['icons/*.png'],
       manifest: {
         name: 'Butler',

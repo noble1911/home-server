@@ -4,6 +4,10 @@ node_modules
 # Build output
 dist
 
+# Android app (#214): built separately by .github/workflows/android.yml
+android
+icons
+
 # Development files
 .git
 .gitignore

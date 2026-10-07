@@ -651,7 +651,7 @@ Custom Python tools interface directly with PostgreSQL (not Butler API's built-i
 
 | Channel | Voice | Text | Notifications | How It Works |
 |---------|-------|------|---------------|--------------|
-| **Mobile App** | ✅ Real-time | ✅ | ✅ Push | Custom app with LiveKit SDK |
+| **Mobile App** | ✅ Real-time | ✅ | ✅ Push | PWA everywhere; on Android also a native app (Capacitor shell around the live PWA) whose notifications Butler pushes over its own WebSocket — no Firebase (#214, `docs/18-android-app.md`) |
 | **Alexa** | ✅ | ❌ | ❌ | Alexa → AWS Lambda (haaska) → Cloudflare Tunnel → HA → Voice Agent |
 | **WhatsApp** | ❌ | ❌ | ✅ Outbound only | Butler sends notifications |
 
@@ -667,6 +667,13 @@ Custom Python tools interface directly with PostgreSQL (not Butler API's built-i
 
 #### Client App: Progressive Web App (PWA)
 
+> **2026-10 update (#214):** Web Push on Android proved unreliable, so Android also
+> gets a native app. It's a Capacitor shell that loads the live PWA (so the UI
+> still has one codebase and web deploys update it), plus a foreground service
+> that holds a WebSocket to Butler for notifications — Butler pushes them itself,
+> with no Firebase/Google dependency. Built on demand by the *Build Android app*
+> workflow. See `docs/18-android-app.md`.
+
 **Why PWA instead of native apps:**
 - Single codebase works on iOS, Android, Windows, Mac, Linux
 - No app store approval or delays
@@ -676,7 +683,7 @@ Custom Python tools interface directly with PostgreSQL (not Butler API's built-i
 | Platform | Access Method | Install |
 |----------|---------------|---------|
 | **iOS (Safari)** | Visit URL → Add to Home Screen | PWA |
-| **Android (Chrome)** | Visit URL → Install App prompt | PWA |
+| **Android** | Butler app from GitHub Releases (`android-v<N>`), or Chrome → Install App | Native shell (#214) or PWA |
 | **Desktop** | Visit URL or install as app | Browser/PWA |
 
 **Tech Stack:**

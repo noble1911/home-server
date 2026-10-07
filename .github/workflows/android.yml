@@ -1,0 +1,95 @@
+# Build the Butler Android app on demand (#214).
+#
+# Run it from Actions → "Build Android app" → Run workflow (main only). It builds
+# a signed APK and attaches it to a GitHub Release tagged android-v<run number>,
+# which the app's Settings → About uses to offer updates. The app loads the live
+# site, so most changes need no new APK — only native ones (notifications, icons).
+#
+# Secrets (Settings → Secrets → Actions): ANDROID_KEYSTORE_BASE64,
+# ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD.
+# Keep the same keystore forever: Android only installs updates signed with it.
+name: Build Android app
+
+on:
+  workflow_dispatch:
+    inputs:
+      notes:
+        description: "What changed (shown on the release)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: app/package-lock.json
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle'
+
+      - name: Build the web bundle and sync Capacitor
+        run: |
+          npm ci
+          npm run build
+          npx cap sync android
+
+      - name: Decode the signing key
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 secret is not set (see docs/18-android-app.md)"
+            exit 1
+          fi
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/butler-release.jks"
+
+      - name: Build signed APK
+        working-directory: app/android
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/butler-release.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          export VERSION_NAME="$(date -u +%Y.%m.%d)-${GITHUB_SHA::7}"
+          echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon --console=plain
+          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/Butler-${{ github.run_number }}.apk"
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NOTES: ${{ inputs.notes }}
+        run: |
+          body="Butler for Android, build ${{ github.run_number }} ($VERSION_NAME) from ${GITHUB_SHA::7}.
+
+          Install: open this page on your phone, download the APK, and allow your browser to install apps if asked.
+          ${NOTES:+
+          Changes: $NOTES}"
+          gh release create "android-v${{ github.run_number }}" \
+            "$RUNNER_TEMP/Butler-${{ github.run_number }}.apk" \
+            --title "Butler Android build ${{ github.run_number }}" \
+            --notes "$body" \
+            --target "$GITHUB_SHA"

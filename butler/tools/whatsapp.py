@@ -323,7 +323,7 @@ class WhatsAppTool(Tool):
 
     @staticmethod
     def _is_quiet_hours(start: str, end: str) -> bool:
-        """Check if the current UTC time falls within quiet hours.
+        """Check if the current local time (LOCAL_TIMEZONE) falls within quiet hours.
 
         Args:
             start: Start time as "HH:MM" string
@@ -333,7 +333,12 @@ class WhatsAppTool(Tool):
             True if current time is within quiet hours.
         """
         try:
-            now = datetime.now(timezone.utc)
+            from zoneinfo import ZoneInfo
+
+            from api.config import settings
+
+            # Users enter quiet hours in local time; UTC ran them an hour late in summer.
+            now = datetime.now(ZoneInfo(settings.local_timezone))
             current_minutes = now.hour * 60 + now.minute
             start_h, start_m = map(int, start.split(":"))
             end_h, end_m = map(int, end.split(":"))

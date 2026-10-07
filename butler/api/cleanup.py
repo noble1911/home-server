@@ -43,12 +43,16 @@ async def delete_expired_facts(pool: DatabasePool) -> int:
 
 async def _run_cleanup(pool: DatabasePool, retention_days: int) -> None:
     """Execute both cleanup operations and log results."""
+    from .devices import cleanup_notifications
+
     conversations = await delete_old_conversations(pool, retention_days)
     facts = await delete_expired_facts(pool)
+    notifications = await cleanup_notifications(pool)
     logger.info(
-        "Cleanup complete: %d old conversations, %d expired facts removed",
+        "Cleanup complete: %d old conversations, %d expired facts, %d app notifications removed",
         conversations,
         facts,
+        notifications,
     )
 
 

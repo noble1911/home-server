@@ -50,6 +50,7 @@ def create_oauth_state(
     user_id: str,
     redirect_uri: str | None = None,
     frontend_url: str | None = None,
+    client: str | None = None,
 ) -> str:
     """Create a signed JWT state parameter encoding the user_id.
 
@@ -72,6 +73,8 @@ def create_oauth_state(
         payload["redirect_uri"] = redirect_uri
     if frontend_url:
         payload["frontend_url"] = frontend_url
+    if client:
+        payload["client"] = client
     return jwt.encode(
         payload,
         settings.jwt_secret,
@@ -96,6 +99,7 @@ def verify_oauth_state(state: str) -> dict:
         "user_id": payload["sub"],
         "redirect_uri": payload.get("redirect_uri"),
         "frontend_url": payload.get("frontend_url"),
+        "client": payload.get("client"),
     }
 
 

@@ -1,0 +1,8 @@
+<!-- Adaptive-icon foreground: the bow tie only, inside Android's 66% safe zone. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <g fill="#fff" transform="translate(512 512) scale(0.86)">
+    <path d="M-70,-60 L-290,-185 Q-335,-210 -335,-160 L-335,160 Q-335,210 -290,185 L-70,60 Z"/>
+    <path d="M70,-60 L290,-185 Q335,-210 335,-160 L335,160 Q335,210 290,185 L70,60 Z"/>
+    <rect x="-88" y="-92" width="176" height="184" rx="44"/>
+  </g>
+</svg>

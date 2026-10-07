@@ -155,6 +155,7 @@ home-server/
 ├── setup.sh               # All-in-one setup (calls scripts/)
 ├── .github/workflows/     # CI/CD (build-and-push, CI)
 ├── app/                   # Butler PWA (React + Vite + LiveKit)
+│   └── android/           # Android app: Capacitor shell + native notifications (docs/18-android-app.md)
 ├── butler/                # Butler API (FastAPI) + LiveKit agent
 │   ├── api/               # Auth, chat, voice, tools routes
 │   ├── tools/             # Custom Python tools (25+)
@@ -188,6 +189,7 @@ home-server/
     ├── VOICE_ARCHITECTURE.md
     ├── google-oauth-setup.md
     ├── kindle-email-setup.md   # Send to Kindle via Butler (#213)
+    ├── 18-android-app.md       # Android app: install, notifications, builds, signing key (#214)
     ├── ebook-reading-guide.md
     └── prowlarr-indexers.md
 ```
@@ -226,6 +228,7 @@ home-server/
 | SSH | Available at 192.168.1.117 | Local network access for management |
 | Book management | BookTool (Open Library + Prowlarr) | Replaced Readarr — simpler, more reliable |
 | Tool routing | 2-phase (categorise → route) | 80-95% API cost reduction |
+| Android app | Capacitor shell loading the live site; notifications over Butler's own WebSocket (no Firebase) | One UI codebase, web deploys update the app; no Google account needed. APK built on demand (Actions → Build Android app) (#214) |
 | Side-effecting actions (email send, calendar edits) | Tap-to-approve drafts (`butler/api/approvals.py`) | The model can draft but never execute; the app's Approve button calls the API directly (#212) |
 
 ## Monthly Costs

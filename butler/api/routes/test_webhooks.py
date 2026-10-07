@@ -205,6 +205,22 @@ class TestBuildNotificationMessage:
 class TestNotifyUsers:
     """Verify notification dispatch to eligible users."""
 
+    @pytest.fixture(autouse=True)
+    def no_real_push(self):
+        # Push (browsers + app) is tested in api/test_push_devices.py.
+        with patch("api.push.send_push_to_user", AsyncMock(return_value=0)) as push:
+            self.push = push
+            yield
+
+    @pytest.mark.asyncio
+    async def test_pushes_to_every_user_as_smart_home(self, mock_pool, mock_whatsapp):
+        mock_pool.pool.fetch = AsyncMock(return_value=[{"id": "ron"}, {"id": "sarah"}])
+        self.push.return_value = 1
+        sent = await _notify_users(mock_pool, None, "Front door opened")
+        assert sent is True
+        assert [c.args[1] for c in self.push.call_args_list] == ["ron", "sarah"]
+        assert all(c.kwargs["category"] == "smart_home" for c in self.push.call_args_list)
+
     @pytest.mark.asyncio
     async def test_notifies_users_with_whatsapp(self, mock_pool, mock_whatsapp):
         mock_pool.pool.fetch = AsyncMock(

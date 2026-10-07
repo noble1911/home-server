@@ -105,18 +105,30 @@ async def _store_event(
 
 async def _notify_users(
     pool: DatabasePool,
-    whatsapp: WhatsAppTool,
+    whatsapp: WhatsAppTool | None,
     message: str,
 ) -> bool:
     """Send a smart_home notification to all eligible users.
 
-    Eligible = phone configured AND smart_home category enabled.
-    The WhatsApp tool's own execute() handles preference checks, rate
-    limiting, and quiet hours for each user individually.
+    Push (browsers + the Android app) goes to everyone; send_push_to_user
+    applies each user's smart_home opt-in and quiet hours. WhatsApp goes to
+    users with a phone, and its execute() does the same checks itself.
 
     Returns True if at least one notification was sent.
     """
+    from ..push import send_push_to_user
+
     db = pool.pool
+    any_sent = False
+    for row in await db.fetch("SELECT id FROM butler.users"):
+        try:
+            if await send_push_to_user(pool, row["id"], "Home", message, url="/", category="smart_home"):
+                any_sent = True
+        except Exception:
+            logger.exception("Push for HA event failed for %s", row["id"])
+
+    if whatsapp is None:
+        return any_sent
     rows = await db.fetch(
         """
         SELECT id FROM butler.users
@@ -125,7 +137,6 @@ async def _notify_users(
         """,
     )
 
-    any_sent = False
     for row in rows:
         result = await whatsapp.execute(
             action="send_message",
@@ -202,19 +213,17 @@ async def receive_ha_event(
 
     notification_sent = False
     if should_notify:
+        # Push always; WhatsApp too when it is configured.
         whatsapp: WhatsAppTool | None = tools.get("whatsapp")
-        if whatsapp:
-            message = _build_notification_message(event)
-            notification_sent = await _notify_users(pool, whatsapp, message)
+        message = _build_notification_message(event)
+        notification_sent = await _notify_users(pool, whatsapp, message)
 
-            # Mark the event as having triggered a notification
-            await pool.pool.execute(
-                "UPDATE butler.ha_events SET notification_sent = $1, processed = TRUE WHERE id = $2",
-                notification_sent,
-                event_id,
-            )
-        else:
-            logger.debug("WhatsApp tool not configured — skipping notification")
+        # Mark the event as having triggered a notification
+        await pool.pool.execute(
+            "UPDATE butler.ha_events SET notification_sent = $1, processed = TRUE WHERE id = $2",
+            notification_sent,
+            event_id,
+        )
     else:
         # Mark as processed but no notification
         await pool.pool.execute(

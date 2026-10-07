@@ -37,6 +37,7 @@ Cloudflare dashboard (domain `noblehaus.uk`) — mirror them here so they're dis
 | Service | Internal address (homeserver net) | LAN address | Notes |
 |---|---|---|---|
 | **butler-api** | `http://butler-api:8000` | `http://192.168.1.117:8000` | Brain + per-user memory + tools. Auth: `X-API-Key: $INTERNAL_API_KEY` (internal → `user_id` in body) or user JWT. Memory is keyed by `user_id`. |
+| **Notification socket** | `ws://butler-api:8000/api/notifications/ws` | via `butler.noblehaus.uk` (butler-app nginx) | The Android app's live connection (#214). Device-token auth (`butler.devices`); outbox `butler.notifications` (7 days). |
 | **ebook-convert** | `http://ebook-convert:8080` | — (no host port) | Calibre `ebook-convert` behind `POST /convert {"path", "to": "epub"}` for Send to Kindle (#213). `Books/eBooks` mounted read-only; `X-Convert-Token` = `EBOOK_CONVERT_TOKEN` in `butler/.env`. Built from `butler/ebook_convert/` with butler-api. |
 | **Kokoro TTS** | `http://kokoro-tts:8880` | `:8880` | OpenAI-compatible `/v1/audio/speech` (wav/mp3). |
 | **Postgres** | `immich-postgres:5432` | `:5432` | DB `immich`, schema `butler` (+pgvector). Shared by butler & vector-llm. |

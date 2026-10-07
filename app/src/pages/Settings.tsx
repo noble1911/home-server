@@ -4,6 +4,8 @@ import { useUserStore } from '../stores/userStore'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useConversationStore } from '../stores/conversationStore'
 import { usePushNotifications } from '../hooks/usePushNotifications'
+import PhoneNotifications from '../components/settings/PhoneNotifications'
+import { ButlerNotifications, checkForAppUpdate, disablePhoneNotifications, isNativeApp, openExternal, type AppUpdate } from '../native/butlerNative'
 import { api, clearUserFacts, deleteUserAccount } from '../services/api'
 import ConfirmDialog from '../components/ConfirmDialog'
 import type { AdminUser, InviteCode, OAuthConnection, ServiceCredential, ToolPermission } from '../types/user'
@@ -118,6 +120,24 @@ export default function Settings() {
   useEffect(() => {
     fetchConnections()
     fetchServiceCredentials()
+    // Back from connecting Google in the browser (Android app): show the result.
+    const onVisible = () => { if (document.visibilityState === 'visible') fetchConnections() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [])
+
+  // Android app: installed version, and whether a newer build is on GitHub
+  const [appVersion, setAppVersion] = useState<{ name: string; code: number } | null>(null)
+  const [appUpdate, setAppUpdate] = useState<AppUpdate | null>(null)
+  useEffect(() => {
+    if (!isNativeApp) return
+    ButlerNotifications.status()
+      .then(s => {
+        setAppVersion({ name: s.versionName, code: s.versionCode })
+        return checkForAppUpdate(s.versionCode)
+      })
+      .then(setAppUpdate)
+      .catch(() => {})
   }, [])
 
   // Fetch invite codes and user list on mount (admin only)
@@ -287,6 +307,14 @@ export default function Settings() {
       // Pass our origin so the backend derives the correct redirect URLs
       // (works for localhost and Cloudflare Tunnel access)
       const origin = encodeURIComponent(window.location.origin)
+      if (isNativeApp) {
+        // Google refuses sign-in inside app web views, so consent happens in the
+        // system browser; client=app makes it end on a "return to the app" page.
+        const data = await api.get<AuthorizeResponse>(`/oauth/google/authorize?origin=${origin}&client=app`)
+        openExternal(data.authorizeUrl)
+        setOauthMessage({ type: 'success', text: 'Finish connecting Google in the browser, then come back here.' })
+        return
+      }
       const data = await api.get<AuthorizeResponse>(`/oauth/google/authorize?origin=${origin}`)
       window.location.href = data.authorizeUrl
     } catch {
@@ -384,6 +412,17 @@ export default function Settings() {
       setIsDeleting(false)
       setShowClearFactsConfirm(false)
     }
+  }
+
+  /** Sign out, and stop this device's notifications first (while still signed in). */
+  async function signOut() {
+    try {
+      if (isNativeApp) await disablePhoneNotifications()
+      else if (push.isSubscribed) await push.unsubscribe()
+    } catch {
+      // sign out regardless
+    }
+    logout()
   }
 
   async function handleDeleteAccount() {
@@ -1028,9 +1067,10 @@ export default function Settings() {
       {/* Push Notifications - per device */}
       <section className="card p-4">
         <h2 className="text-sm font-medium text-butler-400 uppercase tracking-wide mb-4">
-          Push Notifications
-          <span className="text-butler-600 ml-2 text-xs normal-case">this device</span>
+          {isNativeApp ? 'Notifications' : 'Push Notifications'}
+          <span className="text-butler-600 ml-2 text-xs normal-case">{isNativeApp ? 'this phone' : 'this device'}</span>
         </h2>
+        {isNativeApp ? <PhoneNotifications /> : <>
 
         {!push.isSupported ? (
           <p className="text-sm text-butler-500">
@@ -1080,6 +1120,7 @@ export default function Settings() {
             )}
           </div>
         )}
+        </>}
       </section>
 
       {/* WhatsApp Notifications - synced */}
@@ -1261,11 +1302,21 @@ export default function Settings() {
         <div className="space-y-2 text-sm text-butler-400 mb-4">
           <div className="flex justify-between">
             <span>Version</span>
-            <span className="text-butler-300">0.1.0</span>
+            <span className="text-butler-300">
+              {appVersion ? `Android app ${appVersion.name} (build ${appVersion.code})` : '0.1.0'}
+            </span>
           </div>
+          {appUpdate && (
+            <button
+              onClick={() => openExternal(appUpdate.url)}
+              className="w-full btn bg-accent text-white hover:bg-accent/80 text-sm"
+            >
+              Update available: build {appUpdate.versionCode} — download
+            </button>
+          )}
         </div>
         <button
-          onClick={logout}
+          onClick={signOut}
           className="w-full btn bg-red-900/50 text-red-300 hover:bg-red-900 hover:text-red-200"
         >
           Sign Out

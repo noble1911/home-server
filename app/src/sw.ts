@@ -21,6 +21,7 @@ interface PushPayload {
   body: string
   url?: string
   category?: string
+  silent?: boolean
 }
 
 self.addEventListener('push', (event) => {
@@ -39,6 +40,8 @@ self.addEventListener('push', (event) => {
     badge: '/icons/icon-192.png',
     tag: payload.category || 'general',
     data: { url: payload.url || '/' },
+    // Quiet hours: Butler still shows it, just without sound or vibration.
+    silent: payload.silent === true,
   }
 
   event.waitUntil(self.registration.showNotification(payload.title, options))

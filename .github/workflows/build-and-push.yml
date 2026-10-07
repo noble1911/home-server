@@ -6,6 +6,10 @@ on:
     branches: [main]
     paths:
       - 'app/**'
+      # The Android project and icon sources aren't part of the web image.
+      - '!app/android/**'
+      - '!app/icons/**'
+      - '!app/capacitor.config.ts'
       - '.github/workflows/build-and-push.yml'
 
 env:
