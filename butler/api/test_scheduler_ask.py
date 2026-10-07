@@ -63,7 +63,8 @@ class TestAskTask:
         assert prompt == PROMPT
         assert set(tools) == {"gmail", "google_calendar", "weather"}  # no shell, home control or downloads
         assert chat.call_args.kwargs["channel"] == "scheduler" and chat.call_args.kwargs["user_id"] == "ron"
-        assert "not watching" in system[-1]["text"] and NOTHING_TO_REPORT in system[-1]["text"]
+        assert "not watching" in system[-1]["text"] and "as many times as you need" in system[-1]["text"]
+        assert "condition is met" in system[-1]["text"] and NOTHING_TO_REPORT in system[-1]["text"]
         assert load_ctx.call_args.kwargs["history_limit"] == 0
 
     @pytest.mark.asyncio
@@ -77,16 +78,14 @@ class TestAskTask:
         assert kw["message"] == "Needs you: Sam needs the contract signed by Friday."
 
     @pytest.mark.asyncio
-    async def test_quiet_when_nothing_matters(self, scheduler):
+    async def test_quiet_when_the_prompts_condition_isnt_met(self, scheduler):
         await _run(scheduler, NOTHING_TO_REPORT)
         scheduler._notify_user.assert_not_awaited()
         scheduler._db_pool.pool.execute.assert_not_awaited()
 
     @pytest.mark.asyncio
-    async def test_always_mode_reports_even_quiet_days(self, scheduler):
-        _, chat = await _run(scheduler, "All quiet: no new important email, two meetings today.", notify="always")
-        instructions = chat.call_args.args[0][-1]["text"]
-        assert "Always write the report" in instructions and NOTHING_TO_REPORT not in instructions
+    async def test_prompt_without_a_condition_always_reports(self, scheduler):
+        await _run(scheduler, "Tomorrow: dry, 14°C. Two meetings, first at 9:30.")
         scheduler._notify_user.assert_awaited_once()
 
     @pytest.mark.asyncio
@@ -140,7 +139,7 @@ class TestScheduleTaskTool:
                                      cron_expression="30 7 * * 1-5", prompt=PROMPT)
         assert "Created task" in out and "(Europe/London)" in out
         stored = pool.fetchrow.call_args.args[4]
-        assert stored == {"type": "ask", "prompt": PROMPT, "notify": "important"}  # a dict, not a JSON string
+        assert stored == {"type": "ask", "prompt": PROMPT}  # a dict, not a JSON string
 
     @pytest.mark.asyncio
     async def test_ask_needs_a_prompt(self):

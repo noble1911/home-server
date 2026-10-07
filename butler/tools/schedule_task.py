@@ -75,17 +75,11 @@ class ScheduleTaskTool(DatabaseTool):
                 "prompt": {
                     "type": "string",
                     "description": (
-                        "For 'ask': what Butler should do each run, written as the user's "
-                        "request, e.g. 'Check my email from the last day and today's calendar. "
-                        "Tell me anything important or that needs a reply.'"
-                    ),
-                },
-                "notify": {
-                    "type": "string",
-                    "enum": ["important", "always"],
-                    "description": (
-                        "For 'ask': 'important' (default) only notifies when something needs "
-                        "attention; 'always' sends the report every time."
+                        "For 'ask': what Butler should do each run, in the user's words, "
+                        "including when to tell them, e.g. 'Check my email from the last day "
+                        "and today's calendar; tell me if anything is important or needs a "
+                        "reply.' Butler notifies only when that condition is met (every run "
+                        "if the prompt sets none)."
                     ),
                 },
                 "message": {
@@ -173,7 +167,6 @@ class ScheduleTaskTool(DatabaseTool):
             if not prompt:
                 return "Error: 'prompt' is required for ask type (what Butler should do each run)."
             task_action["prompt"] = prompt
-            task_action["notify"] = kwargs.get("notify") if kwargs.get("notify") in ("important", "always") else "important"
 
         # Add notification channel
         if action_type in ("reminder", "check", "ask"):
