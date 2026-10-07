@@ -85,7 +85,7 @@ services:
       start_period: 30s
 
   seerr:
-    image: seerr/seerr:v3.3.0
+    image: seerr/seerr:v3.5.0
     container_name: seerr
     environment:
       - TZ=Europe/London

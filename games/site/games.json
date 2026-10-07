@@ -29,8 +29,8 @@
     "id": "tycoon-town",
     "name": "Tycoon Town",
     "path": "tycoon-town/",
-    "tagline": "Buy, run and flip a town's property against three AI rivals.",
-    "players": "Single player",
+    "tagline": "Buy, run and flip a town's property against AI rivals and friends.",
+    "players": "Solo vs AI · up to 4 online",
     "image": "img/tycoon-town.jpg"
   },
   {

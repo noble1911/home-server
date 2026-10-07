@@ -16,7 +16,7 @@ behind one Caddy container (`games-gateway`, LAN :3010). **Full guide: `docs/17-
 | Super Skidmarks | `/skidmarks/` | `super-skidmarks` :3002, `~/super-skidmarks` | rsync from the laptop repo, `docker compose up -d --build` |
 | Word Poker | `/dont-lie/` | `dont-lie-app` :3001, `~/dont-lie` (no git) | `docker compose up -d --build` in `~/dont-lie` |
 | Gunpey 99 | `/gunpey/` | `gunpey` :3003, `~/gunpey` | `git pull && docker compose up -d --build` |
-| Tycoon Town | `/tycoon-town/` | static, `~/games-static/tycoon-town` | copy a commit's game files from the laptop |
+| Tycoon Town | `/tycoon-town/` | `tycoon-town` :3005, `~/tycoon-town` (no git) | from the laptop repo: export a commit, rsync, `docker compose up -d --build` (see its CLAUDE.md) |
 | Modern Combat | `/modern-combat/` | `modern-combat` :3004, `~/modern-combat` (no git) | `npm run deploy` in the laptop repo (ships a commit, `docker compose up -d --build`) |
 
 **Add a game:** make it work under a path (relative asset and socket URLs, prefixed storage keys),
