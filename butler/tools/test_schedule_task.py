@@ -71,7 +71,7 @@ class TestScheduleTaskTool:
         assert call_args[0][1] == "ron"  # user_id
         assert call_args[0][2] == "Daily vitamins"  # name
         assert call_args[0][3] == "0 9 * * *"  # cron
-        action_json = json.loads(call_args[0][4])
+        action_json = call_args[0][4]  # stored as a dict; the pool codec encodes JSONB
         assert action_json["type"] == "reminder"
         assert action_json["message"] == "Take your vitamins!"
 
@@ -109,7 +109,7 @@ class TestScheduleTaskTool:
 
         assert "Created task" in result
         call_args = mock_pool.pool.fetchrow.call_args
-        action_json = json.loads(call_args[0][4])
+        action_json = call_args[0][4]  # stored as a dict; the pool codec encodes JSONB
         assert action_json["type"] == "check"
         assert action_json["notifyOn"] == "warning"
 
@@ -247,7 +247,7 @@ class TestScheduleTaskTool:
 
         assert "Created task" in result
         call_args = mock_pool.pool.fetchrow.call_args
-        action_json = json.loads(call_args[0][4])
+        action_json = call_args[0][4]  # stored as a dict; the pool codec encodes JSONB
         assert action_json["channel"] == "whatsapp"
 
     @pytest.mark.asyncio
@@ -265,7 +265,7 @@ class TestScheduleTaskTool:
 
         assert "Created task" in result
         call_args = mock_pool.pool.fetchrow.call_args
-        action_json = json.loads(call_args[0][4])
+        action_json = call_args[0][4]  # stored as a dict; the pool codec encodes JSONB
         assert "channel" not in action_json
 
     @pytest.mark.asyncio
@@ -285,7 +285,7 @@ class TestScheduleTaskTool:
 
         assert "Created task" in result
         call_args = mock_pool.pool.fetchrow.call_args
-        action_json = json.loads(call_args[0][4])
+        action_json = call_args[0][4]  # stored as a dict; the pool codec encodes JSONB
         assert action_json["channel"] == "both"
 
     @pytest.mark.asyncio
@@ -303,7 +303,7 @@ class TestScheduleTaskTool:
         )
 
         call_args = mock_pool.pool.fetchrow.call_args
-        action_json = json.loads(call_args[0][4])
+        action_json = call_args[0][4]  # stored as a dict; the pool codec encodes JSONB
         assert "channel" not in action_json
 
     @pytest.mark.asyncio

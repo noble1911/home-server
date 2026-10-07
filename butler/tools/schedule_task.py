@@ -10,8 +10,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from typing import Any
-
-from croniter import croniter
+from zoneinfo import ZoneInfo
 
 from .memory import DatabaseTool
 
@@ -26,10 +25,12 @@ class ScheduleTaskTool(DatabaseTool):
     @property
     def description(self) -> str:
         return (
-            "Manage scheduled tasks for reminders, automations, or health checks. "
-            "Actions: 'create' a new task, 'list' existing tasks, or 'delete' one. "
-            "Supports cron expressions for recurring tasks (e.g., '0 9 * * *' = daily at 9am) "
-            "or one-time execution when cron_expression is omitted."
+            "Manage scheduled tasks: reminders, health checks, and 'ask' tasks where Butler "
+            "itself runs on a schedule with the user's email, calendar, weather and memory, "
+            "then reports back (e.g. 'every weekday at 7:30 check my email and calendar and "
+            "tell me if anything needs attention'). Actions: 'create', 'list', 'delete'. "
+            "Cron times are local time (e.g. '30 7 * * 1-5' = weekdays 7:30am); omit "
+            "cron_expression for a one-off run."
         )
 
     @property
@@ -60,12 +61,31 @@ class ScheduleTaskTool(DatabaseTool):
                 },
                 "action_type": {
                     "type": "string",
-                    "enum": ["reminder", "automation", "check"],
+                    "enum": ["reminder", "ask", "automation", "check"],
                     "description": (
                         "Task type (required for 'create'). "
-                        "reminder: send notification (push by default). "
-                        "automation: execute a tool. "
-                        "check: run health check and notify on threshold."
+                        "reminder: send a fixed notification (push by default). "
+                        "ask: Butler runs `prompt` with the user's email, calendar, weather and "
+                        "memory, then sends what it finds (use for briefings, digests, "
+                        "'tell me if anything important…'). "
+                        "automation: execute one tool with fixed params. "
+                        "check: run a health check tool and notify on threshold."
+                    ),
+                },
+                "prompt": {
+                    "type": "string",
+                    "description": (
+                        "For 'ask': what Butler should do each run, written as the user's "
+                        "request, e.g. 'Check my email from the last day and today's calendar. "
+                        "Tell me anything important or that needs a reply.'"
+                    ),
+                },
+                "notify": {
+                    "type": "string",
+                    "enum": ["important", "always"],
+                    "description": (
+                        "For 'ask': 'important' (default) only notifies when something needs "
+                        "attention; 'always' sends the report every time."
                     ),
                 },
                 "message": {
@@ -93,7 +113,7 @@ class ScheduleTaskTool(DatabaseTool):
                     "type": "string",
                     "enum": ["push", "whatsapp", "both"],
                     "description": (
-                        "Notification channel (for reminder/check). "
+                        "Notification channel (for reminder/check/ask). "
                         "'push' (default): browser push notification, "
                         "falls back to WhatsApp if no subscriptions. "
                         "'whatsapp': WhatsApp only. "
@@ -128,7 +148,7 @@ class ScheduleTaskTool(DatabaseTool):
 
         action_type = kwargs.get("action_type")
         if not action_type:
-            return "Error: 'action_type' is required (reminder, automation, or check)."
+            return "Error: 'action_type' is required (reminder, ask, automation, or check)."
 
         cron_expr = kwargs.get("cron_expression")
 
@@ -148,18 +168,26 @@ class ScheduleTaskTool(DatabaseTool):
             task_action["tool"] = kwargs["tool"]
             task_action["params"] = kwargs.get("params", {})
             task_action["notifyOn"] = kwargs.get("notify_on", "warning")
+        elif action_type == "ask":
+            prompt = (kwargs.get("prompt") or "").strip()
+            if not prompt:
+                return "Error: 'prompt' is required for ask type (what Butler should do each run)."
+            task_action["prompt"] = prompt
+            task_action["notify"] = kwargs.get("notify") if kwargs.get("notify") in ("important", "always") else "important"
 
-        # Add notification channel (reminder/check only)
-        if action_type in ("reminder", "check"):
+        # Add notification channel
+        if action_type in ("reminder", "check", "ask"):
             channel = kwargs.get("channel")
             if channel:
                 task_action["channel"] = channel
 
-        # Compute next_run
+        # Compute next_run (cron is local time)
+        from api.scheduler import next_cron_run
+
         now = datetime.now(timezone.utc)
         if cron_expr:
             try:
-                next_run = croniter(cron_expr, now).get_next(datetime)
+                next_run = next_cron_run(cron_expr, now)
             except (ValueError, KeyError) as e:
                 return f"Error: Invalid cron expression '{cron_expr}': {e}"
         else:
@@ -176,13 +204,13 @@ class ScheduleTaskTool(DatabaseTool):
             user_id,
             name,
             cron_expr,
-            json.dumps(task_action),
+            task_action,  # the pool's JSONB codec encodes it (json.dumps would double-encode)
             next_run,
         )
 
         task_id = row["id"]
         schedule = f"cron '{cron_expr}'" if cron_expr else "one-time"
-        return f"Created task '{name}' (ID: {task_id}, {schedule}, next run: {next_run:%Y-%m-%d %H:%M UTC})"
+        return f"Created task '{name}' (ID: {task_id}, {schedule}, next run: {_local(next_run)})"
 
     async def _list(self, user_id: str) -> str:
         pool = await self._get_pool()
@@ -204,11 +232,12 @@ class ScheduleTaskTool(DatabaseTool):
             status = "enabled" if r["enabled"] else "disabled"
             action = json.loads(r["action"]) if isinstance(r["action"], str) else r["action"]
             schedule = r["cron_expression"] or "one-time"
-            next_run = r["next_run"].strftime("%Y-%m-%d %H:%M UTC") if r["next_run"] else "none"
+            next_run = _local(r["next_run"]) if r["next_run"] else "none"
             channel = action.get("channel", "push")
+            detail = f": \"{action['prompt'][:80]}\"" if action.get("type") == "ask" else ""
             lines.append(
                 f"- [{r['id']}] {r['name']} ({action.get('type')}, {schedule}, {status}, "
-                f"via {channel}, next: {next_run})"
+                f"via {channel}, next: {next_run}){detail}"
             )
 
         return f"Scheduled tasks ({len(rows)}):\n" + "\n".join(lines)
@@ -227,3 +256,11 @@ class ScheduleTaskTool(DatabaseTool):
         if result == "DELETE 0":
             return f"Task {task_id} not found or doesn't belong to you."
         return f"Deleted task {task_id}."
+
+
+def _local(when: datetime) -> str:
+    """A UTC timestamp as household local time, for the model to repeat to the user."""
+    from api.config import settings
+
+    tz = settings.local_timezone
+    return f"{when.astimezone(ZoneInfo(tz)):%a %d %b %H:%M} ({tz})"

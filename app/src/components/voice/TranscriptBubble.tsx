@@ -49,6 +49,14 @@ export default function TranscriptBubble({ message, butlerName }: TranscriptBubb
             Claude Code
           </span>
         )}
+        {message.source === 'scheduled' && (
+          <span className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs bg-accent/15 text-accent-light border border-accent/30">
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Scheduled
+          </span>
+        )}
       </div>
       <div className="pl-8 text-butler-100">
         {!message.content && !message.toolStatus ? (
