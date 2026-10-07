@@ -54,9 +54,8 @@ See `services.yaml` for the full machine-readable port map (the source of truth 
 |---|---|
 | `butler.noblehaus.uk` | `butler-app:80` (PWA) |
 | `butler-api.noblehaus.uk` | `butler-api:8000` |
-| `esp-gateway.noblehaus.uk` | `esp-gateway:8770` *(gateway deployed & running; confirm route exists in dashboard)* |
+| ~~`esp-gateway.noblehaus.uk`~~ | **Not routed:** the hostname has no DNS record (checked 2026-10-07). The gateway runs on the LAN at `:8770`; add this route in the dashboard if ESP devices need it from outside. |
 | `games.noblehaus.uk` | `games-gateway:80` — every game, under its own path (`docs/17-games.md`). **New games need no route of their own.** |
-| *temporary:* random `*.trycloudflare.com` | container `skidmarks-quicktunnel`, a cloudflared quick tunnel (no account, not the main tunnel) to `super-skidmarks:3002`, from before the games site. Remove it (`docker rm -f skidmarks-quicktunnel`) once `games.noblehaus.uk` is routed. |
 | _…(add the rest from the dashboard: photos, jellyfin, ha, etc.)_ | |
 
 > `doctor.sh` can verify host ports against live containers, but it **cannot** see

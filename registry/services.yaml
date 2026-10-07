@@ -92,7 +92,6 @@ services:
   - { name: modern-combat, project: modern-combat, container: modern-combat, host_port: 3004 }  # Modern Combat game + multiplayer relay (/ws) — games.noblehaus.uk/modern-combat/
   - { name: tycoon-town, project: tycoon-town, container: tycoon-town, host_port: 3005 }  # Tycoon Town game + online server (Node, /ws) — games.noblehaus.uk/tycoon-town/
   - { name: froths-party, project: froths-party, container: froths-party, host_port: 3006 }  # Froths Party party games (Node + Socket.IO) — games.noblehaus.uk/froths/
-  - { name: skidmarks-quicktunnel, project: super-skidmarks, container: skidmarks-quicktunnel }  # TEMPORARY cloudflared quick tunnel — remove once games.noblehaus.uk is routed
 
   # ── vector-llm ───────────────────────────────────────────────────
   # vector-llm itself runs as a host Python process (no container). Its compose
