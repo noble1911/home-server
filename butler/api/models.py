@@ -271,6 +271,26 @@ class OAuthAuthorizeResponse(BaseModel):
     authorizeUrl: str
 
 
+# --- Chat model (admin setting, #215) ---
+
+
+class ChatModelOption(BaseModel):
+    id: str
+    label: str
+    description: str
+
+
+class ChatModelSettings(BaseModel):
+    current: str            # what Butler is using now
+    selected: str | None    # the admin's choice; None = server default
+    serverDefault: str      # ANTHROPIC_MODEL
+    options: list[ChatModelOption]
+
+
+class SetChatModelRequest(BaseModel):
+    model: str | None = None  # None = go back to the server default
+
+
 # --- Approvals (tap-to-approve pending actions) ---
 
 

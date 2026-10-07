@@ -228,6 +228,7 @@ home-server/
 | SSH | Available at 192.168.1.117 | Local network access for management |
 | Book management | BookTool (Open Library + Prowlarr) | Replaced Readarr — simpler, more reliable |
 | Tool routing | 2-phase (categorise → route) | 80-95% API cost reduction |
+| Chat model | Admin picks in Settings (Opus 5.5 / Sonnet 5.5), stored in `butler.app_settings`; else `ANTHROPIC_MODEL`. 5.x models opt in to server-side refusal fallback | Cost/quality dial without redeploys; chosen over running Butler on headless Claude Code (latency, shared subscription limits, account terms) (#215) |
 | Android app | Capacitor shell loading the live site; notifications over Butler's own WebSocket (no Firebase) | One UI codebase, web deploys update the app; no Google account needed. APK built on demand (Actions → Build Android app) (#214) |
 | Side-effecting actions (email send, calendar edits) | Tap-to-approve drafts (`butler/api/approvals.py`) | The model can draft but never execute; the app's Approve button calls the API directly (#212) |
 

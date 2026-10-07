@@ -22,11 +22,16 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from tools import DatabasePool
 
 from ..deps import ALL_PERMISSION_GROUPS, DEFAULT_PERMISSIONS, get_admin_user, get_db_pool
+from .. import model_settings
+from ..config import settings
 from ..crypto import decrypt_password
 from ..provisioning import deprovision_user_accounts, provision_user_accounts
 
 logger = logging.getLogger(__name__)
 from ..models import (
+    ChatModelOption,
+    ChatModelSettings,
+    SetChatModelRequest,
     AdminUserInfo,
     AdminUserListResponse,
     CreateInviteCodeRequest,
@@ -267,3 +272,35 @@ async def admin_delete_user(
     # CASCADE handles all child tables (facts, credentials, tokens, etc.)
     await db.execute("DELETE FROM butler.users WHERE id = $1", user_id)
     return Response(status_code=204)
+
+
+# --- Chat model (#215) ---
+
+
+def _model_settings() -> ChatModelSettings:
+    return ChatModelSettings(
+        current=model_settings.current_model(),
+        selected=model_settings.selected_model(),
+        serverDefault=settings.anthropic_model,
+        options=[ChatModelOption(id=k, **v) for k, v in model_settings.CHAT_MODELS.items()],
+    )
+
+
+@router.get("/model", response_model=ChatModelSettings)
+async def get_chat_model(admin_id: str = Depends(get_admin_user)):
+    """Which Claude model Butler chats with, and the choices."""
+    return _model_settings()
+
+
+@router.put("/model", response_model=ChatModelSettings)
+async def set_chat_model(
+    req: SetChatModelRequest,
+    admin_id: str = Depends(get_admin_user),
+    pool: DatabasePool = Depends(get_db_pool),
+):
+    """Choose the household's chat model (null = server default). Takes effect on the next message."""
+    try:
+        await model_settings.set_model(pool, req.model, admin_id)
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from e
+    return _model_settings()

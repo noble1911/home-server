@@ -568,6 +568,24 @@ export function deleteTorrent(hash: string, deleteFiles = false): Promise<void> 
   return api.delete(`/downloads/${hash}?deleteFiles=${deleteFiles}`)
 }
 
+// --- Chat model (admin setting) ---
+
+export interface ChatModelSettings {
+  current: string
+  selected: string | null
+  serverDefault: string
+  options: { id: string; label: string; description: string }[]
+}
+
+export function getChatModel(): Promise<ChatModelSettings> {
+  return api.get('/admin/model')
+}
+
+/** Pick Butler's chat model for everyone; null goes back to the server default. */
+export function setChatModel(model: string | null): Promise<ChatModelSettings> {
+  return api.put('/admin/model', { model })
+}
+
 // --- Approvals (tap-to-approve emails and calendar changes) ---
 
 export function getPendingApprovals(): Promise<{ approvals: PendingApproval[] }> {

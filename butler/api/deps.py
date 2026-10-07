@@ -139,6 +139,10 @@ async def init_resources() -> None:
     # Apply all DB migrations before initializing tools
     await _run_migrations(_db_pool)
 
+    # The chat model an admin picked in Settings (else ANTHROPIC_MODEL)
+    from . import model_settings
+    await model_settings.load(_db_pool)
+
     # Embedding service for semantic memory search (optional)
     _embedding_service = EmbeddingService(settings.ollama_url) if settings.ollama_url else None
 

@@ -32,6 +32,7 @@ from tools import DatabasePool, Tool
 from .approvals import capture_pending_actions, notify_pending
 from .audit import execute_and_log_tool
 from .config import settings
+from .model_settings import current_model
 
 logger = logging.getLogger(__name__)
 
@@ -75,11 +76,49 @@ def _web_search_tool(model: str) -> dict:
     }
 
 
+# Models whose safety classifiers can decline a request. For these we opt in to
+# server-side fallback: on a decline Anthropic re-runs the request on its
+# recommended model inside the same call, instead of Butler saying "I can't help".
+FALLBACK_MODELS = {"claude-opus-5-5", "claude-sonnet-5-5", "claude-opus-5"}
+FALLBACK_BETA = "server-side-fallback-2026-07-01"
+
+
 def _request_kwargs(model: str) -> dict:
-    """Per-model request options: effort where the model supports it."""
+    """Per-model request options: effort where supported, refusal fallback where needed."""
     if model.startswith("claude-haiku-4-5") or model.startswith("claude-3"):
         return {}
-    return {"output_config": {"effort": settings.chat_effort}}
+    kwargs: dict = {"output_config": {"effort": settings.chat_effort}}
+    if model in FALLBACK_MODELS:
+        kwargs |= {"betas": [FALLBACK_BETA], "fallbacks": "default"}
+    return kwargs
+
+
+def _messages_api(model: str):
+    """`fallbacks` only exists on the beta Messages API; everything else uses the plain one."""
+    client = _get_client()
+    return client.beta.messages if model in FALLBACK_MODELS else client.messages
+
+
+def _turn_content(content: list) -> list:
+    """The response's blocks, minus what a declined attempt left before a fallback.
+
+    After a server-side fallback the content holds the declined attempt's
+    partial output, a `fallback` marker, then the fallback model's output.
+    Only the partial's text (and completed server-tool pairs) may be sent back,
+    and the declined attempt's tool calls must not run.
+    """
+    marks = [i for i, b in enumerate(content) if b.type == "fallback"]
+    if not marks:
+        return list(content)
+    before, after = content[:marks[-1]], content[marks[-1] + 1:]
+    answered = {getattr(b, "tool_use_id", None) for b in before if b.type.endswith("_tool_result")}
+    kept = [
+        b for b in before
+        if b.type == "text"
+        or (b.type == "server_tool_use" and b.id in answered)
+        or (b.type.endswith("_tool_result") and b.type != "tool_result")
+    ]
+    return kept + after
 
 
 def _refusal_text() -> str:
@@ -199,7 +238,7 @@ class _ToolRouter:
             return self._model_override
         if settings.routing_model and not self._tools_used:
             return settings.routing_model
-        return settings.anthropic_model
+        return current_model()  # the admin's choice (Settings), else ANTHROPIC_MODEL
 
     @property
     def request_kwargs(self) -> dict:
@@ -440,12 +479,11 @@ async def chat_with_tools(
     Returns:
         Claude's final text response
     """
-    client = _get_client()
     router = _ToolRouter(tools, system_prompt)
     messages = _build_messages(user_message, history, image=image)
 
     for round_num in range(max_tool_rounds):
-        response = await client.messages.create(
+        response = await _messages_api(router.model).create(
             model=router.model,
             max_tokens=settings.max_tokens,
             system=router.system_blocks,
@@ -459,19 +497,20 @@ async def chat_with_tools(
 
         # Extract custom tool use blocks (server-side tools like web_search
         # have type "server_tool_use" and are handled by Anthropic automatically)
-        tool_use_blocks = [b for b in response.content if b.type == "tool_use"]
+        content = _turn_content(response.content)
+        tool_use_blocks = [b for b in content if b.type == "tool_use"]
 
         # Server-side tool pause — Anthropic needs another round-trip to
         # finish processing (e.g. web search). Send the partial response
         # back without executing any custom tools.
         if not tool_use_blocks and response.stop_reason == "pause_turn":
             logger.info("Server-side tool pause (round %d), continuing", round_num + 1)
-            messages.append({"role": "assistant", "content": response.content})
+            messages.append({"role": "assistant", "content": content})
             continue
 
         if not tool_use_blocks:
             # No tool use — extract text and return
-            text_parts = [b.text for b in response.content if b.type == "text"]
+            text_parts = [b.text for b in content if b.type == "text"]
             return " ".join(text_parts) if text_parts else ""
 
         logger.info(
@@ -481,7 +520,7 @@ async def chat_with_tools(
         )
 
         # Append the full assistant response (including tool_use blocks)
-        messages.append({"role": "assistant", "content": response.content})
+        messages.append({"role": "assistant", "content": content})
 
         # Execute tools (including request_tools routing)
         tool_results = await _execute_tool_blocks(
@@ -532,12 +571,11 @@ async def stream_chat_with_tools(
     Yields:
         Text chunks as they arrive from Claude's streaming API
     """
-    client = _get_client()
     router = _ToolRouter(tools, system_prompt, model_override=model_override, allow_web_search=allow_web_search)
     messages = _build_messages(user_message, history, image=image)
 
     for round_num in range(max_tool_rounds):
-        async with client.messages.stream(
+        async with _messages_api(router.model).stream(
             model=router.model,
             max_tokens=max_tokens if max_tokens is not None else settings.max_tokens,
             system=router.system_blocks,
@@ -563,11 +601,12 @@ async def stream_chat_with_tools(
             return
 
         # Check if Claude requested custom tool use
-        tool_use_blocks = [b for b in response.content if b.type == "tool_use"]
+        content = _turn_content(response.content)
+        tool_use_blocks = [b for b in content if b.type == "tool_use"]
 
         if not tool_use_blocks and response.stop_reason == "pause_turn":
             logger.info("Server-side tool pause in voice stream (round %d)", round_num + 1)
-            messages.append({"role": "assistant", "content": response.content})
+            messages.append({"role": "assistant", "content": content})
             continue
 
         if not tool_use_blocks:
@@ -580,7 +619,7 @@ async def stream_chat_with_tools(
         )
 
         # Append assistant response and execute tools
-        messages.append({"role": "assistant", "content": response.content})
+        messages.append({"role": "assistant", "content": content})
 
         tool_results = []
         for block in tool_use_blocks:
@@ -645,14 +684,13 @@ async def stream_chat_with_events(
 
     Used by the PWA chat streaming endpoint to surface tool activity in the UI.
     """
-    client = _get_client()
     router = _ToolRouter(tools, system_prompt)
     messages = _build_messages(user_message, history, image=image)
 
     for round_num in range(max_tool_rounds):
         web_search_active = False
 
-        async with client.messages.stream(
+        async with _messages_api(router.model).stream(
             model=router.model,
             max_tokens=settings.max_tokens,
             system=router.system_blocks,
@@ -685,11 +723,12 @@ async def stream_chat_with_events(
             yield {"type": "text_delta", "delta": _refusal_text()}
             return
 
-        tool_use_blocks = [b for b in response.content if b.type == "tool_use"]
+        content = _turn_content(response.content)
+        tool_use_blocks = [b for b in content if b.type == "tool_use"]
 
         if not tool_use_blocks and response.stop_reason == "pause_turn":
             logger.info("Server-side tool pause in event stream (round %d)", round_num + 1)
-            messages.append({"role": "assistant", "content": response.content})
+            messages.append({"role": "assistant", "content": content})
             continue
 
         if not tool_use_blocks:
@@ -701,7 +740,7 @@ async def stream_chat_with_events(
             [b.name for b in tool_use_blocks],
         )
 
-        messages.append({"role": "assistant", "content": response.content})
+        messages.append({"role": "assistant", "content": content})
 
         tool_results = []
         for block in tool_use_blocks:

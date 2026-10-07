@@ -85,7 +85,9 @@ class TestPerModelRequestShape:
 
     def test_effort_only_where_supported(self):
         with patch.object(llm.settings, "chat_effort", "medium"):
-            assert _request_kwargs("claude-opus-5") == {"output_config": {"effort": "medium"}}
+            # Opus 5 also opts in to server-side refusal fallback (see test_model_settings.py).
+            assert _request_kwargs("claude-opus-5")["output_config"] == {"effort": "medium"}
+            assert _request_kwargs("claude-opus-4-8") == {"output_config": {"effort": "medium"}}
             assert _request_kwargs("claude-haiku-4-5") == {}
 
 

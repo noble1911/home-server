@@ -5,6 +5,7 @@ import { useSettingsStore } from '../stores/settingsStore'
 import { useConversationStore } from '../stores/conversationStore'
 import { usePushNotifications } from '../hooks/usePushNotifications'
 import PhoneNotifications from '../components/settings/PhoneNotifications'
+import ChatModelSetting from '../components/settings/ChatModelSetting'
 import { ButlerNotifications, checkForAppUpdate, disablePhoneNotifications, isNativeApp, openExternal, type AppUpdate } from '../native/butlerNative'
 import { api, clearUserFacts, deleteUserAccount } from '../services/api'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -566,6 +567,9 @@ export default function Settings() {
           )}
         </div>
       </section>
+
+      {/* Chat model - admin only, applies to everyone */}
+      {isAdmin && <ChatModelSetting />}
 
       {/* Invite Codes - admin only */}
       {isAdmin && (
