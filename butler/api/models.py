@@ -255,6 +255,7 @@ class OAuthConnection(BaseModel):
     connected: bool
     accountId: str | None = None
     connectedAt: str | None = None
+    scopes: list[str] = []
 
 
 class OAuthConnectionsResponse(BaseModel):
@@ -263,6 +264,30 @@ class OAuthConnectionsResponse(BaseModel):
 
 class OAuthAuthorizeResponse(BaseModel):
     authorizeUrl: str
+
+
+# --- Approvals (tap-to-approve pending actions) ---
+
+
+class PendingApproval(BaseModel):
+    id: str
+    kind: str
+    title: str
+    fields: list[list[str]] = []
+    body: str | None = None
+    status: str
+    createdAt: str
+    expiresAt: str
+
+
+class PendingApprovalsResponse(BaseModel):
+    approvals: list[PendingApproval]
+
+
+class ApprovalResult(BaseModel):
+    id: str
+    status: str
+    result: str
 
 
 # --- Scheduled Tasks ---

@@ -271,6 +271,24 @@ def _build_rules_text_base(channel: str | None = None) -> str:
     return "\n".join(parts)
 
 
+def _current_time_line() -> str:
+    """Current local date/time, so relative dates ("Friday at 3pm") resolve correctly.
+
+    Lives in the per-user block, which isn't cached on its own; it's computed
+    once per request, so every tool round of one request still hits the cache.
+    """
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    tz = settings.local_timezone
+    try:
+        zone = ZoneInfo(tz)
+    except (ValueError, TypeError, KeyError):  # a bad LOCAL_TIMEZONE mustn't break chat
+        tz, zone = "UTC", ZoneInfo("UTC")
+    now = datetime.now(zone)
+    return f"Current date and time: {now:%A} {now.day} {now:%B %Y, %H:%M} ({tz})."
+
+
 def _build_system_blocks(
     user_name: str,
     soul: dict,
@@ -300,7 +318,8 @@ def _build_system_blocks(
     butler_name = soul.get("butler_name", "Butler")
     parts = [
         f"You are {butler_name}, a helpful AI assistant. "
-        f"You are speaking with {user_name}."
+        f"You are speaking with {user_name}.",
+        _current_time_line(),
     ]
 
     if soul:

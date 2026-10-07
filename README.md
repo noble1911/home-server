@@ -132,7 +132,7 @@ You'll configure these routes in the Cloudflare dashboard after `setup.sh` has d
 
 ### Step 4: Google OAuth Credentials (Optional)
 
-Required if you want Butler to read your Google Calendar and Gmail.
+Required if you want Butler to use your Google Calendar and Gmail (reading, plus sending and calendar changes that you approve one by one).
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Create a new project called `Butler Home Server`
@@ -144,12 +144,14 @@ Required if you want Butler to read your Google Calendar and Gmail.
    - `https://www.googleapis.com/auth/calendar.readonly`
    - `https://www.googleapis.com/auth/gmail.readonly`
    - `https://www.googleapis.com/auth/userinfo.email`
+   - `https://www.googleapis.com/auth/gmail.send`
+   - `https://www.googleapis.com/auth/calendar.events`
 8. Add your household Google accounts as **test users**
 9. Go to **APIs & Services → Credentials**
 10. Click **Create Credentials → OAuth client ID**
 11. Choose **Web application**, name it `Butler Web`
 12. Add **Authorized redirect URIs**:
-    - `http://localhost:8000/api/oauth/google/callback`
+    - `http://localhost:3000/api/oauth/google/callback`
     - `https://butler.yourdomain.com/api/oauth/google/callback` (if using Cloudflare Tunnel)
 13. Copy the **Client ID** and **Client Secret**
 

@@ -29,6 +29,7 @@ import anthropic
 
 from tools import DatabasePool, Tool
 
+from .approvals import capture_pending_actions, notify_pending
 from .audit import execute_and_log_tool
 from .config import settings
 
@@ -272,16 +273,30 @@ async def _run_tool_block(
     db_pool: DatabasePool | None,
     user_id: str | None,
     channel: str | None,
+    approvals_out: list[dict] | None = None,
 ) -> str:
-    """Execute one tool_use block: routing meta-tool or a real tool (audited)."""
+    """Execute one tool_use block: routing meta-tool or a real tool (audited).
+
+    Tools that draft a side-effecting action (send email, change calendar)
+    create a pending approval instead of acting. The event stream passes
+    ``approvals_out`` to show approval cards inline; other surfaces (voice,
+    batch) get a push notification pointing the user to the app.
+    """
     if block.name == "request_tools":
         return router.handle_request_tools(block.input.get("tools", []))
     router.resolve(block.name)
     router.note_tool_use()
-    return await execute_and_log_tool(
-        block.name, block.input, router.active_tools,
-        db_pool=db_pool, user_id=user_id, channel=channel,
-    )
+    with capture_pending_actions() as created:
+        result = await execute_and_log_tool(
+            block.name, block.input, router.active_tools,
+            db_pool=db_pool, user_id=user_id, channel=channel,
+        )
+    if created:
+        if approvals_out is not None:
+            approvals_out.extend(created)
+        elif db_pool is not None and user_id:
+            await notify_pending(db_pool, user_id, created)
+    return result
 
 
 # ── Message building ────────────────────────────────────────────────
@@ -625,6 +640,8 @@ async def stream_chat_with_events(
     - ``{"type": "text_delta", "delta": "..."}``  — text as it arrives
     - ``{"type": "tool_start", "tool": "weather"}`` — tool execution begins
     - ``{"type": "tool_end", "tool": "weather"}``   — tool execution finished
+    - ``{"type": "approval_required", "approval": {...}}`` — a drafted action
+      (email, calendar change) is waiting for the user's tap-to-approve
 
     Used by the PWA chat streaming endpoint to surface tool activity in the UI.
     """
@@ -701,11 +718,15 @@ async def stream_chat_with_events(
 
             yield {"type": "tool_start", "tool": block.name}
 
+            created: list[dict] = []
             result = await _run_tool_block(
                 block, router, db_pool=db_pool, user_id=user_id, channel=channel,
+                approvals_out=created,
             )
 
             yield {"type": "tool_end", "tool": block.name}
+            for approval in created:
+                yield {"type": "approval_required", "approval": approval}
 
             tool_results.append(
                 {

@@ -5,7 +5,9 @@ export type ToolPermission =
   | 'home'
   | 'location'
   | 'calendar'
+  | 'calendar_write'
   | 'email'
+  | 'email_send'
   | 'automation'
   | 'communication'
   | 'claude_code'
@@ -98,7 +100,15 @@ export interface OAuthConnection {
   connected: boolean
   accountId?: string
   connectedAt?: string
+  scopes?: string[]
 }
+
+export const GOOGLE_SCOPES = {
+  gmailRead: 'https://www.googleapis.com/auth/gmail.readonly',
+  gmailSend: 'https://www.googleapis.com/auth/gmail.send',
+  calendarRead: 'https://www.googleapis.com/auth/calendar.readonly',
+  calendarEvents: 'https://www.googleapis.com/auth/calendar.events',
+} as const
 
 export interface ServiceCredential {
   service: string
@@ -130,7 +140,9 @@ export const PERMISSION_INFO: Record<ToolPermission, { label: string; descriptio
   home: { label: 'Smart Home', description: 'Home Assistant, entity control' },
   location: { label: 'Location', description: 'Phone location tracking' },
   calendar: { label: 'Calendar', description: 'Google Calendar' },
+  calendar_write: { label: 'Calendar: edit', description: 'Add, move and delete events (you approve each change)' },
   email: { label: 'Email', description: 'Gmail' },
+  email_send: { label: 'Email: send', description: 'Send emails and replies (you approve each one)' },
   automation: { label: 'Automation', description: 'Scheduled tasks' },
   communication: { label: 'Communication', description: 'WhatsApp messages' },
   claude_code: { label: 'Claude Code', description: 'Run agentic tasks using Claude Code on the server' },

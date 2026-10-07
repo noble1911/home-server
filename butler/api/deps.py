@@ -81,6 +81,10 @@ PERMISSION_TOOL_MAP: dict[str, list[str]] = {
     "location": ["phone_location"],
     "calendar": ["google_calendar"],
     "email": ["gmail"],
+    # Write access to the same tools (#212). Drafts still need the user's
+    # tap-to-approve before anything is sent or changed (api/approvals.py).
+    "calendar_write": ["google_calendar"],
+    "email_send": ["gmail"],
     "automation": ["schedule_task"],
     "communication": ["whatsapp"],
     "admin": ["self_update"],
@@ -411,6 +415,23 @@ async def get_internal_or_user(
     return await get_current_user(authorization)
 
 
+async def get_user_permissions(db_pool: DatabasePool, user_id: str) -> list[str]:
+    """The user's effective permission groups (admins get every group)."""
+    import json as _json
+
+    row = await db_pool.pool.fetchrow(
+        "SELECT permissions, role FROM butler.users WHERE id = $1", user_id
+    )
+    if row is None:
+        return list(DEFAULT_PERMISSIONS)
+    if row["role"] == "admin":
+        return list(PERMISSION_TOOL_MAP.keys())
+    raw = row["permissions"]
+    if raw is None:
+        return list(DEFAULT_PERMISSIONS)
+    return _json.loads(raw) if isinstance(raw, str) else list(raw)
+
+
 async def get_user_tools(
     user_id: str,
     global_tools: dict[str, Tool],
@@ -422,25 +443,7 @@ async def get_user_tools(
     2. Compute which tool names are allowed (always-allowed + permission groups).
     3. Filter global tools and conditionally add per-user OAuth tools.
     """
-    import json as _json
-
-    db = db_pool.pool
-    row = await db.fetchrow(
-        "SELECT permissions, role FROM butler.users WHERE id = $1", user_id
-    )
-    if row is not None:
-        raw = row["permissions"]
-        user_perms: list[str] = (
-            _json.loads(raw) if isinstance(raw, str) else raw
-        ) if raw is not None else DEFAULT_PERMISSIONS
-        user_role: str | None = row["role"]
-    else:
-        user_perms = DEFAULT_PERMISSIONS
-        user_role = None
-
-    # Admin role grants all permission groups automatically
-    if user_role == "admin":
-        user_perms = list(PERMISSION_TOOL_MAP.keys())
+    user_perms = await get_user_permissions(db_pool, user_id)
 
     # Build the set of allowed tool names
     allowed: set[str] = set(ALWAYS_ALLOWED_TOOLS)
@@ -457,9 +460,15 @@ async def get_user_tools(
 
     # Add per-user OAuth tools only if user has the corresponding permission
     if settings.google_client_id:
-        if "calendar" in user_perms:
-            user_tools["google_calendar"] = GoogleCalendarTool(db_pool, user_id)
-        if "email" in user_perms:
-            user_tools["gmail"] = GmailTool(db_pool, user_id)
+        can_read_cal, can_write_cal = "calendar" in user_perms, "calendar_write" in user_perms
+        if can_read_cal or can_write_cal:
+            user_tools["google_calendar"] = GoogleCalendarTool(
+                db_pool, user_id, can_read=can_read_cal, can_write=can_write_cal,
+            )
+        can_read_mail, can_send_mail = "email" in user_perms, "email_send" in user_perms
+        if can_read_mail or can_send_mail:
+            user_tools["gmail"] = GmailTool(
+                db_pool, user_id, can_read=can_read_mail, can_send=can_send_mail,
+            )
 
     return user_tools

@@ -142,6 +142,7 @@ async def get_connections(
             connected=True,
             accountId=row["account_id"],
             connectedAt=row["created_at"],
+            scopes=row["scopes"],
         )
         for row in rows
     ]

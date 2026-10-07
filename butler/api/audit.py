@@ -17,6 +17,19 @@ logger = logging.getLogger(__name__)
 _MAX_RESULT_LENGTH = 500
 _RETENTION_DAYS = 30
 
+# Parameters kept out of the audit log (it's retained for 30 days and readable
+# by admins). The drafted email itself lives in butler.pending_actions.
+_REDACTED_PARAMS: dict[str, set[str]] = {
+    "gmail": {"body"},
+}
+
+
+def _redact(tool_name: str, params: dict[str, Any]) -> dict[str, Any]:
+    keys = _REDACTED_PARAMS.get(tool_name, set()) & params.keys()
+    if not keys:
+        return params
+    return {**params, **{k: f"<{len(str(params[k]))} chars>" for k in keys}}
+
 
 async def execute_and_log_tool(
     tool_name: str,
@@ -95,7 +108,7 @@ async def _log_usage(
             """,
             user_id,
             tool_name,
-            parameters,
+            _redact(tool_name, parameters),
             result_summary,
             error,
             duration_ms,

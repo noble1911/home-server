@@ -7,7 +7,7 @@ import { usePushNotifications } from '../hooks/usePushNotifications'
 import { api, clearUserFacts, deleteUserAccount } from '../services/api'
 import ConfirmDialog from '../components/ConfirmDialog'
 import type { AdminUser, InviteCode, OAuthConnection, ServiceCredential, ToolPermission } from '../types/user'
-import { DEFAULT_VOICE, PERMISSION_INFO, SERVICE_DISPLAY_NAMES, VOICE_OPTIONS } from '../types/user'
+import { DEFAULT_VOICE, GOOGLE_SCOPES, PERMISSION_INFO, SERVICE_DISPLAY_NAMES, VOICE_OPTIONS } from '../types/user'
 
 interface ConnectionsResponse {
   connections: OAuthConnection[]
@@ -383,6 +383,13 @@ export default function Settings() {
   const allPermissions = Object.keys(PERMISSION_INFO) as ToolPermission[]
 
   const googleConnection = connections.find(c => c.provider === 'google')
+  // Google only grants scopes at consent time: users connected before send/edit
+  // existed (or who unticked them) must reconnect before Butler can use them.
+  const googleScopes = googleConnection?.scopes ?? []
+  const googleNeedsReconnect = !!googleConnection && (
+    ((isAdmin || profile?.permissions.includes('email_send')) && !googleScopes.includes(GOOGLE_SCOPES.gmailSend)) ||
+    ((isAdmin || profile?.permissions.includes('calendar_write')) && !googleScopes.includes(GOOGLE_SCOPES.calendarEvents))
+  )
 
   if (!profile) {
     return (
@@ -691,27 +698,47 @@ export default function Settings() {
 
         <div className="space-y-3">
           {/* Google (Calendar + Gmail) */}
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
               <div className="text-sm text-butler-100">Google</div>
               {connectionsLoading ? (
                 <div className="text-xs text-butler-500">Checking...</div>
               ) : googleConnection ? (
-                <div className="text-xs text-butler-400">
-                  Connected{googleConnection.accountId ? ` as ${googleConnection.accountId}` : ''} &middot; Calendar, Gmail
-                </div>
+                <>
+                  <div className="text-xs text-butler-400 truncate">
+                    Connected{googleConnection.accountId ? ` as ${googleConnection.accountId}` : ''}
+                  </div>
+                  <div className="text-xs text-butler-500">{describeGoogleAccess(googleScopes)}</div>
+                  {googleNeedsReconnect && (
+                    <div className="text-xs text-amber-300 mt-0.5">
+                      Reconnect to let Butler send email and edit your calendar (you approve each one)
+                    </div>
+                  )}
+                </>
               ) : (
                 <div className="text-xs text-butler-500">Not connected &middot; Calendar, Gmail</div>
               )}
             </div>
             {!connectionsLoading && (
               googleConnection ? (
-                <button
-                  onClick={() => disconnectProvider('google')}
-                  className="px-3 py-1.5 rounded-lg text-xs bg-red-900/50 text-red-300 hover:bg-red-900 hover:text-red-200"
-                >
-                  Disconnect
-                </button>
+                <div className="flex gap-2 shrink-0">
+                  <button
+                    onClick={connectGoogle}
+                    className={`px-3 py-1.5 rounded-lg text-xs ${
+                      googleNeedsReconnect
+                        ? 'bg-accent text-white hover:bg-accent/80'
+                        : 'bg-butler-700 text-butler-200 hover:bg-butler-600'
+                    }`}
+                  >
+                    Reconnect
+                  </button>
+                  <button
+                    onClick={() => disconnectProvider('google')}
+                    className="px-3 py-1.5 rounded-lg text-xs bg-red-900/50 text-red-300 hover:bg-red-900 hover:text-red-200"
+                  >
+                    Disconnect
+                  </button>
+                </div>
               ) : (
                 <button
                   onClick={connectGoogle}
@@ -1226,4 +1253,12 @@ export default function Settings() {
       )}
     </div>
   )
+}
+
+/** e.g. "Email: read & send · Calendar: read & edit" from the granted OAuth scopes. */
+function describeGoogleAccess(scopes: string[]): string {
+  const has = (scope: string) => scopes.includes(scope)
+  const email = [has(GOOGLE_SCOPES.gmailRead) && 'read', has(GOOGLE_SCOPES.gmailSend) && 'send'].filter(Boolean).join(' & ')
+  const calendar = [has(GOOGLE_SCOPES.calendarRead) && 'read', has(GOOGLE_SCOPES.calendarEvents) && 'edit'].filter(Boolean).join(' & ')
+  return `Email: ${email || 'none'} \u00b7 Calendar: ${calendar || 'none'}`
 }

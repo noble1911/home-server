@@ -30,7 +30,14 @@ GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo"
 CALENDAR_READONLY_SCOPE = "https://www.googleapis.com/auth/calendar.readonly"
 GMAIL_READONLY_SCOPE = "https://www.googleapis.com/auth/gmail.readonly"
 USERINFO_EMAIL_SCOPE = "https://www.googleapis.com/auth/userinfo.email"
-GOOGLE_SCOPES = f"{CALENDAR_READONLY_SCOPE} {GMAIL_READONLY_SCOPE} {USERINFO_EMAIL_SCOPE}"
+# Write access (#212). Narrowest scopes that work: gmail.send can only send
+# (no reading/deleting), calendar.events can't touch calendar settings or ACLs.
+GMAIL_SEND_SCOPE = "https://www.googleapis.com/auth/gmail.send"
+CALENDAR_EVENTS_SCOPE = "https://www.googleapis.com/auth/calendar.events"
+GOOGLE_SCOPES = " ".join([
+    CALENDAR_READONLY_SCOPE, GMAIL_READONLY_SCOPE, USERINFO_EMAIL_SCOPE,
+    GMAIL_SEND_SCOPE, CALENDAR_EVENTS_SCOPE,
+])
 
 # State JWT settings
 _STATE_TTL_MINUTES = 10
@@ -281,11 +288,28 @@ async def get_valid_token(pool, user_id: str, provider: str) -> str | None:
         return None
 
 
+async def get_granted_scopes(pool, user_id: str, provider: str = "google") -> set[str]:
+    """Scopes the user actually granted (they can untick some on Google's consent screen)."""
+    row = await pool.pool.fetchrow(
+        "SELECT scopes FROM butler.oauth_tokens WHERE user_id = $1 AND provider = $2",
+        user_id, provider,
+    )
+    return set((row["scopes"] or "").split()) if row else set()
+
+
+async def get_account_email(pool, user_id: str, provider: str = "google") -> str | None:
+    """The connected account's address (e.g. the user's Gmail), if known."""
+    return await pool.pool.fetchval(
+        "SELECT provider_account_id FROM butler.oauth_tokens WHERE user_id = $1 AND provider = $2",
+        user_id, provider,
+    )
+
+
 async def list_connections(pool, user_id: str) -> list[dict]:
     """List all OAuth connections for a user."""
     rows = await pool.pool.fetch(
         """
-        SELECT provider, provider_account_id, created_at
+        SELECT provider, provider_account_id, created_at, scopes
         FROM butler.oauth_tokens
         WHERE user_id = $1
         ORDER BY created_at
@@ -297,6 +321,7 @@ async def list_connections(pool, user_id: str) -> list[dict]:
             "provider": row["provider"],
             "account_id": row["provider_account_id"],
             "created_at": row["created_at"].isoformat() if row["created_at"] else None,
+            "scopes": (row["scopes"] or "").split(),
         }
         for row in rows
     ]

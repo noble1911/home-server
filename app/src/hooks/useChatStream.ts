@@ -1,5 +1,6 @@
 import { useRef, useState, useCallback, useEffect } from 'react'
 import { useConversationStore } from '../stores/conversationStore'
+import { useApprovalStore } from '../stores/approvalStore'
 import { streamSSE } from '../services/sse'
 import type { ChatStreamEvent, Message } from '../types/conversation'
 
@@ -19,7 +20,7 @@ const TOOL_LABELS: Record<string, string> = {
   jellyfin: 'Checking media library...',
   immich: 'Searching photos...',
   google_calendar: 'Checking calendar...',
-  gmail: 'Checking email...',
+  gmail: 'Working on email...',
   server_health: 'Checking server health...',
   storage_monitor: 'Checking storage...',
   whatsapp: 'Sending WhatsApp message...',
@@ -111,7 +112,11 @@ export function useChatStream(): UseChatStreamReturn {
             case 'tool_end':
               updateMessage(assistantId, { toolStatus: undefined })
               break
+            case 'approval_required':
+              useApprovalStore.getState().add(event.approval)
+              break
             case 'done':
+              useApprovalStore.getState().fetch()
               break
           }
         },

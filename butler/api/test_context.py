@@ -396,3 +396,24 @@ class TestBuildMessages:
         assert messages[0]["role"] == "user"
         assert "Previous unanswered question" in messages[0]["content"]
         assert "New question" in messages[0]["content"]
+
+
+class TestCurrentTime:
+    def test_system_prompt_states_local_date_and_time(self):
+        from unittest.mock import patch as _patch
+
+        from .context import _current_time_line
+
+        with _patch("api.context.settings") as s:
+            s.local_timezone = "Europe/London"
+            line = _current_time_line()
+        assert line.startswith("Current date and time: ") and "(Europe/London)" in line
+
+    def test_bad_timezone_falls_back_to_utc(self):
+        from unittest.mock import patch as _patch
+
+        from .context import _current_time_line
+
+        with _patch("api.context.settings") as s:
+            s.local_timezone = "Not/AZone"
+            assert _current_time_line().endswith("(UTC).")

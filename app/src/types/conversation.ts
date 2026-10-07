@@ -45,8 +45,27 @@ export interface VisualContentMessage {
 export type LiveKitDataMessage = TranscriptMessage | AgentStateMessage | VisualContentMessage
 
 /** SSE events from POST /api/chat/stream */
+/** A drafted email / calendar change waiting for the user's tap-to-approve. */
+export interface PendingApproval {
+  id: string
+  kind: string            // e.g. 'gmail.send', 'calendar.update'
+  title: string           // e.g. 'Send email'
+  fields: [string, string][]
+  body?: string | null
+  status: string
+  createdAt: string
+  expiresAt: string
+}
+
+export interface ApprovalResult {
+  id: string
+  status: 'done' | 'failed' | 'rejected' | string
+  result: string
+}
+
 export type ChatStreamEvent =
   | { type: 'text_delta'; delta: string }
   | { type: 'tool_start'; tool: string }
   | { type: 'tool_end'; tool: string }
+  | { type: 'approval_required'; approval: PendingApproval }
   | { type: 'done'; message_id: string }

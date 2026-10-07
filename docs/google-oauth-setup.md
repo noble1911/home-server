@@ -32,6 +32,8 @@ This guide walks you through creating Google OAuth credentials so Butler can acc
    - `https://www.googleapis.com/auth/calendar.readonly`
    - `https://www.googleapis.com/auth/gmail.readonly`
    - `https://www.googleapis.com/auth/userinfo.email`
+   - `https://www.googleapis.com/auth/gmail.send` (lets Butler send emails you approve)
+   - `https://www.googleapis.com/auth/calendar.events` (lets Butler add, move and delete events you approve)
 6. Click **Save and Continue**
 7. On the **Test users** page, add the Google accounts of your household members
 8. Click **Save and Continue**
@@ -83,6 +85,16 @@ Your OAuth app starts in **Testing** mode. This is fine for a home server:
 - **Testing mode:** Up to 100 test users (more than enough for a household). Users must be added to the test users list in step 3.7 above.
 - **Unverified app warning:** Users will see a "Google hasn't verified this app" screen. Click **Advanced > Go to Butler (unsafe)** to proceed. This is normal for self-hosted apps.
 - **Production mode:** Requires Google's app review process. Not needed for personal use.
+- **Weekly reconnects:** in Testing mode Google expires refresh tokens for apps using sensitive scopes (Gmail, Calendar) after **7 days**. When Butler says Google access has expired, tap **Reconnect** next to Google in Settings.
+
+### Sending email and changing the calendar
+
+Butler can draft emails, replies and calendar changes, but it **never sends or changes anything on its own**. Each draft appears in the chat as a card showing exactly what will happen; nothing is sent until you tap **Send** / **Approve** (drafts expire after 12 hours). The card's button calls the API directly, so the model can't approve its own drafts.
+
+Two things must both be true for a user to get these abilities:
+
+1. **Permission:** an admin grants **Email: send** and/or **Calendar: edit** (Settings > Users). Admins have them automatically; nobody else gets them by default.
+2. **Google consent:** the user's Google connection includes the `gmail.send` / `calendar.events` scopes. Accounts connected before these existed need to tap **Reconnect** next to Google in Settings (it's highlighted when needed). Settings shows what each connection allows, e.g. *Email: read & send · Calendar: read & edit*.
 
 ### Adding More Google Services
 
@@ -91,4 +103,4 @@ The same OAuth credentials work for additional Google APIs. To add a new service
 1. Enable the API in Google Cloud Console (APIs & Services > Library)
 2. Add the required scope to the consent screen (APIs & Services > OAuth consent screen > Scopes)
 3. Add the scope to `GOOGLE_SCOPES` in `butler/api/oauth.py`
-4. Existing users will need to disconnect and reconnect to grant the new scope
+4. Existing users tap **Reconnect** next to Google in Settings to grant the new scope (Google only grants scopes at consent time)

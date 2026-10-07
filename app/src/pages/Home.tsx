@@ -9,6 +9,8 @@ import type { Message } from '../types/conversation'
 import Waveform from '../components/voice/Waveform'
 import TranscriptBubble from '../components/voice/TranscriptBubble'
 import ChatInput from '../components/chat/ChatInput'
+import ApprovalCards from '../components/chat/ApprovalCards'
+import { useApprovalStore } from '../stores/approvalStore'
 
 export default function Home() {
   const { profile } = useUserStore()
@@ -44,6 +46,16 @@ export default function Home() {
     profile?.role === 'admin' || profile?.permissions.includes('claude_code')
   const showWaveform = isRecording || voiceStatus === 'speaking'
   const scrollRef = useRef<HTMLDivElement>(null)
+
+  // Drafted emails / calendar changes waiting for approval. Voice-created ones
+  // arrive by push, so refresh whenever the app comes back to the foreground.
+  const fetchApprovals = useApprovalStore(s => s.fetch)
+  useEffect(() => {
+    fetchApprovals()
+    const onVisible = () => { if (document.visibilityState === 'visible') fetchApprovals() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [fetchApprovals])
 
   // Load conversation history on mount (only once per session)
   useEffect(() => {
@@ -272,6 +284,8 @@ export default function Home() {
             <Waveform isActive={showWaveform} levels={audioLevels} />
           </div>
         )}
+
+        <ApprovalCards />
 
         <ChatInput
           voiceStatus={voiceStatus}

@@ -7,6 +7,7 @@
  */
 
 import { useAuthStore } from '../stores/authStore'
+import type { ApprovalResult, PendingApproval } from '../types/conversation'
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api'
 
@@ -15,6 +16,13 @@ class ApiError extends Error {
     super(message)
     this.name = 'ApiError'
   }
+}
+
+/** FastAPI puts the reason in `detail` (a string for HTTPException); others use `message`. */
+function errorText(body: { message?: unknown; detail?: unknown }): string | undefined {
+  if (typeof body.message === 'string') return body.message
+  if (typeof body.detail === 'string') return body.detail
+  return undefined
 }
 
 export function getAuthToken(): string | null {
@@ -126,7 +134,7 @@ async function request<T>(
 
       if (!retryResponse.ok) {
         const error = await retryResponse.json().catch(() => ({ message: 'Request failed' }))
-        throw new ApiError(retryResponse.status, error.message || `HTTP ${retryResponse.status}`)
+        throw new ApiError(retryResponse.status, errorText(error) || `HTTP ${retryResponse.status}`)
       }
       if (retryResponse.status === 204) return undefined as T
       return retryResponse.json()
@@ -137,7 +145,7 @@ async function request<T>(
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ message: 'Request failed' }))
-    throw new ApiError(response.status, error.message || `HTTP ${response.status}`)
+    throw new ApiError(response.status, errorText(error) || `HTTP ${response.status}`)
   }
 
   // Handle 204 No Content
@@ -558,4 +566,18 @@ export function resumeTorrent(hash: string): Promise<void> {
 
 export function deleteTorrent(hash: string, deleteFiles = false): Promise<void> {
   return api.delete(`/downloads/${hash}?deleteFiles=${deleteFiles}`)
+}
+
+// --- Approvals (tap-to-approve emails and calendar changes) ---
+
+export function getPendingApprovals(): Promise<{ approvals: PendingApproval[] }> {
+  return api.get('/approvals')
+}
+
+export function approveAction(id: string): Promise<ApprovalResult> {
+  return api.post(`/approvals/${encodeURIComponent(id)}/approve`)
+}
+
+export function rejectAction(id: string): Promise<ApprovalResult> {
+  return api.post(`/approvals/${encodeURIComponent(id)}/reject`)
 }

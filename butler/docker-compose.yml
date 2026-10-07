@@ -14,6 +14,7 @@ services:
       # Claude API
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-opus-5}
+      - LOCAL_TIMEZONE=${LOCAL_TIMEZONE:-Europe/London}
       - ROUTING_MODEL=${ROUTING_MODEL:-}
       - CHAT_EFFORT=${CHAT_EFFORT:-medium}
       # LiveKit (must match voice-stack config)

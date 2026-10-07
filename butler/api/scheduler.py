@@ -172,6 +172,17 @@ class TaskScheduler:
             return None
 
         params = dict(action.get("params") or {})
+        # A tool that drafts something needing approval (email, calendar) must
+        # tell the user, since nobody is watching a chat screen for the card.
+        from .approvals import capture_pending_actions, notify_pending
+
+        with capture_pending_actions() as drafted:
+            result = await self._execute_scheduled_tool(tool_name, params, user_tools, user_id)
+        if drafted:
+            await notify_pending(self._db_pool, user_id, drafted)
+        return result
+
+    async def _execute_scheduled_tool(self, tool_name, params, user_tools, user_id):
         return await execute_and_log_tool(
             tool_name,
             params,

@@ -227,6 +227,7 @@ home-server/
 | SSH | Available at 192.168.1.117 | Local network access for management |
 | Book management | BookTool (Open Library + Prowlarr) | Replaced Readarr — simpler, more reliable |
 | Tool routing | 2-phase (categorise → route) | 80-95% API cost reduction |
+| Side-effecting actions (email send, calendar edits) | Tap-to-approve drafts (`butler/api/approvals.py`) | The model can draft but never execute; the app's Approve button calls the API directly (#212) |
 
 ## Monthly Costs
 

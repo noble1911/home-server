@@ -258,7 +258,7 @@ The Butler is built on **custom Python tools**, keeping the codebase minimal and
 | **No external dependencies for AI tools** | Skill download capability removed from codebase |
 | **Custom Python tools only** | All integrations built and audited by us |
 | **Network isolation** | Cloudflare Tunnel for remote access, admin services LAN-only |
-| **Read-only where possible** | Calendar, email, location = read-only access |
+| **Read-only where possible** | Location = read-only. Email and calendar can be written, but only through tap-to-approve drafts (#212) — the model can't send or change anything by itself |
 | **Multi-user** | Supports both household members |
 
 ### System Architecture
@@ -706,8 +706,8 @@ Custom Python tools interface directly with PostgreSQL (not Butler API's built-i
 
 | Integration | Purpose | Access Level |
 |-------------|---------|--------------|
-| **Google Calendar** | Know schedule, holidays, return dates | Read-only |
-| **Gmail** | Flight confirmations, delivery notifications | Read-only |
+| **Google Calendar** | Know schedule, holidays, return dates; add/move/delete events | Read; write via tap-to-approve (`calendar_write` permission, #212) |
+| **Gmail** | Flight confirmations, delivery notifications; send and reply | Read; send via tap-to-approve (`email_send` permission, #212) |
 | **Phone Location** (×2) | Know if home/away, enable geofencing | Read-only |
 | **Weather API** | Forecasts for automation decisions | Read-only |
 

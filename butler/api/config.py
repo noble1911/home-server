@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     chat_effort: str = "medium"
     # Caps thinking + answer together on Opus 5 (thinking is on by default).
     max_tokens: int = 16000
+
+    # Household timezone (IANA name): "today" for the calendar, and the current
+    # date/time Butler is told so it can resolve "Friday at 3pm".
+    local_timezone: str = "Europe/London"
     max_history_messages: int = 20
 
     # Web search (Anthropic server-side tool)
