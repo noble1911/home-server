@@ -4,5 +4,6 @@ livekit-plugins-silero==1.4.1
 livekit-plugins-openai==1.4.1
 livekit-plugins-groq==1.4.1
 aiohttp
+httpx  # livekit-agents 1.4.1 imports it without declaring it
 pydantic-settings
 python-dotenv
