@@ -38,9 +38,13 @@ export default function ChatInput({
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { sendMessage, cancelStream, isStreaming, error } = useChatStream()
 
-  // Voice button handlers
-  const handleVoicePress = useCallback(() => {
-    if (!onStartListening) return
+  // Voice button handlers. Pointer events cover mouse and touch in one path: with
+  // touch + mouse handlers a tap fires twice (the browser adds mouse events after
+  // touchend), which started and stopped recording in tap-to-toggle mode.
+  const handleVoicePress = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
+    if (!onStartListening || (e.pointerType === 'mouse' && e.button !== 0)) return
+    // Keep getting this pointer's events even if a finger drifts off the button
+    e.currentTarget.setPointerCapture(e.pointerId)
     if (voiceMode === 'push-to-talk') {
       onStartListening()
     } else {
@@ -162,13 +166,13 @@ export default function ChatInput({
         {onStartListening && (
           <button
             type="button"
-            onMouseDown={handleVoicePress}
-            onMouseUp={handleVoiceRelease}
-            onMouseLeave={voiceMode === 'push-to-talk' ? handleVoiceRelease : undefined}
-            onTouchStart={handleVoicePress}
-            onTouchEnd={handleVoiceRelease}
+            onPointerDown={handleVoicePress}
+            onPointerUp={handleVoiceRelease}
+            onPointerCancel={handleVoiceRelease}
+            onContextMenu={(e) => e.preventDefault()}
             className={`
               shrink-0 w-10 h-10 rounded-full flex items-center justify-center
+              touch-none select-none [-webkit-touch-callout:none]
               transition-all duration-200 active:scale-95
               ${micStatusColors[voiceStatus]}
             `}

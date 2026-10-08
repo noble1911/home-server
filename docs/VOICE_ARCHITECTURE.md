@@ -314,7 +314,17 @@ The app and the LiveKit agent also talk over the room's data channel (`butler/li
 | agent → app | `{"type": "agent_state", "state": "thinking" \| "speaking" \| "idle"}` | Drives the voice status; "speaking" shows a **Stop speaking** button |
 | agent → app | `user_transcript` / `assistant_transcript` / `visual_content` | Puts the conversation in the chat (`butler_llm.py`); a reply cut short is still posted |
 | app → agent | `{"type": "interrupt"}` on topic `butler-control` | Stops the current reply. Sent by Stop speaking, pressing the mic, or sending a typed message |
-| app → agent | participant attribute `speak_replies="false"` | **Settings → Read replies aloud** off: answers come back as text only (TTS is skipped, not muted). Can change mid-conversation |
+| app → agent | participant attribute `speak_replies="false"` | **Settings → Read replies aloud** off: answers come back as text only (TTS is skipped, not muted). Can change mid-conversation. Needs `canUpdateOwnMetadata` in the token (`butler/api/auth.py`) |
+| app → agent | the mic track's mute state | Push-to-talk. Unmuted = the button is held: Butler stops talking and listens however long you pause (manual turn detection). Muted = you let go: everything said is one turn, answered straight away |
+| app → agent | pre-connect audio (byte stream `lk.agent.pre-connect-audio-buffer`) | The first press opens the room; the app records from the press while connecting, and LiveKit hands that audio to the agent when it joins, so the first words aren't lost |
+
+### Push-to-talk timing (#219)
+
+- **First press** (`useLiveKitVoice.startRoom`): the mic starts in parallel with fetching the token and connecting, with LiveKit's pre-connect buffer on (`publishDefaults.preConnectBuffer`; livekit-client 2.17 reads it there, not from `setMicrophoneEnabled`'s publish options). The agent must call `session.start()` *before* `ctx.connect()` to accept it, and waits up to 10s for it (LiveKit's 3s default is too short over the internet).
+- **Letting go**: the app keeps the mic open 300ms (`MIC_TAIL_MS`) so the last word isn't clipped, then mutes; the agent detaches its input and commits the turn (STT flushed with silence, no VAD wait). If you let go before Butler has heard anything (a short first command whose pre-connect audio is still arriving), the agent falls back to VAD turn detection for that turn so the audio isn't dropped.
+- **No greeting**: by the time the agent joins you're usually already talking.
+- **Agent gone** (e.g. redeployed): the app drops the room and the next press opens a fresh one.
+- Testing: `docker exec livekit-agent python e2e_check.py` on the server (free, no speech); `butler/livekit-agent/harness/` locally for the full app → agent run with real speech.
 
 ---
 

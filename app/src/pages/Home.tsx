@@ -159,7 +159,7 @@ export default function Home() {
       {/* Connection error banner */}
       {connectionError && (
         <div className="shrink-0 mx-4 mt-2 px-3 py-2 bg-red-900/30 text-red-300 text-xs rounded-lg">
-          Voice server unavailable — using demo mode
+          Voice unavailable: {connectionError}
         </div>
       )}
 

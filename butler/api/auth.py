@@ -102,6 +102,8 @@ def create_livekit_token(user_id: str, room_name: str) -> str:
         room=room_name,
         can_publish=True,
         can_subscribe=True,
+        # The app sets attributes such as speak_replies on itself
+        can_update_own_metadata=True,
     ))
     token.ttl = timedelta(hours=1)
     return token.to_jwt()

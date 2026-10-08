@@ -1,28 +1,32 @@
-"""End-to-end check of the running voice agent's controls (#217).
+"""End-to-end check of the running voice agent (#217, #219).
 
-A fake user joins a fresh room and checks the agent greets, reports its state,
-stops when told to, and stays silent with "Read replies aloud" off. No speech,
-STT or LLM involved, so it's quick and free. Run after rebuilding the agent:
+A fake user joins a fresh room and checks the agent joins and reports its
+state, doesn't talk unprompted (no greeting over the user), and handles a
+push-to-talk press with nothing said without replying. No speech, so nothing
+reaches STT or Claude: quick and free. Run after rebuilding the agent:
 
     docker exec livekit-agent python e2e_check.py
+
+For the full browser -> agent check with real speech, see harness/README.md.
 """
 import asyncio, json, os, time, uuid
 from livekit import api, rtc
 
 URL, KEY, SECRET = os.environ["LIVEKIT_URL"], os.environ["LIVEKIT_API_KEY"], os.environ["LIVEKIT_API_SECRET"]
+AGENT_READY_TIMEOUT = 15
 
 
-def token(room, attrs):
+def token(room):
     grants = api.VideoGrants(room_join=True, room=room, can_publish=True, can_subscribe=True,
                              can_publish_data=True, can_update_own_metadata=True)
     return (api.AccessToken(KEY, SECRET).with_identity("e2e-user").with_name("e2e")
-            .with_grants(grants).with_attributes(attrs).to_jwt())
+            .with_grants(grants).with_attributes({"speak_replies": "true"}).to_jwt())
 
 
-async def run(name, attrs, scenario):
+async def main():
     room_name = f"butler_e2etest_{uuid.uuid4().hex[:8]}"
-    room, states = rtc.Room(), []
-    t0 = time.monotonic()
+    room, states, t0 = rtc.Room(), [], time.monotonic()
+    ready = asyncio.Event()
 
     @room.on("data_received")
     def _(pkt):
@@ -33,19 +37,42 @@ async def run(name, attrs, scenario):
         if m.get("type") == "agent_state":
             states.append((round(time.monotonic() - t0, 2), m["state"]))
 
-    async def wait_for(state, timeout):
-        end = time.monotonic() + timeout
-        n = len([s for s in states if s[1] == state])
-        while time.monotonic() < end:
-            hits = [s for s in states if s[1] == state]
-            if len(hits) > n or (n == 0 and hits):
-                return hits[-1][0]
-            await asyncio.sleep(0.02)
-        return None
+    def check_ready(*_):
+        for p in room.remote_participants.values():
+            if p.kind == rtc.ParticipantKind.PARTICIPANT_KIND_AGENT and p.attributes.get("lk.agent.state"):
+                ready.set()
+    room.on("participant_attributes_changed", check_ready)
+    room.on("participant_connected", check_ready)
 
-    await room.connect(URL, token(room_name, attrs))
+    results = {}
+    await room.connect(URL, token(room_name))
     try:
-        result = await scenario(room, wait_for)
+        check_ready()
+        try:
+            await asyncio.wait_for(ready.wait(), AGENT_READY_TIMEOUT)
+            results["joined_in_s"] = round(time.monotonic() - t0, 2)
+        except asyncio.TimeoutError:
+            results["joined_in_s"] = None
+
+        # No greeting: Butler shouldn't talk over someone who's just pressed the mic
+        await asyncio.sleep(3)
+        results["spoke_unprompted"] = any(s == "speaking" for _, s in states)
+
+        # Push-to-talk with nothing said: press (unmute) then let go (mute); no reply expected
+        source = rtc.AudioSource(48000, 1)
+        mic = rtc.LocalAudioTrack.create_audio_track("mic", source)
+        await room.local_participant.publish_track(
+            mic, rtc.TrackPublishOptions(source=rtc.TrackSource.SOURCE_MICROPHONE))
+        mic.mute()
+        await asyncio.sleep(1)
+        before = len(states)
+        mic.unmute()
+        await asyncio.sleep(1.5)
+        mic.mute()
+        await asyncio.sleep(4)
+        results["replied_to_silence"] = any(s in ("thinking", "speaking") for _, s in states[before:])
+        results["agent_still_there"] = any(
+            p.kind == rtc.ParticipantKind.PARTICIPANT_KIND_AGENT for p in room.remote_participants.values())
     finally:
         await room.disconnect()
         lk = api.LiveKitAPI(URL.replace("ws://", "http://"), KEY, SECRET)
@@ -53,51 +80,10 @@ async def run(name, attrs, scenario):
             await lk.room.delete_room(api.DeleteRoomRequest(room=room_name))
         finally:
             await lk.aclose()
-    print(f"{name}: {result} | states {states}")
-    return result, states
 
-
-async def greeting(room, wait_for):
-    spk = await wait_for("speaking", 25)
-    idle = await wait_for("idle", 15)
-    return {"speaking_at": spk, "idle_at": idle, "spoke_for": idle and spk and round(idle - spk, 2)}
-
-
-async def stop_button(room, wait_for):
-    spk = await wait_for("speaking", 25)
-    if spk is None:
-        return {"error": "never spoke"}
-    sent = time.monotonic()
-    await room.local_participant.publish_data(json.dumps({"type": "interrupt"}).encode(),
-                                              reliable=True, topic="butler-control")
-    idle = await wait_for("idle", 15)
-    return {"stopped_after": idle and round(time.monotonic() - sent, 2)}
-
-
-async def read_aloud_off(room, wait_for):
-    return {"spoke": await wait_for("speaking", 10)}
-
-
-async def toggle_off_mid_reply(room, wait_for):
-    spk = await wait_for("speaking", 25)
-    if spk is None:
-        return {"error": "never spoke"}
-    sent = time.monotonic()
-    await room.local_participant.set_attributes({"speak_replies": "false"})
-    idle = await wait_for("idle", 15)
-    return {"stopped_after": idle and round(time.monotonic() - sent, 2)}
-
-
-async def main():
-    ok = True
-    (g, _) = await run("greeting", {"speak_replies": "true"}, greeting)
-    ok &= bool(g["spoke_for"])
-    (s, _) = await run("stop button", {"speak_replies": "true"}, stop_button)
-    ok &= bool(s.get("stopped_after") is not None and g["spoke_for"] and s["stopped_after"] < g["spoke_for"])
-    (r, _) = await run("read aloud off", {"speak_replies": "false"}, read_aloud_off)
-    ok &= r["spoke"] is None
-    (t, _) = await run("toggle off mid-reply", {"speak_replies": "true"}, toggle_off_mid_reply)
-    ok &= bool(t.get("stopped_after") is not None and t["stopped_after"] < g["spoke_for"])
+    print(f"{results} | states {states}")
+    ok = (results["joined_in_s"] is not None and not results["spoke_unprompted"]
+          and not results["replied_to_silence"] and results["agent_still_there"])
     print("E2E PASSED" if ok else "E2E FAILED")
 
 asyncio.run(main())
