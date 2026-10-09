@@ -12,6 +12,7 @@ adding a game never touches Cloudflare. Script: `scripts/17-games.sh`. Config: `
 | Tycoon Town | `/tycoon-town/` | container `tycoon-town` (LAN `:3005`) | `~/tycoon-town` ← `~/IdeaProjects/tycoon-town` on the laptop |
 | Modern Combat | `/modern-combat/` | container `modern-combat` (LAN `:3004`) | `~/modern-combat` ← `~/IdeaProjects/modern-combat` ([noble1911/modern-combat](https://github.com/noble1911/modern-combat)) |
 | Froths Party | `/froths/` | container `froths-party` (LAN `:3006`) | `~/froths-party` ← [noble1911/froths-party](https://github.com/noble1911/froths-party) (private) |
+| Innovation | `/innovation/` | container `innovation` (LAN `:3007`) | `~/innovation` ← [noble1911/innovation](https://github.com/noble1911/innovation) (private) |
 
 On the LAN the whole site is at `http://192.168.1.117:3010/`.
 
@@ -25,13 +26,14 @@ browser ─https─▶ Cloudflare ─tunnel─▶ cloudflared ─http─▶ game
                                                            ├─ /gunpey/*       → gunpey:3000
                                                            ├─ /modern-combat/* → modern-combat:3000
                                                            ├─ /tycoon-town/*  → tycoon-town:3000
-                                                           └─ /froths/*       → froths-party:3000
+                                                           ├─ /froths/*       → froths-party:3000
+                                                           └─ /innovation/*   → innovation:3000
 ```
 
 - **The gateway strips the prefix.** A request for `/skidmarks/assets/app.js` reaches the game as
   `/assets/app.js`, so a game doesn't need to know where it's mounted. It only has to use relative
   URLs (see [Make it work under a path](#1-make-it-work-under-a-path)).
-- **WebSockets pass straight through** (the multiplayer in skidmarks, gunpey, modern-combat, tycoon-town and froths), Cloudflare included.
+- **WebSockets pass straight through** (the multiplayer in skidmarks, gunpey, modern-combat, tycoon-town, froths and innovation), Cloudflare included.
 - **`/<name>` redirects to `/<name>/`**: relative URLs resolve against the trailing slash.
 - **A game that's down** (its container stopped) gets `games/site/down.html` with a 502, and its
   card on the hub says *Resting* instead of *Online*.
@@ -154,6 +156,7 @@ row to the table at the top of this page. Run `registry/doctor.sh`.
 | Tycoon Town | From the laptop, a committed version: `rm -rf /tmp/tt && mkdir /tmp/tt && git archive HEAD \| tar -x -C /tmp/tt --exclude '*.blend' --exclude '*.jpg'`, then `rsync -az --delete /tmp/tt/ 192.168.1.117:tycoon-town/`, write `git rev-parse --short HEAD` to `~/tycoon-town/.deployed-commit`, then on the box `cd ~/tycoon-town && docker compose up -d --build`. A deploy restarts the container, which ends online games in progress. Full steps: the game repo's `CLAUDE.md`. |
 | Modern Combat | From the laptop, a committed version: `npm run deploy` in the repo (`scripts/deploy.sh`: exports `HEAD` to `192.168.1.117:modern-combat/`, runs `docker compose up -d --build` there, waits for the healthcheck, then checks the page and a multiplayer socket through the gateway). No git on the box: `~/modern-combat/.deployed-commit` records which commit is live. |
 | Froths Party | From the laptop, in the repo (the box can't pull the private repo): `rm -rf /tmp/froths && mkdir /tmp/froths && git archive HEAD \| tar -x -C /tmp/froths`, then `rsync -az --delete --exclude .env /tmp/froths/ 192.168.1.117:froths-party/`, then on the box `cd ~/froths-party && docker compose up -d --build`. Never overwrite `.env` (holds `PACKS_PASSWORD`); custom packs are in the `froths-party_froths-data` volume. |
+| Innovation | From the laptop, in the repo (the box can't pull the private repo): `rm -rf /tmp/innovation && mkdir /tmp/innovation && git archive HEAD \| tar -x -C /tmp/innovation`, then `rsync -az --delete --exclude .env --exclude .deployed-commit /tmp/innovation/ 192.168.1.117:innovation/`, then on the box `cd ~/innovation && docker compose up -d --build`. Never overwrite `.env` (holds `SITE_PASSWORD`). Rooms are saved in the `innovation_innovation-data` volume and replayed on start, so a deploy doesn't end games — but one that changes a card's rules can rewind a saved game to the last move that still applies. |
 | The hub | Edit `games/`, then re-run `scripts/17-games.sh`. |
 
 ## Testing

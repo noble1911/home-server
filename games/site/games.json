@@ -50,5 +50,13 @@
     "players": "3–10 on their phones · TV optional",
     "image": "img/froths.jpg",
     "repo": "https://github.com/noble1911/froths-party"
+  },
+  {
+    "id": "innovation",
+    "name": "Innovation",
+    "path": "innovation/",
+    "tagline": "Build a civilisation from archery to A.I.: the card game of ideas, on the TV and your phones.",
+    "players": "2–5 on their phones · TV optional · password",
+    "image": "img/innovation.jpg"
   }
 ]
