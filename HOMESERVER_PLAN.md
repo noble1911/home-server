@@ -66,7 +66,7 @@
 | **Device** | Mac Mini M4 | Apple Silicon, excellent power efficiency |
 | **RAM** | 24GB Unified Memory | Shared between CPU, GPU, Neural Engine |
 | **Storage (Internal)** | 512GB SSD | OS, Docker images, databases |
-| **Storage (External)** | USB External HDD (4-8TB recommended) | Media, photos, documents (see below) |
+| **Storage (External)** | USB External HDD (4-8TB recommended) | Media, photos, documents (see below). Live box: two 8 TB drives, HomeServer + HomeServer2 |
 | **Connectivity** | Gigabit Ethernet | Hardwired recommended for streaming |
 | **Power Draw** | ~10-30W typical | Very efficient for 24/7 operation |
 
@@ -867,6 +867,20 @@ Butler API is already minimal (~4k lines), but we further harden it:
 | **Single drive** | No redundancy — if drive fails, data is lost | Cloud backup for irreplaceable data (photos/docs) |
 | **USB disconnect** | macOS can unmount on sleep/wake | Enable "Prevent sleep" or use Amphetamine app |
 | **Seek times** | Slow for random file access (~10ms vs 0.1ms SSD) | Keep databases on SSD |
+
+##### Two media drives (live setup)
+
+The Mac Mini has two 8 TB externals. Both have the same `Media/TV` and `Media/Movies` folders:
+
+| Drive | Holds | Inside Sonarr/Radarr/Bazarr |
+|-------|-------|-----------------------------|
+| **HomeServer** (`DRIVE_PATH`) | Downloads, anime, books, photos, and **new** movies/TV | `/tv`, `/movies` (the default root folders) |
+| **HomeServer2** | The older movies/TV library (filled up Oct 2026) | `/tv-hs2`, `/movies-hs2` |
+
+- Seerr and Butler add new titles to `/tv` and `/movies`. Butler picks the non-anime root folder with the most free space.
+- Sonarr keeps a series in one folder, so new episodes of a show follow the show's drive. Continuing series live on HomeServer; move one across with Sonarr's series editor (change root folder, move files).
+- Jellyfin's TV Shows and Movies libraries each list both drives' folders, so users see one library.
+- History: until Oct 2026 `HomeServer/Media/TV` and `/Movies` were symlinks to HomeServer2, which sent every import there until it was 95% full (#224).
 
 ---
 

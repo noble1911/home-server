@@ -455,5 +455,30 @@ class TestErrorHandling:
             assert "timed out" in result
 
 
+class TestRootFolderChoice:
+    """One root folder per drive: new adds go where there's room."""
+
+    FOLDERS = [
+        {"id": 1, "path": "/tv-hs2", "freeSpace": 400 * 10**9},
+        {"id": 2, "path": "/anime-series", "freeSpace": 5_700 * 10**9},
+        {"id": 3, "path": "/tv", "freeSpace": 5_700 * 10**9},
+    ]
+
+    @pytest.mark.asyncio
+    async def test_picks_regular_folder_with_most_space(self, tool):
+        tool._root_folders = self.FOLDERS
+        assert await tool._get_root_folder() == "/tv"
+
+    @pytest.mark.asyncio
+    async def test_anime_still_goes_to_anime_folder(self, tool):
+        tool._root_folders = self.FOLDERS
+        assert await tool._get_root_folder(is_anime=True) == "/anime-series"
+
+    @pytest.mark.asyncio
+    async def test_missing_free_space_falls_back_to_first(self, tool):
+        tool._root_folders = [{"id": 1, "path": "/tv"}, {"id": 2, "path": "/tv-hs2"}]
+        assert await tool._get_root_folder() == "/tv"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

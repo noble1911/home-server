@@ -104,7 +104,7 @@ class StorageMonitorTool(Tool):
     def description(self) -> str:
         return (
             "Disk usage on the home server: the Mac SSD and both 8 TB media drives "
-            "(HomeServer = downloads/anime, HomeServer2 = movies/TV library). "
+            "(HomeServer = downloads, anime and new movies/TV; HomeServer2 = older movies/TV library). "
             "Use 'check_all' for every drive plus the media pool total, "
             "'check_external' for the media drives with a per-folder breakdown, "
             "'check_ssd' for the Mac SSD, or 'get_alerts' for active storage alerts."
@@ -186,7 +186,7 @@ class StorageMonitorTool(Tool):
             pct = int(d.get("percent") or 0)
             slug = d["name"].lower().replace(" ", "-")
             await self._update_threshold_alerts(slug, pct)
-            role = {"downloads": "downloads + anime", "library": "movies/TV library", "system": "macOS + Docker"}.get(d.get("role"), "")
+            role = {"downloads": "downloads, anime + new movies/TV", "library": "older movies/TV library", "system": "macOS + Docker"}.get(d.get("role"), "")
             lines.append(
                 f"{d['name']}{f' ({role})' if role else ''}: {_format_bytes(d['used'])} / "
                 f"{_format_bytes(d['total'])} ({pct}%), {_format_bytes(d['free'])} free "

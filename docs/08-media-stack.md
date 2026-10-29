@@ -168,14 +168,18 @@ In Prowlarr (http://localhost:9696):
 | Jellyfin | `/media/anime-movies` | `Media/Anime/Movies` (read-only) |
 | Jellyfin | `/media/anime-series` | `Media/Anime/Series` (read-only) |
 | Jellyfin | `/media/music` | `Media/Music` (read-only) |
-| Radarr | `/movies` | `Media/Movies` |
+| Radarr | `/movies` | `Media/Movies` (new movies) |
+| Radarr | `/movies-hs2` | `/Volumes/HomeServer2/Media/Movies` (older library) |
 | Radarr | `/anime-movies` | `Media/Anime/Movies` |
 | Radarr | `/downloads` | `Downloads` |
-| Sonarr | `/tv` | `Media/TV` |
+| Sonarr | `/tv` | `Media/TV` (new series) |
+| Sonarr | `/tv-hs2` | `/Volumes/HomeServer2/Media/TV` (older library) |
 | Sonarr | `/anime-series` | `Media/Anime/Series` |
 | Sonarr | `/downloads` | `Downloads` |
-| Bazarr | `/movies`, `/tv`, `/anime-movies`, `/anime-series` | Matching media folders |
+| Bazarr | `/movies`, `/tv`, `/movies-hs2`, `/tv-hs2`, `/anime-movies`, `/anime-series` | Matching media folders |
 | Dispatcharr | `/data` | `dispatcharr-data` volume |
+
+The `-hs2` mounts exist only on the live box, which has a second 8 TB drive (HomeServer2). See "Two media drives" in HOMESERVER_PLAN.md. Jellyfin now runs as the native macOS app and reads the host paths directly, so its rows above describe the old container.
 
 ## The Download Flow
 
