@@ -94,7 +94,7 @@ async def test_push(
         user_id=user_id,
         title="Butler Test",
         body="Push notifications are working!",
-        url="/settings",
+        url="/settings?tab=alerts",
         category="test",  # always delivered, whatever the notification settings
     )
     return {"sent": count}

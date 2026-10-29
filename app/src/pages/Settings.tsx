@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
 import { useUserStore } from '../stores/userStore'
 import { useSettingsStore } from '../stores/settingsStore'
@@ -42,6 +43,14 @@ export default function Settings() {
   const { clearMessages } = useConversationStore()
   const push = usePushNotifications()
   const isAdmin = role === 'admin'
+
+  // Selected tab lives in the URL (?tab=alerts) so links and notifications can
+  // open a group directly; bare /settings (incl. the OAuth return) is "You".
+  const [searchParams, setSearchParams] = useSearchParams()
+  const requestedTab = searchParams.get('tab')
+  const tab = SETTINGS_TABS.find(t => t.id === requestedTab && (isAdmin || !t.adminOnly))?.id ?? 'you'
+  const selectTab = (next: SettingsTab) =>
+    setSearchParams(next === 'you' ? {} : { tab: next }, { replace: true })
 
   const [connections, setConnections] = useState<OAuthConnection[]>([])
   const [connectionsLoading, setConnectionsLoading] = useState(true)
@@ -472,882 +481,887 @@ export default function Settings() {
         )}
       </div>
 
-      {/* Account - synced across devices */}
-      <section className="card p-4">
-        <h2 className="text-sm font-medium text-butler-400 uppercase tracking-wide mb-4">
-          Account
-          <span className="text-butler-600 ml-2 text-xs normal-case">synced</span>
-        </h2>
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm text-butler-300 mb-1">Name</label>
-            <div className="text-butler-100">{profile.name}</div>
-          </div>
-          {isAdmin && (
-            <div>
-              <label className="block text-sm text-butler-300 mb-1">Role</label>
-              <div className="text-accent text-sm">Admin</div>
-            </div>
-          )}
+      <SettingsTabs tab={tab} onChange={selectTab} isAdmin={isAdmin} />
 
-          {/* Send to Kindle */}
-          <div>
-            <label htmlFor="kindle-email" className="block text-sm text-butler-300 mb-1">Kindle address</label>
-            <input
-              id="kindle-email"
-              type="email"
-              inputMode="email"
-              autoCapitalize="none"
-              value={kindleInput}
-              onChange={(e) => { setKindleInput(e.target.value); setKindleStatus(null) }}
-              onBlur={saveKindleEmail}
-              onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
-              placeholder="you_123@kindle.com"
-              className="input w-full text-sm"
-            />
-            <p className="text-xs text-butler-500 mt-1">
-              Ask Butler to “send <em>a book</em> to my Kindle”. Find this address in Amazon under
-              Manage Your Content and Devices → Preferences → Personal Document Settings, and add
-              your Gmail address to the approved senders list there.
-            </p>
-            {kindleStatus && (
-              <p className={`text-xs mt-1 ${kindleStatus.type === 'error' ? 'text-red-400' : 'text-green-400'}`}>
-                {kindleStatus.text}
-              </p>
-            )}
-          </div>
-
-          {/* Change service password */}
-          {!credentialsLoading && serviceCredentials.length > 0 && (
-            <div className="pt-4 border-t border-butler-700">
-              <label className="block text-sm text-butler-300 mb-1">Service Password</label>
-              <p className="text-xs text-butler-500 mb-3">
-                Change your password across Jellyfin, Audiobookshelf, Nextcloud, and other services.
-              </p>
-              <div className="space-y-2">
-                <input
-                  type="password"
-                  value={newServicePassword}
-                  onChange={(e) => setNewServicePassword(e.target.value)}
-                  placeholder="New password (min 6 chars)"
-                  className="input w-full text-sm"
-                />
-                <input
-                  type="password"
-                  value={confirmServicePassword}
-                  onChange={(e) => setConfirmServicePassword(e.target.value)}
-                  placeholder="Confirm password"
-                  className="input w-full text-sm"
-                />
-                {newServicePassword && confirmServicePassword && newServicePassword !== confirmServicePassword && (
-                  <p className="text-xs text-red-400">Passwords do not match</p>
-                )}
-                <button
-                  onClick={changeServicePassword}
-                  disabled={
-                    passwordChangeLoading ||
-                    !newServicePassword ||
-                    newServicePassword.length < 6 ||
-                    newServicePassword !== confirmServicePassword
-                  }
-                  className="w-full btn bg-butler-700 text-butler-300 hover:bg-butler-600 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {passwordChangeLoading ? 'Updating...' : 'Change Password'}
-                </button>
+      {tab === 'you' && (
+        <>
+          {/* Account - synced across devices */}
+          <section className="card p-4">
+            <h2 className="text-sm font-medium text-butler-400 uppercase tracking-wide mb-4">
+              Account
+              <span className="text-butler-600 ml-2 text-xs normal-case">synced</span>
+            </h2>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-butler-300 mb-1">Name</label>
+                <div className="text-butler-100">{profile.name}</div>
               </div>
-              {passwordChangeResults && (
-                <div className="mt-2 space-y-1">
-                  {passwordChangeResults.map(r => (
-                    <div key={r.service} className={`text-xs ${r.status === 'updated' ? 'text-green-400' : r.status === 'skipped' ? 'text-butler-500' : 'text-red-400'}`}>
-                      {SERVICE_DISPLAY_NAMES[r.service]?.label || r.service}: {r.status}{r.error ? ` — ${r.error}` : ''}
-                    </div>
-                  ))}
+              {isAdmin && (
+                <div>
+                  <label className="block text-sm text-butler-300 mb-1">Role</label>
+                  <div className="text-accent text-sm">Admin</div>
                 </div>
               )}
-            </div>
-          )}
-        </div>
-      </section>
 
-      {/* Chat model - admin only, applies to everyone */}
-      {isAdmin && <ChatModelSetting />}
+              {/* Send to Kindle */}
+              <div>
+                <label htmlFor="kindle-email" className="block text-sm text-butler-300 mb-1">Kindle address</label>
+                <input
+                  id="kindle-email"
+                  type="email"
+                  inputMode="email"
+                  autoCapitalize="none"
+                  value={kindleInput}
+                  onChange={(e) => { setKindleInput(e.target.value); setKindleStatus(null) }}
+                  onBlur={saveKindleEmail}
+                  onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
+                  placeholder="you_123@kindle.com"
+                  className="input w-full text-sm"
+                />
+                <p className="text-xs text-butler-500 mt-1">
+                  Ask Butler to “send <em>a book</em> to my Kindle”. Find this address in Amazon under
+                  Manage Your Content and Devices → Preferences → Personal Document Settings, and add
+                  your Gmail address to the approved senders list there.
+                </p>
+                {kindleStatus && (
+                  <p className={`text-xs mt-1 ${kindleStatus.type === 'error' ? 'text-red-400' : 'text-green-400'}`}>
+                    {kindleStatus.text}
+                  </p>
+                )}
+              </div>
 
-      {/* Live TV provider - admin only, pushed to Dispatcharr */}
-      {isAdmin && <IptvProviderSetting />}
-
-      {/* Invite Codes - admin only */}
-      {isAdmin && (
-        <section className="card p-4">
-          <h2 className="text-sm font-medium text-butler-400 uppercase tracking-wide mb-4">
-            Invite Codes
-            <span className="text-butler-600 ml-2 text-xs normal-case">admin</span>
-          </h2>
-
-          <div className="mb-4 p-3 bg-butler-900 rounded-lg">
-            <p className="text-sm font-medium text-butler-300 mb-2">Permissions for new user</p>
-            <div className="flex flex-wrap gap-2">
-              {(Object.keys(PERMISSION_INFO) as ToolPermission[]).map(perm => (
-                <button
-                  key={perm}
-                  onClick={() => toggleInvitePermission(perm)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                    invitePermissions.has(perm)
-                      ? 'bg-accent/20 text-accent border border-accent/40'
-                      : 'bg-butler-800 text-butler-400 border border-butler-600'
-                  }`}
-                >
-                  {PERMISSION_INFO[perm].label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <button
-            onClick={generateInviteCode}
-            disabled={isGenerating}
-            className="btn btn-primary w-full mb-4 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isGenerating ? 'Generating...' : 'Generate Invite Code'}
-          </button>
-
-          {inviteCodes.length === 0 ? (
-            <p className="text-sm text-butler-500 text-center">
-              No invite codes yet. Generate one to add household members.
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {inviteCodes.map(code => (
-                <div
-                  key={code.code}
-                  className="flex items-center justify-between p-3 bg-butler-800 rounded-lg"
-                >
-                  <div className="min-w-0">
-                    <span className="font-mono text-butler-100 text-sm">{code.code}</span>
-                    <div className="text-xs text-butler-500 mt-0.5">
-                      {code.isUsed
-                        ? `Used${code.usedBy ? ` by ${code.usedBy}` : ''}`
-                        : code.isExpired
-                          ? 'Expired'
-                          : `Expires ${new Date(code.expiresAt).toLocaleDateString()}`
+              {/* Change service password */}
+              {!credentialsLoading && serviceCredentials.length > 0 && (
+                <div className="pt-4 border-t border-butler-700">
+                  <label className="block text-sm text-butler-300 mb-1">Service Password</label>
+                  <p className="text-xs text-butler-500 mb-3">
+                    Change your password across Jellyfin, Audiobookshelf, Nextcloud, and other services.
+                  </p>
+                  <div className="space-y-2">
+                    <input
+                      type="password"
+                      value={newServicePassword}
+                      onChange={(e) => setNewServicePassword(e.target.value)}
+                      placeholder="New password (min 6 chars)"
+                      className="input w-full text-sm"
+                    />
+                    <input
+                      type="password"
+                      value={confirmServicePassword}
+                      onChange={(e) => setConfirmServicePassword(e.target.value)}
+                      placeholder="Confirm password"
+                      className="input w-full text-sm"
+                    />
+                    {newServicePassword && confirmServicePassword && newServicePassword !== confirmServicePassword && (
+                      <p className="text-xs text-red-400">Passwords do not match</p>
+                    )}
+                    <button
+                      onClick={changeServicePassword}
+                      disabled={
+                        passwordChangeLoading ||
+                        !newServicePassword ||
+                        newServicePassword.length < 6 ||
+                        newServicePassword !== confirmServicePassword
                       }
-                    </div>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {code.permissions.map(p => (
-                        <span key={p} className="text-xs px-1.5 py-0.5 rounded bg-accent/10 text-accent">
-                          {PERMISSION_INFO[p as ToolPermission]?.label || p}
-                        </span>
+                      className="w-full btn bg-butler-700 text-butler-300 hover:bg-butler-600 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {passwordChangeLoading ? 'Updating...' : 'Change Password'}
+                    </button>
+                  </div>
+                  {passwordChangeResults && (
+                    <div className="mt-2 space-y-1">
+                      {passwordChangeResults.map(r => (
+                        <div key={r.service} className={`text-xs ${r.status === 'updated' ? 'text-green-400' : r.status === 'skipped' ? 'text-butler-500' : 'text-red-400'}`}>
+                          {SERVICE_DISPLAY_NAMES[r.service]?.label || r.service}: {r.status}{r.error ? ` — ${r.error}` : ''}
+                        </div>
                       ))}
                     </div>
-                  </div>
-                  <div className="flex gap-2 shrink-0 ml-2">
-                    {!code.isUsed && !code.isExpired && (
-                      <>
-                        <button
-                          onClick={() => copyCode(code.code)}
-                          className="px-2 py-1 rounded text-xs bg-butler-700 text-accent hover:bg-butler-600"
-                        >
-                          {copiedCode === code.code ? 'Copied!' : 'Copy'}
-                        </button>
-                        <button
-                          onClick={() => revokeInviteCode(code.code)}
-                          className="px-2 py-1 rounded text-xs bg-red-900/50 text-red-300 hover:bg-red-900"
-                        >
-                          Revoke
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-      )}
-
-      {/* Butler Settings - synced across devices */}
-      <section className="card p-4">
-        <h2 className="text-sm font-medium text-butler-400 uppercase tracking-wide mb-4">
-          My Butler
-          <span className="text-butler-600 ml-2 text-xs normal-case">synced</span>
-        </h2>
-        <div className="space-y-4">
-          <div>
-            <label htmlFor="butler-name" className="block text-sm text-butler-300 mb-1">
-              Butler Name
-            </label>
-            <input
-              id="butler-name"
-              type="text"
-              value={profile.butlerName}
-              onChange={(e) => updateButlerName(e.target.value)}
-              className="input"
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* Personality - synced across devices */}
-      <section className="card p-4">
-        <h2 className="text-sm font-medium text-butler-400 uppercase tracking-wide mb-4">
-          Personality
-          <span className="text-butler-600 ml-2 text-xs normal-case">synced</span>
-        </h2>
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm text-butler-300 mb-2">Style</label>
-            <div className="flex flex-wrap gap-2">
-              {(['casual', 'balanced', 'formal'] as const).map(style => (
-                <button
-                  key={style}
-                  onClick={() => updateSoul({ personality: style })}
-                  className={`px-4 py-2 rounded-lg text-sm capitalize ${
-                    profile.soul.personality === style
-                      ? 'bg-accent text-white'
-                      : 'bg-butler-700 text-butler-300 hover:bg-butler-600'
-                  }`}
-                >
-                  {style}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm text-butler-300 mb-2">Verbosity</label>
-            <div className="flex flex-wrap gap-2">
-              {(['concise', 'moderate', 'detailed'] as const).map(level => (
-                <button
-                  key={level}
-                  onClick={() => updateSoul({ verbosity: level })}
-                  className={`px-4 py-2 rounded-lg text-sm capitalize ${
-                    profile.soul.verbosity === level
-                      ? 'bg-accent text-white'
-                      : 'bg-butler-700 text-butler-300 hover:bg-butler-600'
-                  }`}
-                >
-                  {level}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm text-butler-300 mb-2">Humor</label>
-            <div className="flex flex-wrap gap-2">
-              {(['none', 'subtle', 'playful'] as const).map(level => (
-                <button
-                  key={level}
-                  onClick={() => updateSoul({ humor: level })}
-                  className={`px-4 py-2 rounded-lg text-sm capitalize ${
-                    profile.soul.humor === level
-                      ? 'bg-accent text-white'
-                      : 'bg-butler-700 text-butler-300 hover:bg-butler-600'
-                  }`}
-                >
-                  {level}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm text-butler-300 mb-2">Voice</label>
-            <div className="space-y-2">
-              {VOICE_OPTIONS.map(v => (
-                <button
-                  key={v.id}
-                  onClick={() => updateSoul({ voice: v.id })}
-                  className={`w-full p-3 rounded-lg border text-left transition-colors ${
-                    (profile.soul.voice || DEFAULT_VOICE) === v.id
-                      ? 'border-accent bg-accent/10'
-                      : 'border-butler-700 bg-butler-800 hover:border-butler-600'
-                  }`}
-                >
-                  <div className="text-sm text-butler-100">{v.name}</div>
-                  <div className="text-xs text-butler-400">{v.accent} {v.gender}</div>
-                </button>
-              ))}
-            </div>
-            <p className="text-xs text-butler-500 mt-2">
-              Voice changes take effect on your next voice session.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Connected Services */}
-      <section className="card p-4">
-        <h2 className="text-sm font-medium text-butler-400 uppercase tracking-wide mb-4">
-          Connected Services
-          <span className="text-butler-600 ml-2 text-xs normal-case">synced</span>
-        </h2>
-
-        {oauthMessage && (
-          <div className={`text-sm mb-3 p-2 rounded ${
-            oauthMessage.type === 'success'
-              ? 'bg-green-900/30 text-green-300'
-              : 'bg-red-900/30 text-red-300'
-          }`}>
-            {oauthMessage.text}
-          </div>
-        )}
-
-        <div className="space-y-3">
-          {/* Google (Calendar + Gmail) */}
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <div className="text-sm text-butler-100">Google</div>
-              {connectionsLoading ? (
-                <div className="text-xs text-butler-500">Checking...</div>
-              ) : googleConnection ? (
-                <>
-                  <div className="text-xs text-butler-400 truncate">
-                    Connected{googleConnection.accountId ? ` as ${googleConnection.accountId}` : ''}
-                  </div>
-                  <div className="text-xs text-butler-500">{describeGoogleAccess(googleScopes)}</div>
-                  {googleNeedsReconnect && (
-                    <div className="text-xs text-amber-300 mt-0.5">
-                      Reconnect to let Butler send email and edit your calendar (you approve each one)
-                    </div>
                   )}
-                </>
-              ) : (
-                <div className="text-xs text-butler-500">Not connected &middot; Calendar, Gmail</div>
+                </div>
               )}
             </div>
-            {!connectionsLoading && (
-              googleConnection ? (
-                <div className="flex gap-2 shrink-0">
-                  <button
-                    onClick={connectGoogle}
-                    className={`px-3 py-1.5 rounded-lg text-xs ${
-                      googleNeedsReconnect
-                        ? 'bg-accent text-white hover:bg-accent/80'
-                        : 'bg-butler-700 text-butler-200 hover:bg-butler-600'
-                    }`}
-                  >
-                    Reconnect
-                  </button>
-                  <button
-                    onClick={() => disconnectProvider('google')}
-                    className="px-3 py-1.5 rounded-lg text-xs bg-red-900/50 text-red-300 hover:bg-red-900 hover:text-red-200"
-                  >
-                    Disconnect
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={connectGoogle}
-                  className="px-3 py-1.5 rounded-lg text-xs bg-accent text-white hover:bg-accent/80"
-                >
-                  Connect
-                </button>
-              )
+          </section>
+
+          {/* Connected Services */}
+          <section className="card p-4">
+            <h2 className="text-sm font-medium text-butler-400 uppercase tracking-wide mb-4">
+              Connected Services
+              <span className="text-butler-600 ml-2 text-xs normal-case">synced</span>
+            </h2>
+
+            {oauthMessage && (
+              <div className={`text-sm mb-3 p-2 rounded ${
+                oauthMessage.type === 'success'
+                  ? 'bg-green-900/30 text-green-300'
+                  : 'bg-red-900/30 text-red-300'
+              }`}>
+                {oauthMessage.text}
+              </div>
             )}
-          </div>
-        </div>
-      </section>
 
-      {/* My Service Accounts */}
-      {!credentialsLoading && serviceCredentials.length > 0 && (
-        <section className="card p-4">
-          <h2 className="text-sm font-medium text-butler-400 uppercase tracking-wide mb-4">
-            My Service Accounts
-            <span className="text-butler-600 ml-2 text-xs normal-case">synced</span>
-          </h2>
-          <p className="text-xs text-butler-500 mb-3">
-            Use these credentials to log into apps directly (web UI or mobile app).
-          </p>
-          <div className="space-y-3">
-            {serviceCredentials.map(cred => {
-              const info = SERVICE_DISPLAY_NAMES[cred.service] || { label: cred.service, description: '' }
-              const showPassword = visiblePasswords.has(cred.service)
-              return (
-                <div key={cred.service} className="p-3 bg-butler-800 rounded-lg">
-                  <div className="flex items-center justify-between mb-2">
-                    <div>
-                      <div className="text-sm text-butler-100">{info.label}</div>
-                      <div className="text-xs text-butler-500">{info.description}</div>
-                    </div>
-                    {cred.status === 'failed' && (
-                      <span className="px-2 py-0.5 rounded text-xs bg-red-900/50 text-red-300">Failed</span>
-                    )}
-                  </div>
-                  {cred.status === 'active' && (
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-butler-400">Username</span>
-                        <span className="font-mono text-xs text-butler-200">{cred.username}</span>
+            <div className="space-y-3">
+              {/* Google (Calendar + Gmail) */}
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-sm text-butler-100">Google</div>
+                  {connectionsLoading ? (
+                    <div className="text-xs text-butler-500">Checking...</div>
+                  ) : googleConnection ? (
+                    <>
+                      <div className="text-xs text-butler-400 truncate">
+                        Connected{googleConnection.accountId ? ` as ${googleConnection.accountId}` : ''}
                       </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-butler-400">Password</span>
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-xs text-butler-200">
-                            {showPassword ? cred.password : '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022'}
-                          </span>
-                          <button
-                            onClick={() => togglePasswordVisibility(cred.service)}
-                            className="text-xs text-accent hover:text-accent/80"
-                          >
-                            {showPassword ? 'Hide' : 'Show'}
-                          </button>
+                      <div className="text-xs text-butler-500">{describeGoogleAccess(googleScopes)}</div>
+                      {googleNeedsReconnect && (
+                        <div className="text-xs text-amber-300 mt-0.5">
+                          Reconnect to let Butler send email and edit your calendar (you approve each one)
                         </div>
-                      </div>
-                    </div>
-                  )}
-                  {cred.status === 'failed' && cred.errorMessage && (
-                    <div className="text-xs text-red-400 mt-1">{cred.errorMessage}</div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="text-xs text-butler-500">Not connected &middot; Calendar, Gmail</div>
                   )}
                 </div>
-              )
-            })}
-          </div>
-
-          {/* Retry failed services */}
-          {serviceCredentials.some(c => c.status === 'failed') && (
-            <div className="mt-4">
-              {reprovisionError && (
-                <div className="text-xs text-red-400 mb-2">{reprovisionError}</div>
-              )}
-              <button
-                onClick={retryProvisioning}
-                disabled={isReprovisioning}
-                className="w-full btn bg-accent/20 text-accent hover:bg-accent/30 text-sm disabled:opacity-50"
-              >
-                {isReprovisioning ? 'Retrying...' : 'Retry Failed Services'}
-              </button>
-            </div>
-          )}
-
-        </section>
-      )}
-
-      {/* Your Tool Access - read-only view of permissions */}
-      <section className="card p-4">
-        <h2 className="text-sm font-medium text-butler-400 uppercase tracking-wide mb-4">
-          Tool Access
-          <span className="text-butler-600 ml-2 text-xs normal-case">synced</span>
-        </h2>
-        <p className="text-xs text-butler-500 mb-3">
-          Tools your Butler can use on your behalf. {!isAdmin && 'Ask an admin to change these.'}
-        </p>
-        <div className="flex flex-wrap gap-2">
-          {allPermissions.map(perm => {
-            const info = PERMISSION_INFO[perm]
-            const enabled = profile.permissions?.includes(perm)
-            return (
-              <div
-                key={perm}
-                className={`px-3 py-1.5 rounded-lg text-xs ${
-                  enabled
-                    ? 'bg-accent/20 text-accent border border-accent/30'
-                    : 'bg-butler-800 text-butler-500 border border-butler-700'
-                }`}
-                title={info.description}
-              >
-                {info.label}
-              </div>
-            )
-          })}
-        </div>
-      </section>
-
-      {/* Manage Permissions - admin only */}
-      {isAdmin && (
-        <section className="card p-4">
-          <h2 className="text-sm font-medium text-butler-400 uppercase tracking-wide mb-4">
-            Manage Permissions
-            <span className="text-butler-600 ml-2 text-xs normal-case">admin</span>
-            {permSaving && <span className="text-accent ml-2 text-xs normal-case">saving...</span>}
-          </h2>
-
-          {adminUsers.length === 0 ? (
-            <p className="text-sm text-butler-500 text-center">Loading users...</p>
-          ) : (
-            <>
-              <div className="mb-4">
-                <label className="block text-sm text-butler-300 mb-2">Select User</label>
-                <select
-                  value={selectedUserId || ''}
-                  onChange={(e) => setSelectedUserId(e.target.value || null)}
-                  className="input w-full"
-                >
-                  <option value="">Choose a user...</option>
-                  {adminUsers.map(u => (
-                    <option key={u.id} value={u.id}>
-                      {u.name} {u.role === 'admin' ? '(admin)' : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {selectedUser && (
-                <div className="space-y-2">
-                  {allPermissions.map(perm => {
-                    const info = PERMISSION_INFO[perm]
-                    const enabled = selectedUser.permissions.includes(perm)
-                    return (
+                {!connectionsLoading && (
+                  googleConnection ? (
+                    <div className="flex gap-2 shrink-0">
                       <button
-                        key={perm}
-                        onClick={() => togglePermission(selectedUser.id, perm)}
-                        className="w-full flex items-center justify-between p-3 bg-butler-800 rounded-lg hover:bg-butler-700 transition-colors"
+                        onClick={connectGoogle}
+                        className={`px-3 py-1.5 rounded-lg text-xs ${
+                          googleNeedsReconnect
+                            ? 'bg-accent text-white hover:bg-accent/80'
+                            : 'bg-butler-700 text-butler-200 hover:bg-butler-600'
+                        }`}
                       >
-                        <div className="text-left">
+                        Reconnect
+                      </button>
+                      <button
+                        onClick={() => disconnectProvider('google')}
+                        className="px-3 py-1.5 rounded-lg text-xs bg-red-900/50 text-red-300 hover:bg-red-900 hover:text-red-200"
+                      >
+                        Disconnect
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={connectGoogle}
+                      className="px-3 py-1.5 rounded-lg text-xs bg-accent text-white hover:bg-accent/80"
+                    >
+                      Connect
+                    </button>
+                  )
+                )}
+              </div>
+            </div>
+          </section>
+
+          {/* My Service Accounts */}
+          {!credentialsLoading && serviceCredentials.length > 0 && (
+            <section className="card p-4">
+              <h2 className="text-sm font-medium text-butler-400 uppercase tracking-wide mb-4">
+                My Service Accounts
+                <span className="text-butler-600 ml-2 text-xs normal-case">synced</span>
+              </h2>
+              <p className="text-xs text-butler-500 mb-3">
+                Use these credentials to log into apps directly (web UI or mobile app).
+              </p>
+              <div className="space-y-3">
+                {serviceCredentials.map(cred => {
+                  const info = SERVICE_DISPLAY_NAMES[cred.service] || { label: cred.service, description: '' }
+                  const showPassword = visiblePasswords.has(cred.service)
+                  return (
+                    <div key={cred.service} className="p-3 bg-butler-800 rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <div>
                           <div className="text-sm text-butler-100">{info.label}</div>
                           <div className="text-xs text-butler-500">{info.description}</div>
                         </div>
+                        {cred.status === 'failed' && (
+                          <span className="px-2 py-0.5 rounded text-xs bg-red-900/50 text-red-300">Failed</span>
+                        )}
+                      </div>
+                      {cred.status === 'active' && (
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-butler-400">Username</span>
+                            <span className="font-mono text-xs text-butler-200">{cred.username}</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-butler-400">Password</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-xs text-butler-200">
+                                {showPassword ? cred.password : '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022'}
+                              </span>
+                              <button
+                                onClick={() => togglePasswordVisibility(cred.service)}
+                                className="text-xs text-accent hover:text-accent/80"
+                              >
+                                {showPassword ? 'Hide' : 'Show'}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {cred.status === 'failed' && cred.errorMessage && (
+                        <div className="text-xs text-red-400 mt-1">{cred.errorMessage}</div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Retry failed services */}
+              {serviceCredentials.some(c => c.status === 'failed') && (
+                <div className="mt-4">
+                  {reprovisionError && (
+                    <div className="text-xs text-red-400 mb-2">{reprovisionError}</div>
+                  )}
+                  <button
+                    onClick={retryProvisioning}
+                    disabled={isReprovisioning}
+                    className="w-full btn bg-accent/20 text-accent hover:bg-accent/30 text-sm disabled:opacity-50"
+                  >
+                    {isReprovisioning ? 'Retrying...' : 'Retry Failed Services'}
+                  </button>
+                </div>
+              )}
+
+            </section>
+          )}
+
+          {/* Data Management */}
+          <section className="card p-4">
+            <h2 className="text-sm font-medium text-butler-400 uppercase tracking-wide mb-4">
+              Data Management
+            </h2>
+
+            {deleteError && (
+              <div className="text-sm mb-3 p-2 rounded bg-red-900/30 text-red-300">
+                {deleteError}
+              </div>
+            )}
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm text-butler-100">Clear Facts</div>
+                  <div className="text-xs text-butler-500">
+                    Remove all learned facts ({profile.facts.length})
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowClearFactsConfirm(true)}
+                  disabled={profile.facts.length === 0}
+                  className="px-3 py-1.5 rounded-lg text-xs bg-red-900/50 text-red-300 hover:bg-red-900 hover:text-red-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Clear
+                </button>
+              </div>
+
+              <div className="border-t border-butler-700" />
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm text-butler-100">Delete Account</div>
+                  <div className="text-xs text-butler-500">
+                    Permanently remove your account and all data
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowDeleteAccountConfirm(true)}
+                  className="px-3 py-1.5 rounded-lg text-xs bg-red-900/50 text-red-300 hover:bg-red-900 hover:text-red-200"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </section>
+
+          {/* About & Logout */}
+          <section className="card p-4">
+            <h2 className="text-sm font-medium text-butler-400 uppercase tracking-wide mb-4">
+              About
+            </h2>
+            <div className="space-y-2 text-sm text-butler-400 mb-4">
+              <div className="flex justify-between">
+                <span>Version</span>
+                <span className="text-butler-300">
+                  {appVersion ? `Android app ${appVersion.name} (build ${appVersion.code})` : '0.1.0'}
+                </span>
+              </div>
+              {appUpdate && (
+                <button
+                  onClick={() => openExternal(appUpdate.url)}
+                  className="w-full btn bg-accent text-white hover:bg-accent/80 text-sm"
+                >
+                  Update available: build {appUpdate.versionCode} — download
+                </button>
+              )}
+            </div>
+            <button
+              onClick={signOut}
+              className="w-full btn bg-red-900/50 text-red-300 hover:bg-red-900 hover:text-red-200"
+            >
+              Sign Out
+            </button>
+          </section>
+        </>
+      )}
+
+      {tab === 'butler' && (
+        <>
+          {/* Name & personality - synced across devices */}
+          <section className="card p-4">
+            <h2 className="text-sm font-medium text-butler-400 uppercase tracking-wide mb-4">
+              My Butler
+              <span className="text-butler-600 ml-2 text-xs normal-case">synced</span>
+            </h2>
+            <div className="space-y-4">
+              <div>
+                <label htmlFor="butler-name" className="block text-sm text-butler-300 mb-1">
+                  Butler Name
+                </label>
+                <input
+                  id="butler-name"
+                  type="text"
+                  value={profile.butlerName}
+                  onChange={(e) => updateButlerName(e.target.value)}
+                  className="input"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-butler-300 mb-2">Style</label>
+                <div className="flex flex-wrap gap-2">
+                  {(['casual', 'balanced', 'formal'] as const).map(style => (
+                    <button
+                      key={style}
+                      onClick={() => updateSoul({ personality: style })}
+                      className={`px-4 py-2 rounded-lg text-sm capitalize ${
+                        profile.soul.personality === style
+                          ? 'bg-accent text-white'
+                          : 'bg-butler-700 text-butler-300 hover:bg-butler-600'
+                      }`}
+                    >
+                      {style}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm text-butler-300 mb-2">Verbosity</label>
+                <div className="flex flex-wrap gap-2">
+                  {(['concise', 'moderate', 'detailed'] as const).map(level => (
+                    <button
+                      key={level}
+                      onClick={() => updateSoul({ verbosity: level })}
+                      className={`px-4 py-2 rounded-lg text-sm capitalize ${
+                        profile.soul.verbosity === level
+                          ? 'bg-accent text-white'
+                          : 'bg-butler-700 text-butler-300 hover:bg-butler-600'
+                      }`}
+                    >
+                      {level}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm text-butler-300 mb-2">Humor</label>
+                <div className="flex flex-wrap gap-2">
+                  {(['none', 'subtle', 'playful'] as const).map(level => (
+                    <button
+                      key={level}
+                      onClick={() => updateSoul({ humor: level })}
+                      className={`px-4 py-2 rounded-lg text-sm capitalize ${
+                        profile.soul.humor === level
+                          ? 'bg-accent text-white'
+                          : 'bg-butler-700 text-butler-300 hover:bg-butler-600'
+                      }`}
+                    >
+                      {level}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm text-butler-300 mb-2">Voice</label>
+                <div className="space-y-2">
+                  {VOICE_OPTIONS.map(v => (
+                    <button
+                      key={v.id}
+                      onClick={() => updateSoul({ voice: v.id })}
+                      className={`w-full p-3 rounded-lg border text-left transition-colors ${
+                        (profile.soul.voice || DEFAULT_VOICE) === v.id
+                          ? 'border-accent bg-accent/10'
+                          : 'border-butler-700 bg-butler-800 hover:border-butler-600'
+                      }`}
+                    >
+                      <div className="text-sm text-butler-100">{v.name}</div>
+                      <div className="text-xs text-butler-400">{v.accent} {v.gender}</div>
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-butler-500 mt-2">
+                  Voice changes take effect on your next voice session.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          {/* Your Tool Access - read-only view of permissions */}
+          <section className="card p-4">
+            <h2 className="text-sm font-medium text-butler-400 uppercase tracking-wide mb-4">
+              Tool Access
+              <span className="text-butler-600 ml-2 text-xs normal-case">synced</span>
+            </h2>
+            <p className="text-xs text-butler-500 mb-3">
+              Tools your Butler can use on your behalf. {!isAdmin && 'Ask an admin to change these.'}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {allPermissions.map(perm => {
+                const info = PERMISSION_INFO[perm]
+                const enabled = profile.permissions?.includes(perm)
+                return (
+                  <div
+                    key={perm}
+                    className={`px-3 py-1.5 rounded-lg text-xs ${
+                      enabled
+                        ? 'bg-accent/20 text-accent border border-accent/30'
+                        : 'bg-butler-800 text-butler-500 border border-butler-700'
+                    }`}
+                    title={info.description}
+                  >
+                    {info.label}
+                  </div>
+                )
+              })}
+            </div>
+          </section>
+
+          {/* Device Settings - local to this device */}
+          <section className="card p-4">
+            <h2 className="text-sm font-medium text-butler-400 uppercase tracking-wide mb-4">
+              This Device
+              <span className="text-butler-600 ml-2 text-xs normal-case">local only</span>
+            </h2>
+            <div>
+              <label className="block text-sm text-butler-300 mb-2">Voice Input Mode</label>
+              <div className="flex flex-wrap gap-2">
+                {([
+                  { value: 'push-to-talk' as const, label: 'Push to Talk' },
+                  { value: 'tap-to-toggle' as const, label: 'Tap to Toggle' },
+                ]).map(mode => (
+                  <button
+                    key={mode.value}
+                    onClick={() => setVoiceMode(mode.value)}
+                    className={`px-4 py-2 rounded-lg text-sm ${
+                      voiceMode === mode.value
+                        ? 'bg-accent text-white'
+                        : 'bg-butler-700 text-butler-300 hover:bg-butler-600'
+                    }`}
+                  >
+                    {mode.label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-butler-500 mt-2">
+                This setting only applies to this device.
+              </p>
+            </div>
+            <div className="mt-4 flex items-start justify-between gap-3">
+              <div>
+                <label htmlFor="speak-replies" className="block text-sm text-butler-300">Read replies aloud</label>
+                <p className="text-xs text-butler-500 mt-0.5">
+                  Off: talk to Butler as usual, but answers appear as text only. You can also tap
+                  Stop speaking, press the mic, or type to cut a reply short.
+                </p>
+              </div>
+              <button
+                id="speak-replies"
+                role="switch"
+                aria-checked={speakReplies}
+                onClick={() => setSpeakReplies(!speakReplies)}
+                className={`relative shrink-0 w-11 h-6 rounded-full transition-colors ${speakReplies ? 'bg-accent' : 'bg-butler-600'}`}
+              >
+                <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${speakReplies ? 'translate-x-5' : ''}`} />
+              </button>
+            </div>
+          </section>
+        </>
+      )}
+
+      {tab === 'alerts' && (
+        <>
+          {/* Push Notifications - per device */}
+          <section className="card p-4">
+            <h2 className="text-sm font-medium text-butler-400 uppercase tracking-wide mb-4">
+              {isNativeApp ? 'Notifications' : 'Push Notifications'}
+              <span className="text-butler-600 ml-2 text-xs normal-case">{isNativeApp ? 'this phone' : 'this device'}</span>
+            </h2>
+            {isNativeApp ? <PhoneNotifications /> : <>
+
+            {!push.isSupported ? (
+              <p className="text-sm text-butler-500">
+                Push notifications are not supported in this browser.
+              </p>
+            ) : push.permission === 'denied' ? (
+              <p className="text-sm text-butler-500">
+                Notifications are blocked. Enable them in your browser settings to receive push notifications.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm text-butler-100">
+                      {push.isSubscribed ? 'Enabled' : 'Disabled'}
+                    </div>
+                    <div className="text-xs text-butler-500">
+                      {push.isSubscribed
+                        ? 'You will receive notifications from Butler'
+                        : 'Enable to receive alerts when the app is closed'}
+                    </div>
+                  </div>
+                  <button
+                    onClick={push.isSubscribed ? push.unsubscribe : push.subscribe}
+                    disabled={push.isLoading}
+                    className={`px-3 py-1.5 rounded-lg text-xs disabled:opacity-50 ${
+                      push.isSubscribed
+                        ? 'bg-red-900/50 text-red-300 hover:bg-red-900 hover:text-red-200'
+                        : 'bg-accent text-white hover:bg-accent/80'
+                    }`}
+                  >
+                    {push.isLoading
+                      ? 'Loading...'
+                      : push.isSubscribed
+                        ? 'Disable'
+                        : 'Enable'}
+                  </button>
+                </div>
+
+                {push.isSubscribed && (
+                  <button
+                    onClick={push.sendTest}
+                    className="w-full btn bg-butler-700 text-butler-300 hover:bg-butler-600 text-sm"
+                  >
+                    Send Test Notification
+                  </button>
+                )}
+              </div>
+            )}
+            </>}
+          </section>
+
+          {/* WhatsApp Notifications - synced */}
+          <section className="card p-4">
+            <h2 className="text-sm font-medium text-butler-400 uppercase tracking-wide mb-4">
+              WhatsApp Notifications
+              <span className="text-butler-600 ml-2 text-xs normal-case">synced</span>
+            </h2>
+
+            <div className="space-y-4">
+              {/* Phone number */}
+              <div>
+                <label htmlFor="whatsapp-phone" className="block text-sm text-butler-300 mb-1">
+                  Phone Number
+                </label>
+                <input
+                  id="whatsapp-phone"
+                  type="tel"
+                  value={phoneInput}
+                  onChange={(e) => { setPhoneInput(e.target.value); setPhoneError(null) }}
+                  onBlur={() => {
+                    if (phoneInput && !/^\+[1-9]\d{1,14}$/.test(phoneInput)) {
+                      setPhoneError('Use international format: +447123456789')
+                      return
+                    }
+                    setPhoneError(null)
+                    if (phoneInput !== (profile?.phone || '')) {
+                      updateNotifications(phoneInput)
+                    }
+                  }}
+                  placeholder="+447123456789"
+                  className="input"
+                />
+                {phoneError && (
+                  <p className="text-xs text-red-400 mt-1">{phoneError}</p>
+                )}
+                <p className="text-xs text-butler-500 mt-1">
+                  International format with country code (E.164)
+                </p>
+              </div>
+
+              {/* Master toggle */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm text-butler-100">Notifications</div>
+                  <div className="text-xs text-butler-500">
+                    {profile?.notificationPrefs.enabled ? 'Receiving WhatsApp alerts' : 'WhatsApp alerts are paused'}
+                  </div>
+                </div>
+                <button
+                  onClick={() => updateNotifications(undefined, { enabled: !profile?.notificationPrefs.enabled })}
+                  className="relative"
+                >
+                  <div className={`w-10 h-6 rounded-full transition-colors ${
+                    profile?.notificationPrefs.enabled ? 'bg-accent' : 'bg-butler-600'
+                  }`}>
+                    <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
+                      profile?.notificationPrefs.enabled ? 'translate-x-5' : 'translate-x-1'
+                    }`} />
+                  </div>
+                </button>
+              </div>
+
+              {/* Category toggles */}
+              {profile?.notificationPrefs.enabled && (
+                <div className="space-y-2">
+                  <label className="block text-sm text-butler-300 mb-1">Categories</label>
+                  {(['download', 'reminder', 'weather', 'smart_home', 'calendar', 'general'] as const).map(cat => {
+                    const isOn = profile.notificationPrefs.categories.includes(cat)
+                    return (
+                      <button
+                        key={cat}
+                        onClick={() => {
+                          const current = profile.notificationPrefs.categories
+                          const updated = isOn
+                            ? current.filter(c => c !== cat)
+                            : [...current, cat]
+                          updateNotifications(undefined, { categories: updated })
+                        }}
+                        className="w-full flex items-center justify-between p-3 bg-butler-800 rounded-lg hover:bg-butler-700 transition-colors"
+                      >
+                        <span className="text-sm text-butler-100 capitalize">{cat.replace('_', ' ')}</span>
                         <div className={`w-10 h-6 rounded-full relative transition-colors ${
-                          enabled ? 'bg-accent' : 'bg-butler-600'
+                          isOn ? 'bg-accent' : 'bg-butler-600'
                         }`}>
                           <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
-                            enabled ? 'translate-x-5' : 'translate-x-1'
+                            isOn ? 'translate-x-5' : 'translate-x-1'
                           }`} />
                         </div>
                       </button>
                     )
                   })}
-
-                  {selectedUser.role !== 'admin' && (
-                    <div className="pt-3 mt-3 border-t border-butler-700 space-y-2">
-                      {adminReprovisionError && (
-                        <div className="text-xs text-red-400">{adminReprovisionError}</div>
-                      )}
-                      {adminReprovisionSuccess && (
-                        <div className="text-xs text-green-400">Services re-provisioned successfully</div>
-                      )}
-                      <button
-                        onClick={() => adminReprovision(selectedUser.id)}
-                        disabled={adminReprovisioning}
-                        className="w-full btn bg-accent/20 text-accent hover:bg-accent/30 text-sm disabled:opacity-50"
-                      >
-                        {adminReprovisioning ? 'Provisioning...' : 'Reprovision Services'}
-                      </button>
-                      {removeUserError && (
-                        <div className="text-xs text-red-400">{removeUserError}</div>
-                      )}
-                      <button
-                        onClick={() => setShowRemoveUserConfirm(true)}
-                        className="w-full btn bg-red-900/50 text-red-300 hover:bg-red-900 hover:text-red-200 text-sm"
-                      >
-                        Remove User
-                      </button>
-                    </div>
-                  )}
                 </div>
               )}
-            </>
-          )}
-        </section>
+
+              {/* Test button */}
+              {profile?.phone && profile.notificationPrefs.enabled && (
+                <button
+                  onClick={async () => {
+                    setIsSendingWhatsappTest(true)
+                    setWhatsappTestResult(null)
+                    try {
+                      const data = await api.post<{ result: string }>('/user/notifications/test')
+                      setWhatsappTestResult(data.result)
+                    } catch {
+                      setWhatsappTestResult('Failed to send test message')
+                    } finally {
+                      setIsSendingWhatsappTest(false)
+                    }
+                  }}
+                  disabled={isSendingWhatsappTest}
+                  className="w-full btn bg-butler-700 text-butler-300 hover:bg-butler-600 text-sm disabled:opacity-50"
+                >
+                  {isSendingWhatsappTest ? 'Sending...' : 'Send Test Message'}
+                </button>
+              )}
+
+              {whatsappTestResult && (
+                <p className={`text-xs ${/error|failed/i.test(whatsappTestResult) ? 'text-red-400' : 'text-green-400'}`}>
+                  {whatsappTestResult}
+                </p>
+              )}
+            </div>
+          </section>
+        </>
       )}
 
-      {/* Device Settings - local to this device */}
-      <section className="card p-4">
-        <h2 className="text-sm font-medium text-butler-400 uppercase tracking-wide mb-4">
-          This Device
-          <span className="text-butler-600 ml-2 text-xs normal-case">local only</span>
-        </h2>
-        <div>
-          <label className="block text-sm text-butler-300 mb-2">Voice Input Mode</label>
-          <div className="flex flex-wrap gap-2">
-            {([
-              { value: 'push-to-talk' as const, label: 'Push to Talk' },
-              { value: 'tap-to-toggle' as const, label: 'Tap to Toggle' },
-            ]).map(mode => (
-              <button
-                key={mode.value}
-                onClick={() => setVoiceMode(mode.value)}
-                className={`px-4 py-2 rounded-lg text-sm ${
-                  voiceMode === mode.value
-                    ? 'bg-accent text-white'
-                    : 'bg-butler-700 text-butler-300 hover:bg-butler-600'
-                }`}
-              >
-                {mode.label}
-              </button>
-            ))}
-          </div>
-          <p className="text-xs text-butler-500 mt-2">
-            This setting only applies to this device.
-          </p>
-        </div>
-        <div className="mt-4 flex items-start justify-between gap-3">
-          <div>
-            <label htmlFor="speak-replies" className="block text-sm text-butler-300">Read replies aloud</label>
-            <p className="text-xs text-butler-500 mt-0.5">
-              Off: talk to Butler as usual, but answers appear as text only. You can also tap
-              Stop speaking, press the mic, or type to cut a reply short.
-            </p>
-          </div>
-          <button
-            id="speak-replies"
-            role="switch"
-            aria-checked={speakReplies}
-            onClick={() => setSpeakReplies(!speakReplies)}
-            className={`relative shrink-0 w-11 h-6 rounded-full transition-colors ${speakReplies ? 'bg-accent' : 'bg-butler-600'}`}
-          >
-            <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${speakReplies ? 'translate-x-5' : ''}`} />
-          </button>
-        </div>
-      </section>
+      {tab === 'admin' && isAdmin && (
+        <>
+          {/* Chat model - applies to everyone */}
+          <ChatModelSetting />
 
-      {/* Push Notifications - per device */}
-      <section className="card p-4">
-        <h2 className="text-sm font-medium text-butler-400 uppercase tracking-wide mb-4">
-          {isNativeApp ? 'Notifications' : 'Push Notifications'}
-          <span className="text-butler-600 ml-2 text-xs normal-case">{isNativeApp ? 'this phone' : 'this device'}</span>
-        </h2>
-        {isNativeApp ? <PhoneNotifications /> : <>
+          {/* Live TV provider - pushed to Dispatcharr */}
+          <IptvProviderSetting />
 
-        {!push.isSupported ? (
-          <p className="text-sm text-butler-500">
-            Push notifications are not supported in this browser.
-          </p>
-        ) : push.permission === 'denied' ? (
-          <p className="text-sm text-butler-500">
-            Notifications are blocked. Enable them in your browser settings to receive push notifications.
-          </p>
-        ) : (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm text-butler-100">
-                  {push.isSubscribed ? 'Enabled' : 'Disabled'}
-                </div>
-                <div className="text-xs text-butler-500">
-                  {push.isSubscribed
-                    ? 'You will receive notifications from Butler'
-                    : 'Enable to receive alerts when the app is closed'}
-                </div>
-              </div>
-              <button
-                onClick={push.isSubscribed ? push.unsubscribe : push.subscribe}
-                disabled={push.isLoading}
-                className={`px-3 py-1.5 rounded-lg text-xs disabled:opacity-50 ${
-                  push.isSubscribed
-                    ? 'bg-red-900/50 text-red-300 hover:bg-red-900 hover:text-red-200'
-                    : 'bg-accent text-white hover:bg-accent/80'
-                }`}
-              >
-                {push.isLoading
-                  ? 'Loading...'
-                  : push.isSubscribed
-                    ? 'Disable'
-                    : 'Enable'}
-              </button>
-            </div>
+          {/* Invite Codes - admin only */}
+          <section className="card p-4">
+            <h2 className="text-sm font-medium text-butler-400 uppercase tracking-wide mb-4">
+              Invite Codes
+              <span className="text-butler-600 ml-2 text-xs normal-case">admin</span>
+            </h2>
 
-            {push.isSubscribed && (
-              <button
-                onClick={push.sendTest}
-                className="w-full btn bg-butler-700 text-butler-300 hover:bg-butler-600 text-sm"
-              >
-                Send Test Notification
-              </button>
-            )}
-          </div>
-        )}
-        </>}
-      </section>
-
-      {/* WhatsApp Notifications - synced */}
-      <section className="card p-4">
-        <h2 className="text-sm font-medium text-butler-400 uppercase tracking-wide mb-4">
-          WhatsApp Notifications
-          <span className="text-butler-600 ml-2 text-xs normal-case">synced</span>
-        </h2>
-
-        <div className="space-y-4">
-          {/* Phone number */}
-          <div>
-            <label htmlFor="whatsapp-phone" className="block text-sm text-butler-300 mb-1">
-              Phone Number
-            </label>
-            <input
-              id="whatsapp-phone"
-              type="tel"
-              value={phoneInput}
-              onChange={(e) => { setPhoneInput(e.target.value); setPhoneError(null) }}
-              onBlur={() => {
-                if (phoneInput && !/^\+[1-9]\d{1,14}$/.test(phoneInput)) {
-                  setPhoneError('Use international format: +447123456789')
-                  return
-                }
-                setPhoneError(null)
-                if (phoneInput !== (profile?.phone || '')) {
-                  updateNotifications(phoneInput)
-                }
-              }}
-              placeholder="+447123456789"
-              className="input"
-            />
-            {phoneError && (
-              <p className="text-xs text-red-400 mt-1">{phoneError}</p>
-            )}
-            <p className="text-xs text-butler-500 mt-1">
-              International format with country code (E.164)
-            </p>
-          </div>
-
-          {/* Master toggle */}
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-sm text-butler-100">Notifications</div>
-              <div className="text-xs text-butler-500">
-                {profile?.notificationPrefs.enabled ? 'Receiving WhatsApp alerts' : 'WhatsApp alerts are paused'}
-              </div>
-            </div>
-            <button
-              onClick={() => updateNotifications(undefined, { enabled: !profile?.notificationPrefs.enabled })}
-              className="relative"
-            >
-              <div className={`w-10 h-6 rounded-full transition-colors ${
-                profile?.notificationPrefs.enabled ? 'bg-accent' : 'bg-butler-600'
-              }`}>
-                <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
-                  profile?.notificationPrefs.enabled ? 'translate-x-5' : 'translate-x-1'
-                }`} />
-              </div>
-            </button>
-          </div>
-
-          {/* Category toggles */}
-          {profile?.notificationPrefs.enabled && (
-            <div className="space-y-2">
-              <label className="block text-sm text-butler-300 mb-1">Categories</label>
-              {(['download', 'reminder', 'weather', 'smart_home', 'calendar', 'general'] as const).map(cat => {
-                const isOn = profile.notificationPrefs.categories.includes(cat)
-                return (
+            <div className="mb-4 p-3 bg-butler-900 rounded-lg">
+              <p className="text-sm font-medium text-butler-300 mb-2">Permissions for new user</p>
+              <div className="flex flex-wrap gap-2">
+                {(Object.keys(PERMISSION_INFO) as ToolPermission[]).map(perm => (
                   <button
-                    key={cat}
-                    onClick={() => {
-                      const current = profile.notificationPrefs.categories
-                      const updated = isOn
-                        ? current.filter(c => c !== cat)
-                        : [...current, cat]
-                      updateNotifications(undefined, { categories: updated })
-                    }}
-                    className="w-full flex items-center justify-between p-3 bg-butler-800 rounded-lg hover:bg-butler-700 transition-colors"
+                    key={perm}
+                    onClick={() => toggleInvitePermission(perm)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                      invitePermissions.has(perm)
+                        ? 'bg-accent/20 text-accent border border-accent/40'
+                        : 'bg-butler-800 text-butler-400 border border-butler-600'
+                    }`}
                   >
-                    <span className="text-sm text-butler-100 capitalize">{cat.replace('_', ' ')}</span>
-                    <div className={`w-10 h-6 rounded-full relative transition-colors ${
-                      isOn ? 'bg-accent' : 'bg-butler-600'
-                    }`}>
-                      <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
-                        isOn ? 'translate-x-5' : 'translate-x-1'
-                      }`} />
-                    </div>
+                    {PERMISSION_INFO[perm].label}
                   </button>
-                )
-              })}
-            </div>
-          )}
-
-          {/* Test button */}
-          {profile?.phone && profile.notificationPrefs.enabled && (
-            <button
-              onClick={async () => {
-                setIsSendingWhatsappTest(true)
-                setWhatsappTestResult(null)
-                try {
-                  const data = await api.post<{ result: string }>('/user/notifications/test')
-                  setWhatsappTestResult(data.result)
-                } catch {
-                  setWhatsappTestResult('Failed to send test message')
-                } finally {
-                  setIsSendingWhatsappTest(false)
-                }
-              }}
-              disabled={isSendingWhatsappTest}
-              className="w-full btn bg-butler-700 text-butler-300 hover:bg-butler-600 text-sm disabled:opacity-50"
-            >
-              {isSendingWhatsappTest ? 'Sending...' : 'Send Test Message'}
-            </button>
-          )}
-
-          {whatsappTestResult && (
-            <p className={`text-xs ${/error|failed/i.test(whatsappTestResult) ? 'text-red-400' : 'text-green-400'}`}>
-              {whatsappTestResult}
-            </p>
-          )}
-        </div>
-      </section>
-
-      {/* Data Management */}
-      <section className="card p-4">
-        <h2 className="text-sm font-medium text-butler-400 uppercase tracking-wide mb-4">
-          Data Management
-        </h2>
-
-        {deleteError && (
-          <div className="text-sm mb-3 p-2 rounded bg-red-900/30 text-red-300">
-            {deleteError}
-          </div>
-        )}
-
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-sm text-butler-100">Clear Facts</div>
-              <div className="text-xs text-butler-500">
-                Remove all learned facts ({profile.facts.length})
+                ))}
               </div>
             </div>
+
             <button
-              onClick={() => setShowClearFactsConfirm(true)}
-              disabled={profile.facts.length === 0}
-              className="px-3 py-1.5 rounded-lg text-xs bg-red-900/50 text-red-300 hover:bg-red-900 hover:text-red-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={generateInviteCode}
+              disabled={isGenerating}
+              className="btn btn-primary w-full mb-4 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Clear
+              {isGenerating ? 'Generating...' : 'Generate Invite Code'}
             </button>
-          </div>
 
-          <div className="border-t border-butler-700" />
-
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-sm text-butler-100">Delete Account</div>
-              <div className="text-xs text-butler-500">
-                Permanently remove your account and all data
+            {inviteCodes.length === 0 ? (
+              <p className="text-sm text-butler-500 text-center">
+                No invite codes yet. Generate one to add household members.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {inviteCodes.map(code => (
+                  <div
+                    key={code.code}
+                    className="flex items-center justify-between p-3 bg-butler-800 rounded-lg"
+                  >
+                    <div className="min-w-0">
+                      <span className="font-mono text-butler-100 text-sm">{code.code}</span>
+                      <div className="text-xs text-butler-500 mt-0.5">
+                        {code.isUsed
+                          ? `Used${code.usedBy ? ` by ${code.usedBy}` : ''}`
+                          : code.isExpired
+                            ? 'Expired'
+                            : `Expires ${new Date(code.expiresAt).toLocaleDateString()}`
+                        }
+                      </div>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {code.permissions.map(p => (
+                          <span key={p} className="text-xs px-1.5 py-0.5 rounded bg-accent/10 text-accent">
+                            {PERMISSION_INFO[p as ToolPermission]?.label || p}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex gap-2 shrink-0 ml-2">
+                      {!code.isUsed && !code.isExpired && (
+                        <>
+                          <button
+                            onClick={() => copyCode(code.code)}
+                            className="px-2 py-1 rounded text-xs bg-butler-700 text-accent hover:bg-butler-600"
+                          >
+                            {copiedCode === code.code ? 'Copied!' : 'Copy'}
+                          </button>
+                          <button
+                            onClick={() => revokeInviteCode(code.code)}
+                            className="px-2 py-1 rounded text-xs bg-red-900/50 text-red-300 hover:bg-red-900"
+                          >
+                            Revoke
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
-            </div>
-            <button
-              onClick={() => setShowDeleteAccountConfirm(true)}
-              className="px-3 py-1.5 rounded-lg text-xs bg-red-900/50 text-red-300 hover:bg-red-900 hover:text-red-200"
-            >
-              Delete
-            </button>
-          </div>
-        </div>
-      </section>
+            )}
+          </section>
 
-      {/* About & Logout */}
-      <section className="card p-4">
-        <h2 className="text-sm font-medium text-butler-400 uppercase tracking-wide mb-4">
-          About
-        </h2>
-        <div className="space-y-2 text-sm text-butler-400 mb-4">
-          <div className="flex justify-between">
-            <span>Version</span>
-            <span className="text-butler-300">
-              {appVersion ? `Android app ${appVersion.name} (build ${appVersion.code})` : '0.1.0'}
-            </span>
-          </div>
-          {appUpdate && (
-            <button
-              onClick={() => openExternal(appUpdate.url)}
-              className="w-full btn bg-accent text-white hover:bg-accent/80 text-sm"
-            >
-              Update available: build {appUpdate.versionCode} — download
-            </button>
-          )}
-        </div>
-        <button
-          onClick={signOut}
-          className="w-full btn bg-red-900/50 text-red-300 hover:bg-red-900 hover:text-red-200"
-        >
-          Sign Out
-        </button>
-      </section>
+          {/* Manage Permissions - admin only */}
+          <section className="card p-4">
+            <h2 className="text-sm font-medium text-butler-400 uppercase tracking-wide mb-4">
+              Manage Permissions
+              <span className="text-butler-600 ml-2 text-xs normal-case">admin</span>
+              {permSaving && <span className="text-accent ml-2 text-xs normal-case">saving...</span>}
+            </h2>
+
+            {adminUsers.length === 0 ? (
+              <p className="text-sm text-butler-500 text-center">Loading users...</p>
+            ) : (
+              <>
+                <div className="mb-4">
+                  <label className="block text-sm text-butler-300 mb-2">Select User</label>
+                  <select
+                    value={selectedUserId || ''}
+                    onChange={(e) => setSelectedUserId(e.target.value || null)}
+                    className="input w-full"
+                  >
+                    <option value="">Choose a user...</option>
+                    {adminUsers.map(u => (
+                      <option key={u.id} value={u.id}>
+                        {u.name} {u.role === 'admin' ? '(admin)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {selectedUser && (
+                  <div className="space-y-2">
+                    {allPermissions.map(perm => {
+                      const info = PERMISSION_INFO[perm]
+                      const enabled = selectedUser.permissions.includes(perm)
+                      return (
+                        <button
+                          key={perm}
+                          onClick={() => togglePermission(selectedUser.id, perm)}
+                          className="w-full flex items-center justify-between p-3 bg-butler-800 rounded-lg hover:bg-butler-700 transition-colors"
+                        >
+                          <div className="text-left">
+                            <div className="text-sm text-butler-100">{info.label}</div>
+                            <div className="text-xs text-butler-500">{info.description}</div>
+                          </div>
+                          <div className={`w-10 h-6 rounded-full relative transition-colors ${
+                            enabled ? 'bg-accent' : 'bg-butler-600'
+                          }`}>
+                            <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
+                              enabled ? 'translate-x-5' : 'translate-x-1'
+                            }`} />
+                          </div>
+                        </button>
+                      )
+                    })}
+
+                    {selectedUser.role !== 'admin' && (
+                      <div className="pt-3 mt-3 border-t border-butler-700 space-y-2">
+                        {adminReprovisionError && (
+                          <div className="text-xs text-red-400">{adminReprovisionError}</div>
+                        )}
+                        {adminReprovisionSuccess && (
+                          <div className="text-xs text-green-400">Services re-provisioned successfully</div>
+                        )}
+                        <button
+                          onClick={() => adminReprovision(selectedUser.id)}
+                          disabled={adminReprovisioning}
+                          className="w-full btn bg-accent/20 text-accent hover:bg-accent/30 text-sm disabled:opacity-50"
+                        >
+                          {adminReprovisioning ? 'Provisioning...' : 'Reprovision Services'}
+                        </button>
+                        {removeUserError && (
+                          <div className="text-xs text-red-400">{removeUserError}</div>
+                        )}
+                        <button
+                          onClick={() => setShowRemoveUserConfirm(true)}
+                          className="w-full btn bg-red-900/50 text-red-300 hover:bg-red-900 hover:text-red-200 text-sm"
+                        >
+                          Remove User
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </section>
+        </>
+      )}
 
       <ConfirmDialog
         open={showClearFactsConfirm}
@@ -1377,6 +1391,39 @@ export default function Settings() {
           onCancel={() => { setShowRemoveUserConfirm(false); setRemoveUserError(null) }}
         />
       )}
+    </div>
+  )
+}
+
+const SETTINGS_TABS = [
+  { id: 'you', label: 'You', adminOnly: false },
+  { id: 'butler', label: 'Butler', adminOnly: false },
+  { id: 'alerts', label: 'Alerts', adminOnly: false },
+  { id: 'admin', label: 'Admin', adminOnly: true },
+] as const
+
+type SettingsTab = typeof SETTINGS_TABS[number]['id']
+
+function SettingsTabs({ tab, onChange, isAdmin }: {
+  tab: SettingsTab
+  onChange: (tab: SettingsTab) => void
+  isAdmin: boolean
+}) {
+  return (
+    <div role="tablist" className="flex gap-1 p-1 bg-butler-800 rounded-lg">
+      {SETTINGS_TABS.filter(t => isAdmin || !t.adminOnly).map(t => (
+        <button
+          key={t.id}
+          role="tab"
+          aria-selected={tab === t.id}
+          onClick={() => onChange(t.id)}
+          className={`flex-1 py-2 rounded-md text-sm transition-colors ${
+            tab === t.id ? 'bg-butler-700 text-butler-100' : 'text-butler-400 hover:text-butler-200'
+          }`}
+        >
+          {t.label}
+        </button>
+      ))}
     </div>
   )
 }

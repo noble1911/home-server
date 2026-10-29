@@ -309,7 +309,7 @@ export default function Tutorial() {
               Some features need permissions to be enabled. You can manage these in Settings.
             </p>
             <button
-              onClick={() => navigate('/settings')}
+              onClick={() => navigate('/settings?tab=butler')}
               className="mt-2 text-sm font-medium text-accent hover:text-accent-light transition-colors"
             >
               Go to Settings &rarr;
