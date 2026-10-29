@@ -7,6 +7,11 @@ GET    /api/admin/users                         — List all users with permissi
 PUT    /api/admin/users/{user_id}/permissions   — Update a user's tool permissions
 POST   /api/admin/users/{user_id}/reprovision   — Re-provision service accounts
 DELETE /api/admin/users/{user_id}               — Delete a user + their service accounts
+GET    /api/admin/model                         — Butler's chat model and the choices
+PUT    /api/admin/model                         — Choose the chat model
+GET    /api/admin/iptv                          — The IPTV provider synced to Dispatcharr
+PUT    /api/admin/iptv                          — Save the IPTV provider and push it to Dispatcharr
+POST   /api/admin/iptv/sync                     — Push the saved provider to Dispatcharr again
 """
 
 from __future__ import annotations
@@ -22,7 +27,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from tools import DatabasePool
 
 from ..deps import ALL_PERMISSION_GROUPS, DEFAULT_PERMISSIONS, get_admin_user, get_db_pool
-from .. import model_settings
+from .. import iptv, model_settings
 from ..config import settings
 from ..crypto import decrypt_password
 from ..provisioning import deprovision_user_accounts, provision_user_accounts
@@ -32,6 +37,8 @@ from ..models import (
     ChatModelOption,
     ChatModelSettings,
     SetChatModelRequest,
+    IptvProviderSettings,
+    SetIptvProviderRequest,
     AdminUserInfo,
     AdminUserListResponse,
     CreateInviteCodeRequest,
@@ -304,3 +311,76 @@ async def set_chat_model(
     except ValueError as e:
         raise HTTPException(422, str(e)) from e
     return _model_settings()
+
+
+# --- IPTV provider -> Dispatcharr (#223) ---
+
+
+async def _iptv_settings(pool: DatabasePool) -> IptvProviderSettings:
+    p = await iptv.get_provider(pool)
+    if not p:
+        return IptvProviderSettings(configured=False)
+    return IptvProviderSettings(
+        configured=True,
+        kind=p["kind"],
+        serverUrl=p["server_url"],
+        username=p["username"],
+        hasPassword=bool(p["password_encrypted"]),
+        hasM3uUrl=bool(p["m3u_url_encrypted"]),
+        maxStreams=p["max_streams"],
+        lastSyncedAt=p["last_synced_at"],
+        lastError=p["last_error"],
+    )
+
+
+@router.get("/iptv", response_model=IptvProviderSettings)
+async def get_iptv_provider(
+    admin_id: str = Depends(get_admin_user),
+    pool: DatabasePool = Depends(get_db_pool),
+):
+    """The household's IPTV provider (secrets withheld) and its last sync."""
+    return await _iptv_settings(pool)
+
+
+@router.put("/iptv", response_model=IptvProviderSettings)
+async def set_iptv_provider(
+    req: SetIptvProviderRequest,
+    admin_id: str = Depends(get_admin_user),
+    pool: DatabasePool = Depends(get_db_pool),
+):
+    """Save the IPTV provider, then push it to Dispatcharr.
+
+    The login is saved even if Dispatcharr can't take it; the failure is
+    returned in ``lastError`` so the admin can fix it and sync again.
+    """
+    try:
+        await iptv.save_provider(
+            pool,
+            kind=req.kind,
+            server_url=(req.serverUrl or "").strip().rstrip("/") or None,
+            username=(req.username or "").strip() or None,
+            password=req.password or None,
+            m3u_url=(req.m3uUrl or "").strip() or None,
+            max_streams=req.maxStreams,
+            user_id=admin_id,
+        )
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from e
+    try:
+        await iptv.sync(pool, admin_id)
+    except iptv.DispatcharrError as e:
+        logger.warning("IPTV provider saved but not synced: %s", e)
+    return await _iptv_settings(pool)
+
+
+@router.post("/iptv/sync", response_model=IptvProviderSettings)
+async def sync_iptv_provider(
+    admin_id: str = Depends(get_admin_user),
+    pool: DatabasePool = Depends(get_db_pool),
+):
+    """Push the saved provider to Dispatcharr again (e.g. after creating the Dispatcharr admin)."""
+    try:
+        await iptv.sync(pool, admin_id)
+    except iptv.DispatcharrError as e:
+        logger.warning("IPTV sync failed: %s", e)
+    return await _iptv_settings(pool)

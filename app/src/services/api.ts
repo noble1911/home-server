@@ -586,6 +586,44 @@ export function setChatModel(model: string | null): Promise<ChatModelSettings> {
   return api.put('/admin/model', { model })
 }
 
+// --- Live TV provider (admin setting, pushed to Dispatcharr) ---
+
+export interface IptvProviderSettings {
+  configured: boolean
+  kind: 'xtream' | 'm3u' | null
+  serverUrl: string | null
+  username: string | null
+  hasPassword: boolean
+  hasM3uUrl: boolean
+  maxStreams: number
+  lastSyncedAt: string | null
+  lastError: string | null
+}
+
+export interface SetIptvProviderRequest {
+  kind: 'xtream' | 'm3u'
+  serverUrl?: string
+  username?: string
+  /** Blank keeps the saved password */
+  password?: string
+  /** Blank keeps the saved playlist URL */
+  m3uUrl?: string
+  maxStreams: number
+}
+
+export function getIptvProvider(): Promise<IptvProviderSettings> {
+  return api.get('/admin/iptv')
+}
+
+/** Save the IPTV login and push it to Dispatcharr; a failed push comes back in lastError. */
+export function setIptvProvider(req: SetIptvProviderRequest): Promise<IptvProviderSettings> {
+  return api.put('/admin/iptv', req)
+}
+
+export function syncIptvProvider(): Promise<IptvProviderSettings> {
+  return api.post('/admin/iptv/sync', {})
+}
+
 // --- Approvals (tap-to-approve emails and calendar changes) ---
 
 export function getPendingApprovals(): Promise<{ approvals: PendingApproval[] }> {

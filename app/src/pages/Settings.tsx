@@ -6,6 +6,7 @@ import { useConversationStore } from '../stores/conversationStore'
 import { usePushNotifications } from '../hooks/usePushNotifications'
 import PhoneNotifications from '../components/settings/PhoneNotifications'
 import ChatModelSetting from '../components/settings/ChatModelSetting'
+import IptvProviderSetting from '../components/settings/IptvProviderSetting'
 import { ButlerNotifications, checkForAppUpdate, disablePhoneNotifications, isNativeApp, openExternal, type AppUpdate } from '../native/butlerNative'
 import { api, clearUserFacts, deleteUserAccount } from '../services/api'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -570,6 +571,9 @@ export default function Settings() {
 
       {/* Chat model - admin only, applies to everyone */}
       {isAdmin && <ChatModelSetting />}
+
+      {/* Live TV provider - admin only, pushed to Dispatcharr */}
+      {isAdmin && <IptvProviderSetting />}
 
       {/* Invite Codes - admin only */}
       {isAdmin && (

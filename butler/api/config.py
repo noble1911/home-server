@@ -80,6 +80,10 @@ class Settings(BaseSettings):
     jellyfin_url: str = ""
     jellyfin_api_key: str = ""
 
+    # Dispatcharr (IPTV / live TV for Jellyfin). Butler signs in with the
+    # admin's service login; the IPTV provider is set in Settings (#223).
+    dispatcharr_url: str = "http://dispatcharr:9191"
+
     # Immich (photo search, read-only)
     immich_url: str = ""
     immich_api_key: str = ""

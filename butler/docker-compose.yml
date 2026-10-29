@@ -60,6 +60,7 @@ services:
       - PROWLARR_API_KEY=${PROWLARR_API_KEY:-}
       # Seerr (media request management)
       - SEERR_URL=${SEERR_URL:-http://seerr:5055}
+      - DISPATCHARR_URL=${DISPATCHARR_URL:-http://dispatcharr:9191}
       - SEERR_API_KEY=${SEERR_API_KEY:-}
       # Immich (photo management + user provisioning)
       - IMMICH_URL=${IMMICH_URL:-http://immich-server:2283}

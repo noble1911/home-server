@@ -6,6 +6,9 @@ See: app/src/types/user.ts, app/src/types/conversation.ts
 
 from __future__ import annotations
 
+from datetime import datetime
+from typing import Literal
+
 from pydantic import BaseModel, Field, model_validator
 
 
@@ -289,6 +292,30 @@ class ChatModelSettings(BaseModel):
 
 class SetChatModelRequest(BaseModel):
     model: str | None = None  # None = go back to the server default
+
+
+# --- IPTV provider -> Dispatcharr (#223) ---
+
+
+class IptvProviderSettings(BaseModel):
+    configured: bool
+    kind: Literal["xtream", "m3u"] | None = None
+    serverUrl: str | None = None
+    username: str | None = None
+    hasPassword: bool = False   # secrets are never sent back
+    hasM3uUrl: bool = False
+    maxStreams: int = 1
+    lastSyncedAt: datetime | None = None
+    lastError: str | None = None
+
+
+class SetIptvProviderRequest(BaseModel):
+    kind: Literal["xtream", "m3u"]
+    serverUrl: str | None = None
+    username: str | None = None
+    password: str | None = None  # blank = keep the saved one
+    m3uUrl: str | None = None    # blank = keep the saved one
+    maxStreams: int = Field(1, ge=1, le=50)
 
 
 # --- Approvals (tap-to-approve pending actions) ---
