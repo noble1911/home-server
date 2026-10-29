@@ -105,6 +105,9 @@ DEFAULT_DRIVES: list[dict[str, Any]] = [
         "name": "HomeServer2",
         "path": "/Volumes/HomeServer2",
         "role": "library",
+        # Kept full on purpose (new media goes to HomeServer), so no
+        # "nearly full" alerts or red bars for it. Drives default to alerts on.
+        "alerts": False,
         "categories": {
             "Movies": "/Volumes/HomeServer2/Media/Movies",
             "TV Shows": "/Volumes/HomeServer2/Media/TV",
@@ -387,6 +390,7 @@ class Sampler:
                 "name": d["name"],
                 "path": path,
                 "role": d.get("role"),
+                "alerts": d.get("alerts", True),
                 "mounted": True,
                 "total": total,
                 "used": used,

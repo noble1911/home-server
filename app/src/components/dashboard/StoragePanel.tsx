@@ -80,7 +80,10 @@ export default function StoragePanel({ storage }: { storage: SystemStorageRespon
 
 function DriveCard({ drive, compact = false }: { drive: StorageDrive; compact?: boolean }) {
   const pct = drive.percent ?? 0
-  const sev = severityFor(pct, 80, 90)
+  // Alerts off (kept full on purpose): thresholds above 100 keep the bar neutral
+  const alertsOn = drive.alerts !== false
+  const [warn, crit] = alertsOn ? [80, 90] : [101, 101]
+  const sev = severityFor(pct, warn, crit)
   const cats = (drive.categories ?? []).filter(c => c.exists)
   const local = cats.filter(c => !c.linkedTo)
   const linked = cats.filter(c => c.linkedTo)
@@ -104,9 +107,13 @@ function DriveCard({ drive, compact = false }: { drive: StorageDrive; compact?: 
         percent={pct}
         value={`${drive.usedFormatted} / ${drive.totalFormatted}`}
         hint={`${drive.freeFormatted} free`}
-        warn={80}
-        crit={90}
+        warn={warn}
+        crit={crit}
       />
+
+      {!alertsOn && (
+        <p className="text-[11px] text-butler-500 mt-2">Full by choice: new media goes to the other drive, so no alerts here.</p>
+      )}
 
       {sev !== 'ok' && (
         <p className={`text-xs mt-2 ${sev === 'critical' ? 'text-red-300' : 'text-yellow-300'}`}>
