@@ -144,6 +144,7 @@
 | [**Sonarr**](https://sonarr.tv/) | [sonarr.tv](https://sonarr.tv/) | TV series automation & management | Docker container | 300MB | 500MB | 8989 |
 | [**Bazarr**](https://www.bazarr.media/) | [bazarr.media](https://www.bazarr.media/) | Subtitle automation | Docker container | 200MB | 400MB | 6767 |
 | [**Seerr**](https://github.com/seerr-team/seerr) | [docs.seerr.dev](https://docs.seerr.dev/) | Media request management | Docker container | 100MB | 200MB | 5055 |
+| [**Dispatcharr**](https://github.com/Dispatcharr/Dispatcharr) | [GitHub](https://github.com/Dispatcharr/Dispatcharr) | IPTV / live TV manager (M3U + EPG → Jellyfin Live TV) | Docker container (AIO) | 300MB | 1GB | 9191 |
 
 > *Jellyfin peaks during 4K transcoding. Direct play uses minimal resources.
 
@@ -1223,6 +1224,7 @@ This does NOT protect against: Mac Mini theft/fire (use cloud for that).
 | 8989 | Sonarr | LAN only |
 | 5055 | Seerr | LAN + Cloudflare Tunnel |
 | 6767 | Bazarr | LAN only |
+| 9191 | Dispatcharr | LAN only |
 | 9696 | Prowlarr | LAN only |
 | 8081 | qBittorrent | LAN only |
 | 8100 | Butler Agent | LAN only |

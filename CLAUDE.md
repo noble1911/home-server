@@ -101,7 +101,7 @@ The Mac Mini is set up and all Docker stacks are deployed via OrbStack. Active w
 ### Deployed Stacks
 | Stack | Services | Status |
 |-------|----------|--------|
-| **media-stack** | Radarr, Sonarr, Bazarr, Seerr | Running |
+| **media-stack** | Radarr, Sonarr, Bazarr, Seerr, Dispatcharr | Running |
 | **download-stack** | qBittorrent, Prowlarr | Running |
 | **books-stack** | Audiobookshelf, LazyLibrarian | Running |
 | **photos-files-stack** | Immich, PostgreSQL, Redis, Nextcloud | Running |
@@ -165,7 +165,7 @@ home-server/
 ├── docker/                # Docker Compose stacks
 │   ├── books-stack/       # Audiobookshelf, LazyLibrarian
 │   ├── download-stack/    # qBittorrent, Prowlarr
-│   ├── media-stack/       # Radarr, Sonarr, Bazarr, Seerr (Jellyfin = native app, see above)
+│   ├── media-stack/       # Radarr, Sonarr, Bazarr, Seerr, Dispatcharr (Jellyfin = native app, see above)
 │   ├── messaging-stack/   # WhatsApp gateway
 │   ├── photos-files-stack/# Immich, Nextcloud, PostgreSQL
 │   ├── smart-home-stack/  # Home Assistant, Cloudflare Tunnel

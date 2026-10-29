@@ -70,6 +70,7 @@ services:
   - { name: bazarr,      project: home-server, container: bazarr,      host_port: 6767 }
   - { name: prowlarr,    project: home-server, container: prowlarr,    host_port: 9696 }
   - { name: seerr,       project: home-server, container: seerr,       host_port: 5055 }
+  - { name: dispatcharr, project: home-server, container: dispatcharr, host_port: 9191 }  # IPTV/EPG manager → Jellyfin Live TV (HDHomeRun / M3U+XMLTV)
 
   # ── home-server: download-stack ──────────────────────────────────
   - { name: qbittorrent, project: home-server, container: qbittorrent, host_port: 8081 }  # WebUI

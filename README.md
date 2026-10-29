@@ -239,7 +239,7 @@ cd ~/home-server && ./scripts/change-drive.sh
 | 4 | `05-orbstack.sh` | OrbStack (Docker) |
 | 5 | `06-external-drive.sh` | External drive directory structure |
 | 6 | `07-download-stack.sh` | qBittorrent + Prowlarr |
-| 7 | `08-media-stack.sh` | Jellyfin + Radarr + Sonarr + Bazarr + Seerr |
+| 7 | `08-media-stack.sh` | Jellyfin + Radarr + Sonarr + Bazarr + Seerr + Dispatcharr |
 | 8 | `09-books-stack.sh` | Audiobookshelf + LazyLibrarian |
 | 9 | `10-photos-files.sh` | Immich + Nextcloud |
 | 10 | `11-smart-home.sh` | Home Assistant + Cloudflare Tunnel |
@@ -393,6 +393,7 @@ Once the shim is running, the **Claude Code toggle button** (terminal icon) appe
 | **qBittorrent** | `http://<server-ip>:8081` | Auto-configured — check container logs for temp password if needed |
 | **Bazarr** | `http://<server-ip>:6767` | Auto-configured — connected to Radarr + Sonarr |
 | **Seerr** | `http://<server-ip>:5055` | Complete setup wizard — sign in with Jellyfin, connect Radarr + Sonarr |
+| **Dispatcharr** | `http://<server-ip>:9191` | Create admin account, add M3U/EPG sources, then add it to Jellyfin Live TV ([guide](docs/08-media-stack.md#dispatcharr-live-tv)) |
 
 > Radarr, Sonarr, Prowlarr, and qBittorrent are admin-only. Household members request media through Seerr and watch via Jellyfin.
 
@@ -507,6 +508,7 @@ docker compose down && docker compose up -d
 | [Sonarr](https://sonarr.tv/) | TV series automation | 8989 |
 | [Bazarr](https://www.bazarr.media/) | Subtitle automation | 6767 |
 | [Seerr](https://github.com/seerr-team/seerr) | Media request management | 5055 |
+| [Dispatcharr](https://github.com/Dispatcharr/Dispatcharr) | IPTV / live TV manager (feeds Jellyfin Live TV) | 9191 |
 | [Prowlarr](https://prowlarr.com/) | Indexer manager | 9696 |
 | [qBittorrent](https://www.qbittorrent.org/) | Torrent client | 8081 |
 

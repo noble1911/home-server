@@ -32,6 +32,7 @@ docker compose ps
 | Sonarr | http://localhost:8989 | TV series automation |
 | Bazarr | http://localhost:6767 | Subtitle automation |
 | Seerr | http://localhost:5055 | Media request management |
+| Dispatcharr | http://localhost:9191 | IPTV / live TV manager (feeds Jellyfin Live TV) |
 
 ## Initial Configuration
 
@@ -107,6 +108,24 @@ docker compose ps
 5. Copy the **API Key** from Settings > General for Butler integration
 6. Optionally enable auto-approval for admin users
 
+### Dispatcharr (Live TV)
+
+Dispatcharr manages IPTV playlists (M3U / Xtream Codes) and guide data (EPG), then re-serves
+the channels you pick as a virtual HDHomeRun tuner that Jellyfin can play and record.
+
+1. Open http://localhost:9191 and create the admin account (first visit only — allowed from the LAN).
+2. **M3U & EPG Manager:** add your playlist (M3U URL or Xtream Codes login) and an EPG/XMLTV source.
+3. **Channels:** create channels from the imported streams and match them to EPG entries.
+4. In Jellyfin (**Dashboard > Live TV**):
+   - **Tuner Devices > Add > HD Homerun:** `http://localhost:9191/hdhr` (Jellyfin is the native
+     app on the same Mac, so `localhost` reaches the container's published port).
+     Alternatively add an **M3U Tuner** with `http://localhost:9191/output/m3u`.
+   - **TV Guide Data Providers > Add > XMLTV:** `http://localhost:9191/output/epg`.
+
+Butler's dashboard and `server_health` tool probe `/hdhr/discover.json` (Media group). Data
+(settings, channels, its bundled Postgres + Redis) lives in the `dispatcharr-data` volume,
+which the daily backup includes.
+
 ### Connect Prowlarr to *arr Apps
 
 In Prowlarr (http://localhost:9696):
@@ -139,6 +158,7 @@ In Prowlarr (http://localhost:9696):
 | Sonarr | `/anime-series` | `Media/Anime/Series` |
 | Sonarr | `/downloads` | `Downloads` |
 | Bazarr | `/movies`, `/tv`, `/anime-movies`, `/anime-series` | Matching media folders |
+| Dispatcharr | `/data` | `dispatcharr-data` volume |
 
 ## The Download Flow
 

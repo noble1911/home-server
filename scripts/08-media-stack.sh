@@ -1,5 +1,5 @@
 #!/bin/bash
-# Step 8: Deploy Media Stack (Jellyfin + Radarr + Sonarr + Bazarr + Seerr)
+# Step 8: Deploy Media Stack (Jellyfin + Radarr + Sonarr + Bazarr + Seerr + Dispatcharr)
 set -e
 
 GREEN='\033[0;32m'

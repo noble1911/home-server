@@ -106,6 +106,33 @@ services:
       retries: 3
       start_period: 30s
 
+  # Dispatcharr: IPTV/live TV manager — imports M3U playlists + EPG and re-serves
+  # them as an HDHomeRun tuner / M3U+XMLTV that Jellyfin's Live TV picks up.
+  # All-in-one image (bundles its own Redis + Postgres under /data).
+  dispatcharr:
+    image: ghcr.io/dispatcharr/dispatcharr:0.33.0
+    container_name: dispatcharr
+    environment:
+      - DISPATCHARR_ENV=aio
+      - REDIS_HOST=localhost
+      - CELERY_BROKER_URL=redis://localhost:6379/0
+      - DISPATCHARR_LOG_LEVEL=info
+      - TZ=Europe/London
+    volumes:
+      - dispatcharr-data:/data
+    ports:
+      - "9191:9191"
+    networks:
+      - homeserver
+    restart: always
+    healthcheck:
+      # HDHomeRun discovery: unauthenticated, but goes through Django + its DB
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:9191/hdhr/discover.json"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+
 networks:
   homeserver:
     external: true
@@ -117,3 +144,5 @@ volumes:
     name: sonarr-config
   bazarr-config:
     name: bazarr-config
+  dispatcharr-data:
+    name: dispatcharr-data

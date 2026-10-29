@@ -69,6 +69,11 @@ DEFAULT_SERVICES: dict[str, dict[str, Any]] = {
         "url": "http://seerr:5055/api/v1/status",
         "stack": "media",
     },
+    "dispatcharr": {
+        # HDHomeRun discovery: unauthenticated, exercises Django + its DB
+        "url": "http://dispatcharr:9191/hdhr/discover.json",
+        "stack": "media",
+    },
     # Download stack
     "qbittorrent": {
         "url": "http://qbittorrent:8081/",
