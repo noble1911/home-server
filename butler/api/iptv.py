@@ -2,8 +2,9 @@
 
 Admins enter the provider login (Xtream Codes server/username/password, or an
 M3U URL) in Settings. It's stored encrypted in butler.iptv_provider and synced
-to Dispatcharr as one M3U account named ``ACCOUNT_NAME``; Jellyfin's Live TV
-reads the channels from Dispatcharr.
+to Dispatcharr as one M3U account named ``ACCOUNT_NAME`` (plus, for Xtream, an
+XMLTV guide source named ``GUIDE_NAME``); Jellyfin's Live TV reads the channels
+and guide from Dispatcharr.
 
 Butler signs in to Dispatcharr with the Dispatcharr login saved alongside the
 provider, or, when that's blank, the saving admin's service login (the
@@ -16,6 +17,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import urlencode
 
 import aiohttp
 
@@ -27,6 +29,8 @@ from .crypto import decrypt_password, encrypt_password
 logger = logging.getLogger(__name__)
 
 ACCOUNT_NAME = "Butler IPTV"
+GUIDE_NAME = "Butler IPTV guide"
+REFRESH_HOURS = 24  # how often Dispatcharr re-reads the playlist and guide
 _HTTP_TIMEOUT = aiohttp.ClientTimeout(total=20)
 
 
@@ -139,6 +143,7 @@ async def _push(pool: DatabasePool, provider: dict[str, Any], admin_id: str) -> 
         "name": ACCOUNT_NAME,
         "max_streams": provider["max_streams"],
         "is_active": True,
+        "refresh_interval": REFRESH_HOURS,
     }
     if provider["kind"] == "xtream":
         body.update(
@@ -174,7 +179,41 @@ async def _push(pool: DatabasePool, provider: dict[str, Any], admin_id: str) -> 
         async with session.post(f"{base}/api/m3u/refresh/{account_id}/", headers=headers) as resp:
             if resp.status >= 300:
                 logger.warning("Dispatcharr refresh of account %s: HTTP %s", account_id, resp.status)
+
+        if provider["kind"] == "xtream":
+            await _push_guide(session, base, headers, body)
     return account_id
+
+
+async def _push_guide(
+    session: aiohttp.ClientSession, base: str, headers: dict[str, str], account: dict[str, Any],
+) -> None:
+    """Keep an XMLTV guide source pointed at the Xtream provider's xmltv.php.
+
+    M3U-only providers have no standard guide URL; those are added by hand.
+    """
+    query = urlencode({"username": account["username"], "password": account["password"]})
+    body = {
+        "name": GUIDE_NAME,
+        "source_type": "xmltv",
+        "url": f"{account['server_url'].rstrip('/')}/xmltv.php?{query}",
+        "is_active": True,
+        "refresh_interval": REFRESH_HOURS,
+    }
+    async with session.get(f"{base}/api/epg/sources/", headers=headers) as resp:
+        if resp.status != 200:
+            raise DispatcharrError(f"Couldn't list Dispatcharr's guide sources: HTTP {resp.status}")
+        data = await resp.json()
+    sources = data.get("results", data) if isinstance(data, dict) else data
+    existing = next((s["id"] for s in sources if s.get("name") == GUIDE_NAME), None)
+
+    if existing is None:
+        method, url = session.post, f"{base}/api/epg/sources/"
+    else:
+        method, url = session.patch, f"{base}/api/epg/sources/{existing}/"
+    async with method(url, json=body, headers=headers) as resp:
+        if resp.status not in (200, 201):
+            raise DispatcharrError(f"Dispatcharr refused the guide source: HTTP {resp.status} - {await resp.text()}")
 
 
 async def _login(
