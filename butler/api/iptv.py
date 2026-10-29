@@ -159,22 +159,40 @@ async def _push(pool: DatabasePool, provider: dict[str, Any], admin_id: str) -> 
 
 async def _login(session: aiohttp.ClientSession, base: str, pool: DatabasePool, admin_id: str) -> str:
     """Sign in as the admin's service login; returns a JWT access token."""
-    row = await pool.pool.fetchrow(
-        "SELECT service_username, service_password_encrypted FROM butler.users WHERE id = $1",
-        admin_id,
-    )
-    if not row or not row["service_username"] or not row["service_password_encrypted"]:
-        raise DispatcharrError("You don't have a service login yet; set one under Service Password first")
-    creds = {"username": row["service_username"], "password": decrypt_password(row["service_password_encrypted"])}
+    username, password = await _service_login(pool, admin_id)
+    creds = {"username": username, "password": password}
     async with session.post(f"{base}/api/accounts/token/", json=creds) as resp:
         if resp.status == 401:
             raise DispatcharrError(
-                f"Dispatcharr didn't accept the login '{creds['username']}'. Create a Dispatcharr admin "
-                "with the same username and password as your Butler service login."
+                f"Dispatcharr didn't accept the login '{username}' (usernames are case-sensitive). "
+                "Create a Dispatcharr admin with exactly that username and your service password."
             )
         if resp.status != 200:
             raise DispatcharrError(f"Dispatcharr sign-in failed: HTTP {resp.status}")
         return (await resp.json())["access"]
+
+
+async def _service_login(pool: DatabasePool, admin_id: str) -> tuple[str, str]:
+    """The admin's service username and password.
+
+    Accounts created before the shared login was stored on butler.users only
+    have per-service credentials, so fall back to the newest of those.
+    """
+    row = await pool.pool.fetchrow(
+        "SELECT service_username, service_password_encrypted FROM butler.users WHERE id = $1",
+        admin_id,
+    )
+    if row and row["service_username"] and row["service_password_encrypted"]:
+        return row["service_username"], decrypt_password(row["service_password_encrypted"])
+    cred = await pool.pool.fetchrow(
+        """SELECT username, password_encrypted FROM butler.service_credentials
+           WHERE user_id = $1 AND status = 'active' AND password_encrypted IS NOT NULL
+           ORDER BY created_at DESC LIMIT 1""",
+        admin_id,
+    )
+    if cred:
+        return cred["username"], decrypt_password(cred["password_encrypted"])
+    raise DispatcharrError("You don't have a service login yet; set one under Service Password first")
 
 
 async def _find_account(
