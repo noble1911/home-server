@@ -131,6 +131,14 @@ leave it on the default, which is inside Jellyfin's data folder on the internal 
 about 2.5 GB per hour. Recording and watching live each use one of the plan's simultaneous
 streams (the limit is set in Butler's Live TV provider settings).
 
+**TV guide scrolling (LG / Samsung):** the web-based TV apps (LG webOS, Samsung Tizen) don't
+scroll the Live TV guide to follow the remote, so arrow keys move focus off-screen (open bug
+[jellyfin-web #5705](https://github.com/jellyfin/jellyfin-web/issues/5705)). Worked around with
+Custom CSS in Dashboard > General > Branding, scoped to `.layout-tv`:
+`.layout-tv .liveTvContainer .guideVerticalScroller { padding-bottom: 750px !important; padding-top: 100px !important; }`.
+Remove it once #5705 is fixed. The pre-change branding config is in
+`~/HomeServer-config-backups/jellyfin-branding-before-guide-fix.json` on the server.
+
 Butler's dashboard and `server_health` tool probe `/hdhr/discover.json` (Media group). Data
 (settings, channels, its bundled Postgres + Redis) lives in the `dispatcharr-data` volume,
 which the daily backup includes.
