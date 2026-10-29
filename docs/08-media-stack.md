@@ -125,6 +125,12 @@ the channels you pick as a virtual HDHomeRun tuner that Jellyfin can play and re
      Alternatively add an **M3U Tuner** with `http://localhost:9191/output/m3u`.
    - **TV Guide Data Providers > Add > XMLTV:** `http://localhost:9191/output/epg`.
 
+**Recording:** Jellyfin's Live TV saves recordings to `Media/Recordings` on the external drive
+(Dashboard > Live TV > Recording path; subfolders on, 2 min before / 5 min after padding). Never
+leave it on the default, which is inside Jellyfin's data folder on the internal SSD. HD channels run
+about 2.5 GB per hour. Recording and watching live each use one of the plan's simultaneous
+streams (the limit is set in Butler's Live TV provider settings).
+
 Butler's dashboard and `server_health` tool probe `/hdhr/discover.json` (Media group). Data
 (settings, channels, its bundled Postgres + Redis) lives in the `dispatcharr-data` volume,
 which the daily backup includes.
