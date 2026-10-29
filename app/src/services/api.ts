@@ -266,6 +266,8 @@ export interface StorageDrive {
   name: string
   path: string
   role: 'system' | 'downloads' | 'library' | string | null
+  /** false = kept full on purpose: no warning colours */
+  alerts?: boolean
   mounted: boolean
   total?: number
   used?: number

@@ -10,6 +10,8 @@ launchd) and gives the dashboard what the container can't see:
 - Every drive — Mac SSD, HomeServer, HomeServer2 — with usage and a cached
   size per category folder (symlinked folders are reported as links, not
   double-counted).
+  A drive entry with `"alerts": false` (HomeServer2, kept full on purpose)
+  gets no storage alerts from Butler and no warning colours on the dashboard.
 - An hour of CPU / memory / swap samples (every 5 s) and container totals
   (every 20 s) for the dashboard's history charts (`/history`). In memory:
   restarting the agent clears it.

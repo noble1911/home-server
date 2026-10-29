@@ -203,6 +203,7 @@ async def system_storage(
                 "name": d["name"],
                 "path": d["path"],
                 "role": d.get("role"),
+                "alerts": d.get("alerts", True),
                 "mounted": True,
                 "total": d["total"],
                 "used": d["used"],

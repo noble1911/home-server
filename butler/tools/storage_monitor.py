@@ -185,12 +185,14 @@ class StorageMonitorTool(Tool):
         for d in chosen:
             pct = int(d.get("percent") or 0)
             slug = d["name"].lower().replace(" ", "-")
-            await self._update_threshold_alerts(slug, pct)
+            alerts_on = d.get("alerts", True)
+            # Alerts off (a drive kept full on purpose): 0% resolves any open ones
+            await self._update_threshold_alerts(slug, pct if alerts_on else 0)
             role = {"downloads": "downloads, anime + new movies/TV", "library": "older movies/TV library", "system": "macOS + Docker"}.get(d.get("role"), "")
             lines.append(
                 f"{d['name']}{f' ({role})' if role else ''}: {_format_bytes(d['used'])} / "
                 f"{_format_bytes(d['total'])} ({pct}%), {_format_bytes(d['free'])} free "
-                f"— {self._status_label(pct)}"
+                f"— {self._status_label(pct) if alerts_on else 'full by choice, alerts off'}"
             )
             if action != "check_all":
                 cats = [c for c in d.get("categories", []) if c.get("exists") and c.get("bytes") is not None and not c.get("linkedTo")]

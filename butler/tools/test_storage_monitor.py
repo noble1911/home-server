@@ -353,6 +353,21 @@ class TestHostAgentDrives:
         assert "storage:homeserver2:80" in keys and "storage:homeserver2:90" not in keys
 
     @pytest.mark.asyncio
+    async def test_drive_with_alerts_off_resolves_instead_of_raising(self, mock_pool, alert_manager):
+        drives = self._drives()
+        drives["drives"][2]["alerts"] = False            # HomeServer2, 89% full on purpose
+        drives["drives"][1]["percent"] = 75.0            # HomeServer still alerts
+        tool = StorageMonitorTool(db_pool=mock_pool, alert_manager=alert_manager,
+                                  host_storage=AsyncMock(return_value=drives))
+        out = await tool.execute(action="check_all")
+        assert "full by choice, alerts off" in out
+        raised = [c.kwargs["alert_key"] for c in alert_manager.trigger_alert.call_args_list]
+        resolved = [c.args[0] for c in alert_manager.resolve_alert.call_args_list]
+        assert not any(k.startswith("storage:homeserver2:") for k in raised)
+        assert {"storage:homeserver2:70", "storage:homeserver2:80", "storage:homeserver2:90"} <= set(resolved)
+        assert "storage:homeserver:70" in raised
+
+    @pytest.mark.asyncio
     async def test_check_external_shows_folders_and_links(self, mock_pool, alert_manager):
         tool = StorageMonitorTool(db_pool=mock_pool, alert_manager=alert_manager,
                                   host_storage=AsyncMock(return_value=self._drives()))
