@@ -12,6 +12,8 @@ export default function IptvProviderSetting() {
   const [password, setPassword] = useState('')
   const [m3uUrl, setM3uUrl] = useState('')
   const [maxStreams, setMaxStreams] = useState(1)
+  const [dispatcharrUsername, setDispatcharrUsername] = useState('')
+  const [dispatcharrPassword, setDispatcharrPassword] = useState('')
   const [busy, setBusy] = useState<'save' | 'sync' | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -21,8 +23,10 @@ export default function IptvProviderSetting() {
     setServerUrl(s.serverUrl ?? '')
     setUsername(s.username ?? '')
     setMaxStreams(s.maxStreams)
+    setDispatcharrUsername(s.dispatcharrUsername ?? '')
     setPassword('')
     setM3uUrl('')
+    setDispatcharrPassword('')
   }
 
   useEffect(() => {
@@ -34,7 +38,7 @@ export default function IptvProviderSetting() {
     setError(null)
     try {
       load(action === 'save'
-        ? await setIptvProvider({ kind, serverUrl, username, password, m3uUrl, maxStreams })
+        ? await setIptvProvider({ kind, serverUrl, username, password, m3uUrl, maxStreams, dispatcharrUsername, dispatcharrPassword })
         : await syncIptvProvider())
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save')
@@ -46,9 +50,11 @@ export default function IptvProviderSetting() {
   // A saved secret can be kept by leaving its field blank
   const keepsPassword = state?.kind === 'xtream' && state.hasPassword
   const keepsM3u = state?.kind === 'm3u' && state.hasM3uUrl
-  const canSave = kind === 'xtream'
+  const keepsDispatcharrPassword = !!state?.hasDispatcharrPassword && dispatcharrUsername.trim() === state.dispatcharrUsername
+  const dispatcharrLoginOk = !dispatcharrUsername.trim() || !!dispatcharrPassword || keepsDispatcharrPassword
+  const canSave = dispatcharrLoginOk && (kind === 'xtream'
     ? !!serverUrl.trim() && !!username.trim() && (!!password || keepsPassword)
-    : !!m3uUrl.trim() || keepsM3u
+    : !!m3uUrl.trim() || keepsM3u)
 
   return (
     <section className="card p-4">
@@ -58,8 +64,6 @@ export default function IptvProviderSetting() {
       </h2>
       <p className="text-xs text-butler-500 mb-3">
         Your IPTV login. Butler sends it to Dispatcharr, which feeds the channels to Jellyfin's Live TV.
-        Butler signs in to Dispatcharr with your service login, so its admin account must use the same
-        username and password.
       </p>
 
       {!state && !error && <p className="text-sm text-butler-500">Loading…</p>}
@@ -131,6 +135,33 @@ export default function IptvProviderSetting() {
               className="input w-20 text-sm"
             />
           </label>
+
+          <div className="pt-2">
+            <label className="block text-sm text-butler-300 mb-1">Dispatcharr sign-in</label>
+            <p className="text-xs text-butler-500 mb-2">
+              The Dispatcharr admin Butler signs in as. Leave blank to use your service login.
+            </p>
+            <div className="space-y-2">
+              <input
+                type="text"
+                value={dispatcharrUsername}
+                onChange={e => setDispatcharrUsername(e.target.value)}
+                placeholder="Dispatcharr username (case-sensitive)"
+                className="input w-full text-sm"
+                autoComplete="off"
+              />
+              {dispatcharrUsername.trim() && (
+                <input
+                  type="password"
+                  value={dispatcharrPassword}
+                  onChange={e => setDispatcharrPassword(e.target.value)}
+                  placeholder={keepsDispatcharrPassword ? 'Dispatcharr password (saved — leave blank to keep)' : 'Dispatcharr password'}
+                  className="input w-full text-sm"
+                  autoComplete="new-password"
+                />
+              )}
+            </div>
+          </div>
 
           <div className="flex gap-2">
             <button

@@ -305,6 +305,8 @@ class IptvProviderSettings(BaseModel):
     hasPassword: bool = False   # secrets are never sent back
     hasM3uUrl: bool = False
     maxStreams: int = 1
+    dispatcharrUsername: str | None = None  # None = sign in with the service login
+    hasDispatcharrPassword: bool = False
     lastSyncedAt: datetime | None = None
     lastError: str | None = None
 
@@ -316,6 +318,8 @@ class SetIptvProviderRequest(BaseModel):
     password: str | None = None  # blank = keep the saved one
     m3uUrl: str | None = None    # blank = keep the saved one
     maxStreams: int = Field(1, ge=1, le=50)
+    dispatcharrUsername: str | None = None  # blank = sign in with the service login
+    dispatcharrPassword: str | None = None  # blank = keep the saved one
 
 
 # --- Approvals (tap-to-approve pending actions) ---

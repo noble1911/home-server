@@ -5,9 +5,10 @@ M3U URL) in Settings. It's stored encrypted in butler.iptv_provider and synced
 to Dispatcharr as one M3U account named ``ACCOUNT_NAME``; Jellyfin's Live TV
 reads the channels from Dispatcharr.
 
-Butler signs in to Dispatcharr with the saving admin's service login (the
+Butler signs in to Dispatcharr with the Dispatcharr login saved alongside the
+provider, or, when that's blank, the saving admin's service login (the
 username/password from onboarding that Butler propagates to every service).
-Dispatcharr's admin account is created by hand with those same credentials.
+Dispatcharr's admin account is created by hand to match.
 """
 
 from __future__ import annotations
@@ -48,10 +49,25 @@ async def save_provider(
     password: str | None,
     m3u_url: str | None,
     max_streams: int,
+    dispatcharr_username: str | None,
+    dispatcharr_password: str | None,
     user_id: str,
 ) -> None:
-    """Save the provider. A blank password / M3U URL keeps the stored one."""
+    """Save the provider. A blank password / M3U URL keeps the stored one.
+
+    A blank Dispatcharr username clears the Dispatcharr login (sign in with
+    the service login instead); a blank Dispatcharr password keeps the saved one.
+    """
     existing = await get_provider(pool) or {}
+    if dispatcharr_username:
+        dispatcharr_password_enc = (
+            encrypt_password(dispatcharr_password) if dispatcharr_password
+            else existing.get("dispatcharr_password_encrypted")
+        )
+        if not dispatcharr_password_enc:
+            raise ValueError("Enter the Dispatcharr password too")
+    else:
+        dispatcharr_username = dispatcharr_password_enc = None
     if kind == "xtream":
         password_enc = encrypt_password(password) if password else existing.get("password_encrypted")
         if not (server_url and username and password_enc):
@@ -69,8 +85,9 @@ async def save_provider(
         """
         INSERT INTO butler.iptv_provider
             (id, kind, server_url, username, password_encrypted, m3u_url_encrypted,
-             max_streams, updated_by, updated_at)
-        VALUES (1, $1, $2, $3, $4, $5, $6, $7, NOW())
+             max_streams, dispatcharr_username, dispatcharr_password_encrypted,
+             updated_by, updated_at)
+        VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
         ON CONFLICT (id) DO UPDATE SET
             kind = EXCLUDED.kind,
             server_url = EXCLUDED.server_url,
@@ -78,10 +95,13 @@ async def save_provider(
             password_encrypted = EXCLUDED.password_encrypted,
             m3u_url_encrypted = EXCLUDED.m3u_url_encrypted,
             max_streams = EXCLUDED.max_streams,
+            dispatcharr_username = EXCLUDED.dispatcharr_username,
+            dispatcharr_password_encrypted = EXCLUDED.dispatcharr_password_encrypted,
             updated_by = EXCLUDED.updated_by,
             updated_at = NOW()
         """,
-        kind, server_url, username, password_enc, m3u_enc, max_streams, user_id,
+        kind, server_url, username, password_enc, m3u_enc, max_streams,
+        dispatcharr_username, dispatcharr_password_enc, user_id,
     )
 
 
@@ -136,7 +156,7 @@ async def _push(pool: DatabasePool, provider: dict[str, Any], admin_id: str) -> 
         )
 
     async with aiohttp.ClientSession(timeout=_HTTP_TIMEOUT) as session:
-        headers = {"Authorization": f"Bearer {await _login(session, base, pool, admin_id)}"}
+        headers = {"Authorization": f"Bearer {await _login(session, base, pool, provider, admin_id)}"}
         account_id = await _find_account(session, base, headers, provider["dispatcharr_account_id"])
 
         if account_id is None:
@@ -157,15 +177,22 @@ async def _push(pool: DatabasePool, provider: dict[str, Any], admin_id: str) -> 
     return account_id
 
 
-async def _login(session: aiohttp.ClientSession, base: str, pool: DatabasePool, admin_id: str) -> str:
-    """Sign in as the admin's service login; returns a JWT access token."""
-    username, password = await _service_login(pool, admin_id)
-    creds = {"username": username, "password": password}
-    async with session.post(f"{base}/api/accounts/token/", json=creds) as resp:
+async def _login(
+    session: aiohttp.ClientSession, base: str, pool: DatabasePool, provider: dict[str, Any], admin_id: str,
+) -> str:
+    """Sign in to Dispatcharr; returns a JWT access token."""
+    if provider.get("dispatcharr_username") and provider.get("dispatcharr_password_encrypted"):
+        username = provider["dispatcharr_username"]
+        password = decrypt_password(provider["dispatcharr_password_encrypted"])
+        source = "the Dispatcharr login saved in Settings"
+    else:
+        username, password = await _service_login(pool, admin_id)
+        source = "your service login"
+    async with session.post(f"{base}/api/accounts/token/", json={"username": username, "password": password}) as resp:
         if resp.status == 401:
             raise DispatcharrError(
-                f"Dispatcharr didn't accept the login '{username}' (usernames are case-sensitive). "
-                "Create a Dispatcharr admin with exactly that username and your service password."
+                f"Dispatcharr didn't accept '{username}' ({source}). Usernames are case-sensitive; "
+                "check it matches a Dispatcharr admin, or set the Dispatcharr login below."
             )
         if resp.status != 200:
             raise DispatcharrError(f"Dispatcharr sign-in failed: HTTP {resp.status}")

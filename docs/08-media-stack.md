@@ -114,6 +114,9 @@ Dispatcharr manages IPTV playlists (M3U / Xtream Codes) and guide data (EPG), th
 the channels you pick as a virtual HDHomeRun tuner that Jellyfin can play and record.
 
 1. Open http://localhost:9191 and create the admin account (first visit only — allowed from the LAN).
+   Then in Butler, **Settings > Live TV provider**, enter your IPTV login; Butler pushes it into
+   Dispatcharr as the "Butler IPTV" playlist. Butler signs in to Dispatcharr with your service login,
+   or with the **Dispatcharr sign-in** fields there if your Dispatcharr password differs.
 2. **M3U & EPG Manager:** add your playlist (M3U URL or Xtream Codes login) and an EPG/XMLTV source.
 3. **Channels:** create channels from the imported streams and match them to EPG entries.
 4. In Jellyfin (**Dashboard > Live TV**):

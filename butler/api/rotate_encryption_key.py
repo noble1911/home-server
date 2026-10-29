@@ -37,6 +37,7 @@ TARGETS = [
     ("butler.service_credentials", "id", "password_encrypted"),
     ("butler.iptv_provider", "id", "password_encrypted"),
     ("butler.iptv_provider", "id", "m3u_url_encrypted"),
+    ("butler.iptv_provider", "id", "dispatcharr_password_encrypted"),
 ]
 
 

@@ -328,6 +328,8 @@ async def _iptv_settings(pool: DatabasePool) -> IptvProviderSettings:
         hasPassword=bool(p["password_encrypted"]),
         hasM3uUrl=bool(p["m3u_url_encrypted"]),
         maxStreams=p["max_streams"],
+        dispatcharrUsername=p["dispatcharr_username"],
+        hasDispatcharrPassword=bool(p["dispatcharr_password_encrypted"]),
         lastSyncedAt=p["last_synced_at"],
         lastError=p["last_error"],
     )
@@ -362,6 +364,8 @@ async def set_iptv_provider(
             password=req.password or None,
             m3u_url=(req.m3uUrl or "").strip() or None,
             max_streams=req.maxStreams,
+            dispatcharr_username=(req.dispatcharrUsername or "").strip() or None,
+            dispatcharr_password=req.dispatcharrPassword or None,
             user_id=admin_id,
         )
     except ValueError as e:

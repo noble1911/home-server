@@ -596,6 +596,9 @@ export interface IptvProviderSettings {
   hasPassword: boolean
   hasM3uUrl: boolean
   maxStreams: number
+  /** null = Butler signs in to Dispatcharr with the service login */
+  dispatcharrUsername: string | null
+  hasDispatcharrPassword: boolean
   lastSyncedAt: string | null
   lastError: string | null
 }
@@ -609,6 +612,10 @@ export interface SetIptvProviderRequest {
   /** Blank keeps the saved playlist URL */
   m3uUrl?: string
   maxStreams: number
+  /** Blank signs in with the service login */
+  dispatcharrUsername?: string
+  /** Blank keeps the saved Dispatcharr password */
+  dispatcharrPassword?: string
 }
 
 export function getIptvProvider(): Promise<IptvProviderSettings> {
