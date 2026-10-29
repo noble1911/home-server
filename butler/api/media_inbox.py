@@ -3,7 +3,7 @@
 Completed torrents land in ``Downloads/Complete`` on the HomeServer drive.
 Radarr/Sonarr import what they were tracking; anything grabbed outside them
 (or that failed to import) sits there until someone moves it into the library
-on HomeServer2 by hand. This module automates that:
+by hand. This module automates that:
 
 1. ``scan()`` lists every top-level item in Complete, its size, whether
    qBittorrent is still seeding it, and what Sonarr/Radarr's *manual import*
@@ -40,12 +40,15 @@ INBOX_CONTAINER = os.path.join(settings.external_drive_path, "Downloads", "Compl
 INBOX_ARR = "/downloads/Complete"
 INBOX_HOST = "/Volumes/HomeServer/Downloads/Complete"
 
-# Fallback destinations (host paths) for the plain move. Movies/TV are on
-# HomeServer2; anime lives on HomeServer. Radarr/Sonarr root folders map to
-# the same places via the media-stack bind mounts.
+# Fallback destinations (host paths) for the plain move. Each drive has its
+# own Media/Movies and Media/TV: HomeServer takes new content, HomeServer2 is
+# the older (full) library. Anime lives on HomeServer. Radarr/Sonarr root
+# folders map to the same places via the media-stack bind mounts.
 MOVE_DESTINATIONS: dict[str, dict[str, str]] = {
-    "movies": {"label": "Movies (HomeServer2)", "path": "/Volumes/HomeServer2/Media/Movies"},
-    "tv": {"label": "TV Shows (HomeServer2)", "path": "/Volumes/HomeServer2/Media/TV"},
+    "movies": {"label": "Movies (HomeServer)", "path": "/Volumes/HomeServer/Media/Movies"},
+    "tv": {"label": "TV Shows (HomeServer)", "path": "/Volumes/HomeServer/Media/TV"},
+    "movies-hs2": {"label": "Movies (HomeServer2)", "path": "/Volumes/HomeServer2/Media/Movies"},
+    "tv-hs2": {"label": "TV Shows (HomeServer2)", "path": "/Volumes/HomeServer2/Media/TV"},
     "anime-series": {"label": "Anime Series (HomeServer)", "path": "/Volumes/HomeServer/Media/Anime/Series"},
     "anime-movies": {"label": "Anime Movies (HomeServer)", "path": "/Volumes/HomeServer/Media/Anime/Movies"},
     # Not a library: a holding pen for duplicates and leftover junk folders.

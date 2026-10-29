@@ -346,7 +346,7 @@ class TestHostAgentDrives:
                                   host_storage=AsyncMock(return_value=self._drives()))
         out = await tool.execute(action="check_all")
         assert "Media drives together (HomeServer + HomeServer2)" in out
-        assert "HomeServer2 (movies/TV library)" in out and "89%" in out and "CRITICAL" in out
+        assert "HomeServer2 (older movies/TV library)" in out and "89%" in out and "CRITICAL" in out
         assert "Mac SSD" in out
         # 89% crosses the 70 and 80 thresholds for HomeServer2 -> alerts raised
         keys = [c.kwargs["alert_key"] for c in alert_manager.trigger_alert.call_args_list]

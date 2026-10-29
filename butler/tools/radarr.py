@@ -354,7 +354,8 @@ class RadarrTool(Tool):
 
         Anime movies are routed to the folder containing 'anime' in its path
         (e.g. /anime-movies), while regular movies go to the standard folder
-        (e.g. /movies).  Falls back to the first available folder.
+        (e.g. /movies), picking the one with the most free space when
+        there are several.  Falls back to the first available folder.
         """
         if self._root_folders is None:
             session = await self._get_session()
@@ -373,10 +374,12 @@ class RadarrTool(Tool):
                 if "anime" in folder.get("path", "").lower():
                     return folder["path"]
 
-        # Default: prefer non-anime folder, fall back to first
-        for folder in self._root_folders:
-            if "anime" not in folder.get("path", "").lower():
-                return folder["path"]
+        # Default: the non-anime folder with the most free space. There's one
+        # per drive (/tv on HomeServer, /tv-hs2 on HomeServer2), so new adds
+        # follow the room rather than whichever folder was created first.
+        regular = [f for f in self._root_folders if "anime" not in f.get("path", "").lower()]
+        if regular:
+            return max(regular, key=lambda f: f.get("freeSpace") or 0)["path"]
         return self._root_folders[0].get("path")
 
     @staticmethod
