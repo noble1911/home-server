@@ -880,6 +880,7 @@ The Mac Mini has two 8 TB externals. Both have the same `Media/TV` and `Media/Mo
 - Seerr and Butler add new titles to `/tv` and `/movies`. Butler picks the non-anime root folder with the most free space.
 - Sonarr keeps a series in one folder, so new episodes of a show follow the show's drive. Continuing series live on HomeServer; move one across with Sonarr's series editor (change root folder, move files).
 - Jellyfin's TV Shows and Movies libraries each list both drives' folders, so users see one library.
+- `HomeServer/Media/TV` and `/Movies` each hold a `.keep` file. Jellyfin skips an *empty* library folder ("inaccessible or empty, skipping") in case the drive is unplugged, and then never removes the items that used to be under it. Don't delete these files.
 - HomeServer2 is kept full on purpose, so its storage alerts are off (`"alerts": False` in the host agent's drive list): no push alerts, no red bar on the dashboard. HomeServer still alerts at 70/80/90%.
 - History: until Oct 2026 `HomeServer/Media/TV` and `/Movies` were symlinks to HomeServer2, which sent every import there until it was 95% full (#224).
 
