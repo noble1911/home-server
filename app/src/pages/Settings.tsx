@@ -99,6 +99,28 @@ export default function Settings() {
     setPhoneInput(profile?.phone || '')
   }, [profile?.phone])
 
+  // Account email (used as the Immich login when provisioning)
+  const [emailInput, setEmailInput] = useState(profile?.email || '')
+  const [emailStatus, setEmailStatus] = useState<{ type: 'error' | 'saved'; text: string } | null>(null)
+  useEffect(() => {
+    setEmailInput(profile?.email || '')
+  }, [profile?.email])
+
+  async function saveEmail() {
+    const value = emailInput.trim().toLowerCase()
+    if (value === (profile?.email || '')) return
+    if (value && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value)) {
+      setEmailStatus({ type: 'error', text: 'Enter a valid email address' })
+      return
+    }
+    await updateProfile({ email: value })
+    // updateProfile reverts (rather than throws) on failure
+    const saved = (useUserStore.getState().profile?.email || '') === value
+    setEmailStatus(saved
+      ? { type: 'saved', text: value ? 'Saved' : 'Removed' }
+      : { type: 'error', text: "Couldn't save — try again" })
+  }
+
   // Send to Kindle address (Butler only ever emails books here)
   const [kindleInput, setKindleInput] = useState(profile?.kindleEmail || '')
   const [kindleStatus, setKindleStatus] = useState<{ type: 'error' | 'saved'; text: string } | null>(null)
@@ -496,12 +518,43 @@ export default function Settings() {
                 <label className="block text-sm text-butler-300 mb-1">Name</label>
                 <div className="text-butler-100">{profile.name}</div>
               </div>
+              {profile.username && (
+                <div>
+                  <label className="block text-sm text-butler-300 mb-1">Username</label>
+                  <div className="text-butler-100 font-mono text-sm">{profile.username}</div>
+                </div>
+              )}
               {isAdmin && (
                 <div>
                   <label className="block text-sm text-butler-300 mb-1">Role</label>
                   <div className="text-accent text-sm">Admin</div>
                 </div>
               )}
+
+              <div>
+                <label htmlFor="account-email" className="block text-sm text-butler-300 mb-1">Email</label>
+                <input
+                  id="account-email"
+                  type="email"
+                  inputMode="email"
+                  autoCapitalize="none"
+                  autoComplete="email"
+                  value={emailInput}
+                  onChange={(e) => { setEmailInput(e.target.value); setEmailStatus(null) }}
+                  onBlur={saveEmail}
+                  onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
+                  placeholder="you@example.com"
+                  className="input w-full text-sm"
+                />
+                <p className="text-xs text-butler-500 mt-1">
+                  Your Immich login when Butler sets up your account.
+                </p>
+                {emailStatus && (
+                  <p className={`text-xs mt-1 ${emailStatus.type === 'error' ? 'text-red-400' : 'text-green-400'}`}>
+                    {emailStatus.text}
+                  </p>
+                )}
+              </div>
 
               {/* Send to Kindle */}
               <div>

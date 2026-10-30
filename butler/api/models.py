@@ -126,6 +126,8 @@ class UserProfile(BaseModel):
     id: str
     name: str
     email: str | None = None
+    # Login name for Butler and the provisioned apps (chosen at onboarding)
+    username: str | None = None
     kindleEmail: str | None = None
     phone: str | None = None
     butlerName: str = "Butler"
@@ -139,7 +141,8 @@ class UserProfile(BaseModel):
 
 class UpdateProfileRequest(BaseModel):
     name: str | None = None
-    email: str | None = None
+    # "" clears it.
+    email: str | None = Field(None, pattern=r"^$|^\s*[^@\s]+@[^@\s]+\.[^@\s]+\s*$", max_length=254)
     # Amazon Send to Kindle address; "" clears it.
     kindleEmail: str | None = Field(
         None, pattern=r"^$|^[A-Za-z0-9._%+-]+@(free\.)?kindle\.com$", max_length=254,

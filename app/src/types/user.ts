@@ -16,7 +16,9 @@ export type ToolPermission =
 export interface User {
   id: string
   name: string
-  email?: string
+  email?: string | null
+  /** Login name for Butler and the provisioned apps (chosen at onboarding) */
+  username?: string | null
   kindleEmail?: string | null
   phone?: string
   butlerName: string
