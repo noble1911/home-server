@@ -17,7 +17,7 @@ curl -fsSL https://raw.githubusercontent.com/noble1911/home-server/main/scripts/
 | **OpenWeatherMap API key** | Optional (for weather) | [openweathermap.org/api](https://openweathermap.org/api) (free tier) |
 | **Google OAuth credentials** | Optional (for Calendar/Gmail) | See [Google OAuth Setup](./google-oauth-setup.md) |
 | **Cloudflare Tunnel token** | Optional (for Alexa) | Cloudflare Zero Trust > Networks > Tunnels |
-| **Admin invite code** | Optional (default: BUTLER-001) | You choose — first user becomes admin |
+| **Admin invite code** | Optional (default: BUTLER-001) | You choose — creates the first (admin) account; ignored once anyone exists |
 
 Security secrets (JWT_SECRET, INTERNAL_API_KEY, LIVEKIT keys) are auto-generated.
 
@@ -156,7 +156,7 @@ Butler loads custom tools from `/butler/tools/`:
 | `GOOGLE_CLIENT_ID` | No | Google OAuth (Calendar/Gmail) |
 | `GOOGLE_CLIENT_SECRET` | No | Google OAuth secret |
 | `CLOUDFLARE_TUNNEL_TOKEN` | No | Cloudflare Tunnel for Alexa integration |
-| `INVITE_CODES` | No | Admin invite code (default: BUTLER-001) |
+| `INVITE_CODES` | No | Setup code for the first admin account (default: BUTLER-001); ignored once anyone exists |
 | `HA_TOKEN` | No | Home Assistant long-lived access token |
 | `DB_USER` | No | PostgreSQL user (default: postgres) |
 | `DB_PASSWORD` | No | PostgreSQL password (default: postgres) |

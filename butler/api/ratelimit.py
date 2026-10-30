@@ -6,7 +6,10 @@ SSE streaming responses (``/api/chat/stream``, ``/api/voice/stream``) pass
 through untouched — ``BaseHTTPMiddleware`` would buffer them.
 
 Rate limit categories:
-    auth     /api/auth/*    5/min   (brute-force protection, keyed by IP)
+    auth     sign-in        5/min   (brute-force protection, keyed by IP):
+             /api/auth/login, /redeem-invite, /reset-password. Token refresh
+             is "default": everyone's devices refresh, and a refusal there
+             used to sign people out.
     chat     /api/chat/*   20/min   (Claude API cost control, keyed by user)
     voice    /api/voice/*  30/min   (keyed by user)
     default  everything    60/min   (keyed by user or IP)
@@ -15,6 +18,7 @@ Rate limit categories:
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import logging
 import time
 from collections import defaultdict, deque
@@ -27,6 +31,30 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from .auth import decode_user_jwt
 
 logger = logging.getLogger(__name__)
+
+# Endpoints that check a credential: the strict "auth" limit
+_SIGN_IN_PATHS = frozenset({"/api/auth/login", "/api/auth/redeem-invite", "/api/auth/reset-password"})
+
+
+def _client_ip(request: Request) -> str:
+    """The real client address.
+
+    Requests arrive through butler-app's nginx (and Cloudflare's tunnel), so
+    the peer is always the proxy: keying on it gave the whole household one
+    shared allowance. Trust the forwarding headers only from a private-network
+    peer, so they can't be spoofed from outside.
+    """
+    peer = request.client.host if request.client else "unknown"
+    try:
+        trusted = ipaddress.ip_address(peer).is_private
+    except ValueError:
+        trusted = False
+    if trusted:
+        for header in ("cf-connecting-ip", "x-real-ip"):
+            value = request.headers.get(header, "").strip()
+            if value:
+                return value
+    return peer
 
 
 # ---------------------------------------------------------------------------
@@ -181,7 +209,7 @@ class RateLimitMiddleware:
 
     @staticmethod
     def _category_for_path(path: str) -> str:
-        if path.startswith("/api/auth"):
+        if path in _SIGN_IN_PATHS:
             return "auth"
         if path.startswith("/api/chat"):
             return "chat"
@@ -207,9 +235,7 @@ class RateLimitMiddleware:
                 return f"user:{payload['sub']}"
             except Exception:
                 pass  # invalid / expired — fall through to IP
-        client = request.client
-        host = client.host if client else "unknown"
-        return f"ip:{host}"
+        return f"ip:{_client_ip(request)}"
 
 
 # ---------------------------------------------------------------------------

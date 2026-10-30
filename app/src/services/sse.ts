@@ -6,7 +6,7 @@
  *  - Custom Authorization headers (for JWT auth)
  */
 
-import { ApiError, getAuthToken, tryRefresh } from './api'
+import { ApiError, getAuthToken, refreshFailure, tryRefresh } from './api'
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api'
 
@@ -53,7 +53,7 @@ export async function streamSSE<T>(
     if (response.status === 401) {
       const refreshed = await tryRefresh()
       if (!refreshed) {
-        callbacks.onError?.(new ApiError(401, 'Session expired'))
+        callbacks.onError?.(refreshFailure())
         return
       }
       response = await doFetch(getAuthToken())

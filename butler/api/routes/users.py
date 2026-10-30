@@ -39,11 +39,11 @@ from ..models import (
     UserProfile,
 )
 from ..oauth import revoke_google_token
+from ..passwords import MIN_PASSWORD_LENGTH, hash_password_async, set_user_password
 from ..crypto import encrypt_password
 from ..provisioning import (
     deprovision_user_accounts,
     provision_user_accounts,
-    update_service_passwords,
 )
 
 logger = logging.getLogger(__name__)
@@ -72,7 +72,7 @@ async def _get_profile(user_id: str, pool: DatabasePool) -> UserProfile:
     db = pool.pool
 
     user = await db.fetchrow(
-        "SELECT id, name, email, kindle_email, service_username, soul, role, permissions, phone, notification_prefs, created_at "
+        "SELECT id, name, email, kindle_email, service_username, password_hash IS NOT NULL AS has_password, soul, role, permissions, phone, notification_prefs, created_at "
         "FROM butler.users WHERE id = $1",
         user_id,
     )
@@ -99,6 +99,7 @@ async def _get_profile(user_id: str, pool: DatabasePool) -> UserProfile:
         name=user["name"],
         email=user["email"],
         username=user["service_username"],
+        hasPassword=user["has_password"],
         kindleEmail=user["kindle_email"],
         phone=user["phone"],
         butlerName=soul.get("butler_name", "Butler"),
@@ -273,34 +274,42 @@ async def complete_onboarding(
         req.email or None,
     )
 
-    # Auto-provision service accounts if credentials were provided
-    service_accounts: list[dict] = []
-    if req.serviceUsername and req.servicePassword:
-        # Store service credentials on user record for re-provisioning
-        await db.execute(
-            "UPDATE butler.users SET service_username = $2, service_password_encrypted = $3 WHERE id = $1",
-            user_id, req.serviceUsername, encrypt_password(req.servicePassword),
-        )
+    # The login for Butler and the apps: usernames are unique, any case
+    taken = await db.fetchval(
+        "SELECT 1 FROM butler.users WHERE lower(service_username) = lower($1) AND id <> $2",
+        req.serviceUsername, user_id,
+    )
+    if taken:
+        raise HTTPException(409, "That username is taken. Choose another.")
 
-        # Get user permissions (default to ["media", "home"] for new users)
-        raw_perms = await db.fetchval(
-            "SELECT permissions FROM butler.users WHERE id = $1", user_id
-        )
-        permissions = (
-            json.loads(raw_perms) if isinstance(raw_perms, str) else raw_perms
-        ) if raw_perms is not None else ["media", "home"]
+    # Butler's sign-in hash, plus the encrypted copy kept for re-provisioning
+    await db.execute(
+        "UPDATE butler.users SET service_username = $2, service_password_encrypted = $3, "
+        "password_hash = $4 WHERE id = $1",
+        user_id, req.serviceUsername, encrypt_password(req.servicePassword),
+        await hash_password_async(req.servicePassword),
+    )
 
-        try:
-            service_accounts = await provision_user_accounts(
-                user_id, req.serviceUsername, req.servicePassword, permissions, pool,
-                email=req.email or None,
-            )
-        except Exception:
-            logger.exception("Service provisioning failed for user %s", user_id)
-            service_accounts = [
-                {"service": "all", "username": req.serviceUsername,
-                 "status": "failed", "error": "Provisioning service unavailable"}
-            ]
+    # Get user permissions (default to ["media", "home"] for new users)
+    raw_perms = await db.fetchval(
+        "SELECT permissions FROM butler.users WHERE id = $1", user_id
+    )
+    permissions = (
+        json.loads(raw_perms) if isinstance(raw_perms, str) else raw_perms
+    ) if raw_perms is not None else ["media", "home"]
+
+    # Create their accounts on the apps their permissions cover
+    try:
+        service_accounts = await provision_user_accounts(
+            user_id, req.serviceUsername, req.servicePassword, permissions, pool,
+            email=req.email or None,
+        )
+    except Exception:
+        logger.exception("Service provisioning failed for user %s", user_id)
+        service_accounts = [
+            {"service": "all", "username": req.serviceUsername,
+             "status": "failed", "error": "Provisioning service unavailable"}
+        ]
 
     return {"status": "ok", "serviceAccounts": service_accounts}
 
@@ -386,14 +395,12 @@ async def change_service_password(
     user_id: str = Depends(get_current_user),
     pool: DatabasePool = Depends(get_db_pool),
 ):
-    """Change password across all provisioned service accounts."""
+    """Change the user's password: Butler sign-in and every linked app."""
     new_password = req.get("newPassword")
-    if not new_password or len(new_password) < 10:
-        raise HTTPException(400, "Password must be at least 10 characters")
+    if not new_password or len(new_password) < MIN_PASSWORD_LENGTH:
+        raise HTTPException(400, f"Password must be at least {MIN_PASSWORD_LENGTH} characters")
 
-    results = await update_service_passwords(user_id, new_password, pool)
-    if not results:
-        raise HTTPException(400, "No active service accounts to update")
+    results = await set_user_password(user_id, new_password, pool)
     return {"status": "ok", "results": results}
 
 

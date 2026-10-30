@@ -231,6 +231,8 @@ home-server/
 | Chat model | Admin picks in Settings (Opus 5.5 / Sonnet 5.5), stored in `butler.app_settings`; else `ANTHROPIC_MODEL`. 5.x models opt in to server-side refusal fallback | Cost/quality dial without redeploys; chosen over running Butler on headless Claude Code (latency, shared subscription limits, account terms) (#215) |
 | Android app | Capacitor shell loading the live site; notifications over Butler's own WebSocket (no Firebase) | One UI codebase, web deploys update the app; no Google account needed. APK built on demand (Actions → Build Android app) (#214) |
 | Side-effecting actions (email send, calendar edits) | Tap-to-approve drafts (`butler/api/approvals.py`) | The model can draft but never execute; the app's Approve button calls the API directly (#212) |
+| Butler sign-in | Username + password (the onboarding login, same as Jellyfin); invite codes only create accounts; admin reset codes; `python -m api.manage reset-code` on the server if locked out | Used invite codes were permanent passwords and leaked via `invite_<code>` user ids. Butler is the one place passwords are set and pushes them to every linked app (`api/passwords.py`) |
+| Admin tools on the Services tab | Radarr/Sonarr/Prowlarr/Bazarr/qBittorrent/Dispatcharr shown to admins only, linked at `http://<LAN_HOST>:<port>` | They have no public hostname. qBittorrent stays a shared account (Butler and the *arr apps sign in with it) |
 
 ## Monthly Costs
 

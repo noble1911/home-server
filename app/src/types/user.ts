@@ -19,6 +19,8 @@ export interface User {
   email?: string | null
   /** Login name for Butler and the provisioned apps (chosen at onboarding) */
   username?: string | null
+  /** False until a password is set: they couldn't sign back in */
+  hasPassword?: boolean
   kindleEmail?: string | null
   phone?: string
   butlerName: string
@@ -126,6 +128,7 @@ export interface ServiceCredential {
 }
 
 export const SERVICE_DISPLAY_NAMES: Record<string, { label: string; description: string }> = {
+  butler: { label: 'Butler sign-in', description: 'This app' },
   jellyfin: { label: 'Jellyfin', description: 'Movies, TV, Music' },
   audiobookshelf: { label: 'Audiobookshelf', description: 'Audiobooks & Podcasts' },
   nextcloud: { label: 'Nextcloud', description: 'File Sync & Storage' },

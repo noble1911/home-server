@@ -82,7 +82,11 @@ export async function tryRefresh(): Promise<boolean> {
       })
 
       if (!response.ok) {
-        useAuthStore.getState().logout()
+        // Only a definite "no" ends the session. A restart (502), the rate
+        // limit (429) or a blip shouldn't throw anyone out: try again later.
+        if (response.status === 401 || response.status === 403) {
+          useAuthStore.getState().logout()
+        }
         return false
       }
 
@@ -93,7 +97,7 @@ export async function tryRefresh(): Promise<boolean> {
       }
       return true
     } catch {
-      useAuthStore.getState().logout()
+      // Offline or the server is unreachable: keep the session
       return false
     }
   })()
@@ -106,7 +110,29 @@ export async function tryRefresh(): Promise<boolean> {
 }
 
 // Endpoints that should never trigger a refresh attempt
-const NO_REFRESH_ENDPOINTS = ['/auth/refresh', '/auth/redeem-invite']
+const NO_REFRESH_ENDPOINTS = ['/auth/refresh', '/auth/redeem-invite', '/auth/login', '/auth/reset-password', '/auth/logout']
+
+/** Sign-out: revoke this device's refresh token so it can't be reused. Best effort. */
+export async function revokeSession(): Promise<void> {
+  const refreshToken = getRefreshToken()
+  if (!refreshToken) return
+  try {
+    await fetch(`${API_BASE}/auth/logout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+    })
+  } catch {
+    // Signing out locally still works; the token expires on its own
+  }
+}
+
+/** Why a 401 couldn't be retried: signed out, or just couldn't refresh right now. */
+export function refreshFailure(): ApiError {
+  return useAuthStore.getState().isAuthenticated
+    ? new ApiError(503, "Couldn't reach Butler. Check your connection and try again.")
+    : new ApiError(401, 'Session expired')
+}
 
 async function request<T>(
   endpoint: string,
@@ -139,8 +165,8 @@ async function request<T>(
       if (retryResponse.status === 204) return undefined as T
       return retryResponse.json()
     }
-    // Refresh failed — logout already happened in tryRefresh
-    throw new ApiError(401, 'Session expired')
+    // Refresh failed: tryRefresh signed out only if the session is really over
+    throw refreshFailure()
   }
 
   if (!response.ok) {

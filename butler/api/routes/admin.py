@@ -2,10 +2,12 @@
 
 POST   /api/admin/invite-codes                  — Generate a new invite code
 GET    /api/admin/invite-codes                  — List all codes and their status
-DELETE /api/admin/invite-codes/{code}           — Revoke an unused code
+DELETE /api/admin/invite-codes/{code}           — Delete a code (revokes it if unused)
+POST   /api/admin/invite-codes/clear            — Delete all used and expired codes
 GET    /api/admin/users                         — List all users with permissions
 PUT    /api/admin/users/{user_id}/permissions   — Update a user's tool permissions
 POST   /api/admin/users/{user_id}/reprovision   — Re-provision service accounts
+POST   /api/admin/users/{user_id}/reset-code    — One-time code to choose a new password
 POST   /api/admin/users/{user_id}/link-accounts — Link logins made outside onboarding
 DELETE /api/admin/users/{user_id}               — Delete a user + their service accounts
 GET    /api/admin/model                         — Butler's chat model and the choices
@@ -32,6 +34,7 @@ from .. import iptv, model_settings
 from ..config import settings
 from ..account_links import link_existing_accounts
 from ..crypto import decrypt_password
+from ..passwords import create_reset_code
 from ..provisioning import deprovision_user_accounts, provision_user_accounts
 
 logger = logging.getLogger(__name__)
@@ -153,20 +156,36 @@ async def list_invite_codes(
     return InviteCodeListResponse(codes=codes)
 
 
+@router.post("/invite-codes/clear")
+async def clear_invite_codes(
+    admin_id: str = Depends(get_admin_user),
+    pool: DatabasePool = Depends(get_db_pool),
+):
+    """Delete every used or expired invite code. Admin only."""
+    result = await pool.pool.execute(
+        "DELETE FROM butler.invite_codes WHERE used_by IS NOT NULL OR expires_at < NOW()"
+    )
+    return {"deleted": int(result.split()[-1])}
+
+
 @router.delete("/invite-codes/{code}", status_code=204)
 async def revoke_invite_code(
     code: str,
     admin_id: str = Depends(get_admin_user),
     pool: DatabasePool = Depends(get_db_pool),
 ):
-    """Revoke an unused invite code. Admin only."""
+    """Delete an invite code: revokes it if unused. Admin only.
+
+    A used code no longer signs anyone in (that's the username and password),
+    so deleting one is just tidying up.
+    """
     db = pool.pool
     result = await db.execute(
-        "DELETE FROM butler.invite_codes WHERE code = $1 AND used_by IS NULL",
+        "DELETE FROM butler.invite_codes WHERE code = $1",
         code.upper(),
     )
     if result == "DELETE 0":
-        raise HTTPException(404, "Code not found or already used")
+        raise HTTPException(404, "Code not found")
     return Response(status_code=204)
 
 
@@ -252,6 +271,25 @@ async def admin_reprovision_user(
         user_id, row["service_username"], password, permissions, pool
     )
     return {"status": "ok", "serviceAccounts": results}
+
+
+@router.post("/users/{user_id}/reset-code")
+async def admin_create_reset_code(
+    user_id: str,
+    admin_id: str = Depends(get_admin_user),
+    pool: DatabasePool = Depends(get_db_pool),
+):
+    """A one-time code (24 hours) the user enters to choose a new password. Admin only."""
+    username = await pool.pool.fetchval(
+        "SELECT service_username FROM butler.users WHERE id = $1", user_id,
+    )
+    if username is None:
+        exists = await pool.pool.fetchval("SELECT 1 FROM butler.users WHERE id = $1", user_id)
+        if not exists:
+            raise HTTPException(404, "User not found")
+        raise HTTPException(400, "This user has no username yet, so they couldn't sign in with a password")
+    code, expires_at = await create_reset_code(user_id, pool, created_by=admin_id)
+    return {"code": code, "expiresAt": expires_at.isoformat(), "username": username}
 
 
 @router.post("/users/{user_id}/link-accounts")

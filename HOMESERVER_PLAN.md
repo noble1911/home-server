@@ -421,17 +421,20 @@ The system supports **N users** with individual settings and preferences.
 | **Permissions** | Control what each user can access |
 | **Notification preferences** | Which WhatsApp updates to receive |
 | **Soul/Personality** | Custom interaction style per user |
-| **Service Accounts** | Auto-provisioned app logins (Jellyfin, Audiobookshelf, Nextcloud, Immich) |
+| **Service Accounts** | One login shown with the apps it works for (Jellyfin, Audiobookshelf, Nextcloud, Immich; admins also Radarr, Sonarr, Prowlarr, Dispatcharr) |
 
 #### User Onboarding & Service Provisioning
 
 During first-time setup, new users complete a PWA wizard that collects:
 1. Their name and butler name/personality preferences
-2. A **single username + password** used across all self-hosted services
+2. A **single username + password** used across all self-hosted services. It is also the Butler sign-in, so it's required (the invite code only creates the account)
 
 Butler then **auto-provisions accounts** on each configured service:
 - **`media` permission** → Jellyfin, Audiobookshelf, Immich
+- **`home` permission** → Home Assistant
 - **All users** → Nextcloud
+
+Butler is the one place the password is set: it keeps a scrypt hash for sign-in (`users.password_hash`) and pushes changes and resets to every linked app (`api/passwords.py` → `provisioning.update_service_passwords`). Logins made outside onboarding (the first admin's, hand-made ones, the single-login admin tools) are linked by **Settings → Admin → Link Existing Accounts** or `python -m api.manage link-accounts <username>`. Forgotten passwords: admin reset codes (24 h, one use), or `python -m api.manage reset-code <username>` on the server.
 
 Provisioning details:
 - Each service is provisioned via its admin API (Jellyfin REST, Audiobookshelf REST, Nextcloud OCS, Immich REST)

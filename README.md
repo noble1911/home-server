@@ -301,12 +301,20 @@ Now that services are running, go back to the Cloudflare dashboard and add route
 
 ### 4.2 Set Up Butler (AI Assistant)
 
-Butler uses **invite codes** for registration. The first person to log in becomes the admin.
+Butler uses **invite codes** to create accounts, and a **username + password** to sign in. The first person becomes the admin.
 
-1. Open `http://<server-ip>:3000`
-2. Enter your admin invite code (default: `BUTLER-001`, or what you chose during setup)
-3. Complete onboarding (set your name, preferences, and optionally choose a service username/password)
-4. To add household members: **Settings → Generate Invite Code** → share the 6-character code
+1. Open `http://<server-ip>:3000` and choose **New here? Have an invite code?**
+2. Enter your admin setup code (default: `BUTLER-001`, or what you chose during setup). It only works while there are no users yet.
+3. Complete onboarding: your name, preferences, and your **login** (username + password). That login signs you in to Butler and is the same one Butler sets up on Jellyfin, Nextcloud, Immich and the other apps.
+4. To add household members: **Settings → Admin → Generate Invite Code** → share the 6-character code. A code creates one account; after that people sign in with their username and password.
+
+**Forgotten password:** an admin opens **Settings → Admin → Manage Permissions**, picks the user and taps **Create Password Reset Code** (works once, for 24 hours). The user chooses **Have a reset code?** on the sign-in page and sets a new password, which goes to all their apps. If the admin is locked out, run this on the server:
+
+```bash
+docker exec butler-api python -m api.manage reset-code <username>
+```
+
+`python -m api.manage list-users` shows who has a password set; `link-accounts <username>` links app logins that were made by hand.
 
 **Invite code permissions:** When generating an invite code, toggle which Butler capabilities the new user gets:
 
@@ -321,7 +329,7 @@ Butler uses **invite codes** for registration. The first person to log in become
 | Communication | WhatsApp tools |
 | Claude Code | Run agentic tasks via Claude Code on the server (admin only by default) |
 
-**Auto-provisioning:** During onboarding, if the user provides a service username and password, Butler automatically creates accounts on Jellyfin, Audiobookshelf, Nextcloud, Immich, and Home Assistant based on the invite code's permissions. Failed services can be retried from Settings. The shared password can also be changed across all services at once from Settings.
+**Auto-provisioning:** During onboarding, Butler creates accounts on Jellyfin, Audiobookshelf, Nextcloud, Immich, and Home Assistant with the user's login, based on the invite code's permissions. Failed services can be retried from Settings. Changing the password in Settings sets it on Butler and every linked app at once; for admins that includes Radarr, Sonarr, Prowlarr and Dispatcharr. qBittorrent keeps its shared account (Butler and the *arr apps sign in with it).
 
 ### 4.3 Set Up Claude Code (Optional)
 
@@ -482,7 +490,7 @@ docker compose down && docker compose up -d
 | `GOOGLE_CLIENT_ID` | Google Calendar/Gmail OAuth | No (prompted) |
 | `GOOGLE_CLIENT_SECRET` | Google Calendar/Gmail OAuth | No (prompted) |
 | `CLOUDFLARE_TUNNEL_TOKEN` | Remote access for all services | No (prompted) |
-| `INVITE_CODES` | Admin bootstrap invite code | Defaults to `BUTLER-001` |
+| `INVITE_CODES` | Setup code for the first (admin) account; ignored once anyone exists | Defaults to `BUTLER-001` |
 | `DB_USER` / `DB_PASSWORD` | PostgreSQL (shared with Immich) | Defaults to `postgres` |
 
 > Security secrets (JWT, LiveKit keys, internal API key) are auto-generated during setup.

@@ -14,7 +14,7 @@ from starlette.responses import PlainTextResponse
 from starlette.routing import Route
 from starlette.testclient import TestClient
 
-from .ratelimit import RateLimitConfig, RateLimitMiddleware, SlidingWindowStore
+from .ratelimit import RateLimitConfig, RateLimitMiddleware, SlidingWindowStore, _client_ip
 
 
 # ---------------------------------------------------------------------------
@@ -243,3 +243,40 @@ class TestRateLimitMiddleware:
             client.post("/api/chat")
 
         assert any("Rate limit exceeded" in r.message for r in caplog.records)
+
+
+# ---------------------------------------------------------------------------
+# Sign-in category and client IP behind the proxies
+# ---------------------------------------------------------------------------
+
+class TestSignInCategory:
+    def test_only_credential_checks_are_auth(self):
+        cat = RateLimitMiddleware._category_for_path
+        for path in ("/api/auth/login", "/api/auth/redeem-invite", "/api/auth/reset-password"):
+            assert cat(path) == "auth"
+        # Every device refreshes: a 429 here used to sign people out
+        assert cat("/api/auth/refresh") == "default"
+        assert cat("/api/auth/token") == "default"
+
+
+def _request(peer: str, headers: dict[str, str]) -> Request:
+    return Request({
+        "type": "http",
+        "client": (peer, 1234),
+        "headers": [(k.lower().encode(), v.encode()) for k, v in headers.items()],
+    })
+
+
+class TestClientIp:
+    def test_uses_forwarded_ip_from_the_proxy(self):
+        # butler-app's nginx on the Docker network passes Cloudflare's header on
+        req = _request("192.168.97.25", {"CF-Connecting-IP": "203.0.113.7", "X-Real-IP": "192.168.97.5"})
+        assert _client_ip(req) == "203.0.113.7"
+        assert _client_ip(_request("192.168.97.25", {"X-Real-IP": "192.168.1.50"})) == "192.168.1.50"
+
+    def test_ignores_forwarding_headers_from_a_public_peer(self):
+        req = _request("8.8.8.8", {"CF-Connecting-IP": "203.0.113.7"})
+        assert _client_ip(req) == "8.8.8.8"
+
+    def test_falls_back_to_the_peer(self):
+        assert _client_ip(_request("192.168.97.25", {})) == "192.168.97.25"

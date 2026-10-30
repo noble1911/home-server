@@ -19,6 +19,20 @@ class RedeemInviteRequest(BaseModel):
     code: str
 
 
+class LoginRequest(BaseModel):
+    username: str = Field(..., max_length=64)
+    password: str = Field(..., max_length=256)
+
+
+class ResetPasswordRequest(BaseModel):
+    code: str = Field(..., max_length=32)
+    newPassword: str = Field(..., max_length=256)
+
+
+class LogoutRequest(BaseModel):
+    refreshToken: str
+
+
 class AuthTokens(BaseModel):
     accessToken: str
     refreshToken: str
@@ -29,6 +43,7 @@ class RedeemInviteResponse(BaseModel):
     tokens: AuthTokens
     hasCompletedOnboarding: bool
     role: str = "user"
+    username: str | None = None
 
 
 class RefreshTokenRequest(BaseModel):
@@ -129,6 +144,8 @@ class UserProfile(BaseModel):
     email: str | None = None
     # Login name for Butler and the provisioned apps (chosen at onboarding)
     username: str | None = None
+    # False until a password is set: the user couldn't sign back in
+    hasPassword: bool = False
     kindleEmail: str | None = None
     phone: str | None = None
     butlerName: str = "Butler"
@@ -164,14 +181,9 @@ class OnboardingRequest(BaseModel):
     butlerName: str
     soul: SoulConfig
     email: str | None = None
-    serviceUsername: str | None = Field(None, pattern=r'^[a-z0-9_]{3,20}$')
-    servicePassword: str | None = Field(None, min_length=10)
-
-    @model_validator(mode='after')
-    def check_credentials_pair(self):
-        if bool(self.serviceUsername) != bool(self.servicePassword):
-            raise ValueError('serviceUsername and servicePassword must both be provided or both omitted')
-        return self
+    # The login for Butler and the apps: required, it's how you sign back in
+    serviceUsername: str = Field(..., pattern=r'^[a-z0-9_]{3,20}$')
+    servicePassword: str = Field(..., min_length=10, max_length=256)
 
 
 class AddFactRequest(BaseModel):

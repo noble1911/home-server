@@ -77,13 +77,11 @@ export default function Onboarding() {
         },
       }
 
-      // Include email and service credentials if provided
+      // The login is required (it's how you sign back in); email is optional
+      data.serviceUsername = serviceUsername
+      data.servicePassword = servicePassword
       if (email.trim()) {
         data.email = email.trim()
-      }
-      if (credentialsValid) {
-        data.serviceUsername = serviceUsername
-        data.servicePassword = servicePassword
       }
 
       const response = await api.post<{ status: string; serviceAccounts: ServiceAccountResult[] }>('/user/onboarding', data)
@@ -277,9 +275,10 @@ export default function Onboarding() {
 
         {step === 'credentials' && (
           <div>
-            <h2 className="text-xl font-bold text-butler-100 mb-2">Create your app login</h2>
+            <h2 className="text-xl font-bold text-butler-100 mb-2">Create your login</h2>
             <p className="text-butler-400 mb-6">
-              This login will work across Jellyfin, Nextcloud, Immich, and other apps on your server.
+              You'll sign in to Butler with this, and the same login works in Jellyfin, Nextcloud,
+              Immich and the other apps on your server.
             </p>
 
             <div className="space-y-4 mb-6">
@@ -366,13 +365,6 @@ export default function Onboarding() {
                 Continue
               </button>
             </div>
-
-            <button
-              onClick={() => setStep('done')}
-              className="w-full mt-3 text-sm text-butler-500 hover:text-butler-300 transition-colors"
-            >
-              Skip for now
-            </button>
           </div>
         )}
 
@@ -388,7 +380,15 @@ export default function Onboarding() {
               {butlerNameInput} is ready to help you, {userName}.
             </p>
             {submitError && (
-              <p className="text-sm text-red-400 mb-4" role="alert">{submitError}</p>
+              <div className="mb-4">
+                <p className="text-sm text-red-400" role="alert">{submitError}</p>
+                <button
+                  onClick={() => { setSubmitError(null); setStep('credentials') }}
+                  className="text-sm text-accent hover:text-accent/80 mt-2"
+                >
+                  Change my login
+                </button>
+              </div>
             )}
             <button
               onClick={handleComplete}

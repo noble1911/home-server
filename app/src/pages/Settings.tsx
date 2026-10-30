@@ -9,7 +9,7 @@ import PhoneNotifications from '../components/settings/PhoneNotifications'
 import ChatModelSetting from '../components/settings/ChatModelSetting'
 import IptvProviderSetting from '../components/settings/IptvProviderSetting'
 import { ButlerNotifications, checkForAppUpdate, disablePhoneNotifications, isNativeApp, openExternal, type AppUpdate } from '../native/butlerNative'
-import { api, clearUserFacts, deleteUserAccount } from '../services/api'
+import { api, clearUserFacts, deleteUserAccount, revokeSession } from '../services/api'
 import ConfirmDialog from '../components/ConfirmDialog'
 import type { AdminUser, InviteCode, OAuthConnection, ServiceCredential, ToolPermission } from '../types/user'
 import { DEFAULT_VOICE, GOOGLE_SCOPES, PERMISSION_INFO, SERVICE_DISPLAY_NAMES, VOICE_OPTIONS } from '../types/user'
@@ -36,6 +36,12 @@ interface AdminUserListResponse {
   users: AdminUser[]
 }
 
+interface ResetCodeResponse {
+  code: string
+  expiresAt: string
+  username: string
+}
+
 interface LinkResult {
   service: string
   status: 'linked' | 'already' | 'not_found' | 'unavailable'
@@ -51,7 +57,7 @@ const LINK_STATUS_TEXT: Record<LinkResult['status'], string> = {
 
 export default function Settings() {
   const { logout, role } = useAuthStore()
-  const { profile, updateProfile, updateButlerName, updateSoul, updateNotifications, clearAllFacts, clearProfile, isLoading } = useUserStore()
+  const { profile, fetchProfile, updateProfile, updateButlerName, updateSoul, updateNotifications, clearAllFacts, clearProfile, isLoading } = useUserStore()
   const { voiceMode, setVoiceMode, speakReplies, setSpeakReplies } = useSettingsStore()
   const { clearMessages } = useConversationStore()
   const push = usePushNotifications()
@@ -88,6 +94,8 @@ export default function Settings() {
   const [adminReprovisionError, setAdminReprovisionError] = useState<string | null>(null)
   const [adminReprovisionSuccess, setAdminReprovisionSuccess] = useState(false)
   const [isLinking, setIsLinking] = useState(false)
+  const [resetCode, setResetCode] = useState<ResetCodeResponse | null>(null)
+  const [resetCodeError, setResetCodeError] = useState<string | null>(null)
   const [linkResults, setLinkResults] = useState<LinkResult[] | null>(null)
   const [linkError, setLinkError] = useState<string | null>(null)
 
@@ -271,10 +279,10 @@ export default function Settings() {
         '/user/service-password',
         { newPassword: newServicePassword }
       )
-      setPasswordChangeResults(data.results)
+      setPasswordChangeResults([{ service: 'butler', status: 'updated' }, ...data.results])
       setNewServicePassword('')
       setConfirmServicePassword('')
-      await fetchServiceCredentials()
+      await Promise.all([fetchServiceCredentials(), fetchProfile()])
     } catch (err) {
       setPasswordChangeResults([{
         service: 'all',
@@ -327,6 +335,25 @@ export default function Settings() {
       setInviteCodes(prev => prev.filter(c => c.code !== code))
     } catch {
       // Silently fail
+    }
+  }
+
+  async function clearInviteCodes() {
+    try {
+      await api.post('/admin/invite-codes/clear')
+      setInviteCodes(prev => prev.filter(c => !c.isUsed && !c.isExpired))
+    } catch {
+      // Silently fail
+    }
+  }
+
+  async function createResetCode(userId: string) {
+    setResetCode(null)
+    setResetCodeError(null)
+    try {
+      setResetCode(await api.post<ResetCodeResponse>(`/admin/users/${userId}/reset-code`))
+    } catch (err) {
+      setResetCodeError(err instanceof Error ? err.message : "Couldn't create a reset code")
     }
   }
 
@@ -485,6 +512,7 @@ export default function Settings() {
     } catch {
       // sign out regardless
     }
+    await revokeSession()
     logout()
   }
 
@@ -538,6 +566,18 @@ export default function Settings() {
 
       {tab === 'you' && (
         <>
+          {!profile.hasPassword && (
+            <div className="card p-4 border border-amber-500/30 bg-amber-500/5">
+              <div className="text-sm text-amber-200 font-medium">Set your password</div>
+              <p className="text-xs text-butler-300 mt-1">
+                {profile.username
+                  ? <>You sign in with your username (<span className="font-mono">{profile.username}</span>) and password now, but you
+                    haven't set a password yet. Set one under Password below, or you won't be able to sign back in.</>
+                  : <>You sign in with a username and password now, and your account doesn't have a username yet. Ask an admin to set one up.</>}
+              </p>
+            </div>
+          )}
+
           {/* Account - synced across devices */}
           <section className="card p-4">
             <h2 className="text-sm font-medium text-butler-400 uppercase tracking-wide mb-4">
@@ -615,11 +655,11 @@ export default function Settings() {
               </div>
 
               {/* Change service password */}
-              {!credentialsLoading && serviceCredentials.some(c => !c.shared) && (
+              {profile.username && (
                 <div className="pt-4 border-t border-butler-700">
                   <label className="block text-sm text-butler-300 mb-1">Password</label>
                   <p className="text-xs text-butler-500 mb-3">
-                    Sets one password on every app under Your Logins.
+                    Your Butler sign-in, and the same password on every app under Your Logins.
                   </p>
                   <div className="space-y-2">
                     <input
@@ -1371,24 +1411,33 @@ export default function Settings() {
                     </div>
                     <div className="flex gap-2 shrink-0 ml-2">
                       {!code.isUsed && !code.isExpired && (
-                        <>
-                          <button
-                            onClick={() => copyCode(code.code)}
-                            className="px-2 py-1 rounded text-xs bg-butler-700 text-accent hover:bg-butler-600"
-                          >
-                            {copiedCode === code.code ? 'Copied!' : 'Copy'}
-                          </button>
-                          <button
-                            onClick={() => revokeInviteCode(code.code)}
-                            className="px-2 py-1 rounded text-xs bg-red-900/50 text-red-300 hover:bg-red-900"
-                          >
-                            Revoke
-                          </button>
-                        </>
+                        <button
+                          onClick={() => copyCode(code.code)}
+                          className="px-2 py-1 rounded text-xs bg-butler-700 text-accent hover:bg-butler-600"
+                        >
+                          {copiedCode === code.code ? 'Copied!' : 'Copy'}
+                        </button>
                       )}
+                      <button
+                        onClick={() => revokeInviteCode(code.code)}
+                        className="px-2 py-1 rounded text-xs bg-red-900/50 text-red-300 hover:bg-red-900"
+                      >
+                        {code.isUsed || code.isExpired ? 'Delete' : 'Revoke'}
+                      </button>
                     </div>
                   </div>
                 ))}
+                {inviteCodes.some(c => c.isUsed || c.isExpired) && (
+                  <button
+                    onClick={clearInviteCodes}
+                    className="w-full btn bg-butler-700 text-butler-300 hover:bg-butler-600 text-sm"
+                  >
+                    Clear Used &amp; Expired Codes
+                  </button>
+                )}
+                <p className="text-xs text-butler-500">
+                  A code only creates the account. People sign back in with their username and password.
+                </p>
               </div>
             )}
           </section>
@@ -1409,7 +1458,10 @@ export default function Settings() {
                   <label className="block text-sm text-butler-300 mb-2">Select User</label>
                   <select
                     value={selectedUserId || ''}
-                    onChange={(e) => { setSelectedUserId(e.target.value || null); setLinkResults(null); setLinkError(null) }}
+                    onChange={(e) => {
+                      setSelectedUserId(e.target.value || null)
+                      setLinkResults(null); setLinkError(null); setResetCode(null); setResetCodeError(null)
+                    }}
                     className="input w-full"
                   >
                     <option value="">Choose a user...</option>
@@ -1449,6 +1501,33 @@ export default function Settings() {
 
                     <div className="pt-3 mt-3 border-t border-butler-700 space-y-2">
                       <CredentialRow label="Username" value={selectedUser.username || 'not set'} />
+                      {resetCodeError && <div className="text-xs text-red-400">{resetCodeError}</div>}
+                      {resetCode ? (
+                        <div className="p-3 bg-butler-900 rounded-lg space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="font-mono text-lg tracking-widest text-butler-100">{resetCode.code}</span>
+                            <button
+                              onClick={() => copyCode(resetCode.code)}
+                              className="px-2 py-1 rounded text-xs bg-butler-700 text-accent hover:bg-butler-600"
+                            >
+                              {copiedCode === resetCode.code ? 'Copied!' : 'Copy'}
+                            </button>
+                          </div>
+                          <p className="text-xs text-butler-500">
+                            Give this to {selectedUser.name}. On the sign-in page they choose "Have a reset code?" and
+                            pick a new password. Works once, until {new Date(resetCode.expiresAt).toLocaleString()}.
+                            You won't see it again.
+                          </p>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => createResetCode(selectedUser.id)}
+                          disabled={!selectedUser.username}
+                          className="w-full btn bg-butler-700 text-butler-300 hover:bg-butler-600 text-sm disabled:opacity-50"
+                        >
+                          Create Password Reset Code
+                        </button>
+                      )}
                       <p className="text-xs text-butler-500">
                         Finds logins this user already has (made by hand, or before Butler set them up) so password changes reach them.
                       </p>
