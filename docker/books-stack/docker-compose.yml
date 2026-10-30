@@ -21,31 +21,6 @@ services:
       retries: 3
       start_period: 30s
 
-  lazylibrarian:
-    image: lscr.io/linuxserver/lazylibrarian:latest
-    container_name: lazylibrarian
-    environment:
-      - PUID=501
-      - PGID=20
-      - TZ=Europe/London
-      - DOCKER_MODS=linuxserver/mods:universal-calibre|linuxserver/mods:lazylibrarian-ffmpeg
-    volumes:
-      - lazylibrarian-config:/config
-      - ${DRIVE_PATH:-/Volumes/HomeServer}/Books/Audiobooks:/audiobooks
-      - ${DRIVE_PATH:-/Volumes/HomeServer}/Books/eBooks:/books
-      - ${DRIVE_PATH:-/Volumes/HomeServer}/Downloads:/downloads
-    ports:
-      - "5299:5299"
-    networks:
-      - homeserver
-    restart: always
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:5299/home"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-
 networks:
   homeserver:
     external: true
@@ -55,5 +30,3 @@ volumes:
     name: audiobookshelf-config
   audiobookshelf-metadata:
     name: audiobookshelf-metadata
-  lazylibrarian-config:
-    name: lazylibrarian-config

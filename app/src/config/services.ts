@@ -9,7 +9,6 @@ import type { ServiceStatus } from '../services/api'
 const SERVICE_NAME_MAP: Record<string, string> = {
   'jellyfin': 'jellyfin',
   'audiobookshelf': 'audiobookshelf',
-  'lazylibrarian': 'lazylibrarian',
   'immich-server': 'immich',
   'nextcloud': 'nextcloud',
   'homeassistant': 'home-assistant',
@@ -53,7 +52,6 @@ function serviceUrl(envVar: string, port: number, tunnelSubdomain: string): stri
 // Pre-compute service URLs so guide text can reference them
 const jellyfinUrl = serviceUrl('VITE_JELLYFIN_URL', 8096, 'jellyfin')
 const audiobookshelfUrl = serviceUrl('VITE_AUDIOBOOKSHELF_URL', 13378, 'books')
-const lazyLibrarianUrl = serviceUrl('VITE_LAZYLIBRARIAN_URL', 5299, 'lazylibrarian')
 const immichUrl = serviceUrl('VITE_IMMICH_URL', 2283, 'photos')
 const nextcloudUrl = serviceUrl('VITE_NEXTCLOUD_URL', 8080, 'files')
 const homeAssistantUrl = serviceUrl('VITE_HOMEASSISTANT_URL', 8123, 'ha')
@@ -138,30 +136,6 @@ export const services: Service[] = [
         'Read ebooks in the browser using the built-in EPUB reader',
         'Download audiobooks for offline listening on long trips',
         'Playback speed and sleep timer are in the player controls',
-      ],
-    },
-  },
-  {
-    id: 'lazylibrarian',
-    access: 'media',
-    name: 'LazyLibrarian',
-    description: 'Book Search & Downloads',
-    icon: '📚',
-    url: lazyLibrarianUrl,
-    category: 'books',
-    guide: {
-      whatItDoes: 'Search for books and audiobooks, manage downloads, and automatically import them into Audiobookshelf.',
-      steps: [
-        `Open LazyLibrarian in your browser: ${lazyLibrarianUrl}`,
-        'Search for a book by title or author',
-        'Select a result and LazyLibrarian will download it via qBittorrent',
-        'Once downloaded, LazyLibrarian organizes the file and moves it to the library folder',
-        'Audiobookshelf picks up the new files automatically',
-      ],
-      tips: [
-        'You can also ask Butler to find and download books for you via chat or voice',
-        'LazyLibrarian supports GoodReads, Google Books, and Open Library for metadata',
-        'Prowlarr syncs indexers to LazyLibrarian automatically — no manual indexer setup needed',
       ],
     },
   },
@@ -301,7 +275,6 @@ export function servicesFor(isAdmin: boolean, permissions: string[], lanHost?: s
 
 export const categoryLabels: Record<ServiceCategory, string> = {
   'media': 'Media',
-  'books': 'Books',
   'photos': 'Photos',
   'files': 'Files',
   'smart-home': 'Smart Home',

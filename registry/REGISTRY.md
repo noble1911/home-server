@@ -61,7 +61,6 @@ See `services.yaml` for the full machine-readable port map (the source of truth 
 | `jellyfin.noblehaus.uk` | Jellyfin (native app, `:8096`) |
 | `requests.noblehaus.uk` | `seerr:5055` |
 | `books.noblehaus.uk` | `audiobookshelf:13378` |
-| `lazylibrarian.noblehaus.uk` | `lazylibrarian:5299`. **Has no login** (multi-user is broken upstream), so it is open to anyone who finds it |
 | `photos.noblehaus.uk` | `immich-server:2283` |
 | `files.noblehaus.uk` | `nextcloud:80` |
 | `ha.noblehaus.uk` | `homeassistant:8123`. Needs HA's `http.trusted_proxies` (docs/11-smart-home.md) or every request gets 400 |

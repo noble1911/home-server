@@ -94,10 +94,6 @@ DEFAULT_SERVICES: dict[str, dict[str, Any]] = {
         "url": "http://audiobookshelf:80/healthcheck",
         "stack": "books",
     },
-    "lazylibrarian": {
-        "url": "http://lazylibrarian:5299/home",
-        "stack": "books",
-    },
     # Photos & files stack
     "immich-server": {
         "url": "http://immich-server:2283/api/server/ping",

@@ -133,7 +133,6 @@ export const SERVICE_DISPLAY_NAMES: Record<string, { label: string; description:
   audiobookshelf: { label: 'Audiobookshelf', description: 'Audiobooks & Podcasts' },
   nextcloud: { label: 'Nextcloud', description: 'File Sync & Storage' },
   immich: { label: 'Immich', description: 'Photo Management' },
-  lazylibrarian: { label: 'LazyLibrarian', description: 'Book Search & Downloads' },
   homeassistant: { label: 'Home Assistant', description: 'Smart Home Control' },
   radarr: { label: 'Radarr', description: 'Movie downloads' },
   sonarr: { label: 'Sonarr', description: 'TV downloads' },

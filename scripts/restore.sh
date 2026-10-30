@@ -32,7 +32,6 @@ declare -A VOLUME_CONTAINER=(
     [qbittorrent-config]=qbittorrent
     [homeassistant-config]=homeassistant
     [nextcloud-data]=nextcloud
-    [lazylibrarian-config]=lazylibrarian
 )
 
 # ─────────────────────────────────────────────

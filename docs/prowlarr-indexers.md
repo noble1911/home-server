@@ -276,4 +276,4 @@ Byparr is registered as a **FlareSolverr indexer proxy** in Prowlarr. Indexers t
 
 - [Step 7: Download Stack](./07-download-stack.md) — qBittorrent + Prowlarr deployment
 - [Step 8: Media Stack](./08-media-stack.md) — Radarr, Sonarr, Jellyfin setup
-- [Step 9: Books Stack](./09-books-stack.md) — Audiobookshelf, LazyLibrarian setup
+- [Step 9: Books Stack](./09-books-stack.md) — Audiobookshelf setup

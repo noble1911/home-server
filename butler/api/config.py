@@ -102,11 +102,6 @@ class Settings(BaseSettings):
     audiobookshelf_url: str = ""
     audiobookshelf_admin_token: str = ""
 
-    # LazyLibrarian (user provisioning via SQLite — no API for user management)
-    # Set to the path of lazylibrarian.db inside the butler container.
-    # Requires the lazylibrarian-config volume to be mounted into butler.
-    lazylibrarian_db_path: str = ""
-
     # Nextcloud (user provisioning via OCS API)
     nextcloud_url: str = ""
     nextcloud_admin_user: str = ""

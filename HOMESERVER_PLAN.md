@@ -153,9 +153,8 @@
 | Service | Homepage | Purpose | Run Method | RAM (Idle) | RAM (Peak) | Port |
 |---------|----------|---------|------------|------------|------------|------|
 | [**Audiobookshelf**](https://www.audiobookshelf.org/) | [audiobookshelf.org](https://www.audiobookshelf.org/) | Ebook + audiobook library, reading, streaming (native mobile apps) | Docker container | 200MB | 400MB | 13378 |
-| [**LazyLibrarian**](https://lazylibrarian.gitlab.io/) | [GitLab](https://gitlab.com/LazyLibrarian/LazyLibrarian) | Book search, download management, library organization | Docker container | 150MB | 300MB | 5299 |
 
-> **Note (2026-02-11):** Calibre-Web, Readarr, and Shelfarr have been replaced by LazyLibrarian + Audiobookshelf. LazyLibrarian provides web-based book search via Prowlarr, manages downloads via qBittorrent, and organizes files into the Audiobookshelf library folders. Butler's BookTool (`butler/tools/books.py`) provides AI-driven book search/download via Open Library + Prowlarr + qBittorrent.
+> **Note (2026-10-30):** Calibre-Web, Readarr, Shelfarr and then LazyLibrarian have all been removed. Books are found and downloaded by asking Butler: BookTool (`butler/tools/books.py`) searches Open Library, finds a torrent via Prowlarr, and has qBittorrent save it straight into the Audiobookshelf library folders (`Books/eBooks`, `Books/Audiobooks`). LazyLibrarian went because it wasn't useful and it had no working login (multi-user is broken upstream), so its public hostname was open to anyone.
 
 > **Ebook Access Methods:** Audiobookshelf serves ebooks via browser (built-in EPUB reader), native iOS/Android apps with offline downloads, and progress sync across devices. See [Ebook Reading Guide](docs/ebook-reading-guide.md) for setup.
 
@@ -201,7 +200,7 @@
 | **Voice Assistant** | LiveKit, Kokoro, Butler API | 1.0GB | 2.1GB |
 | **Media** | Jellyfin, *arrs, Seerr, qBit | 1.6GB | 6.1GB |
 | **Photos/Files** | Immich, Nextcloud | 1.4GB | 5GB |
-| **Books** | Audiobookshelf, LazyLibrarian | 0.35GB | 0.7GB |
+| **Books** | Audiobookshelf | 0.2GB | 0.4GB |
 | **Smart Home** | Home Assistant | 0.4GB | 1GB |
 | **Notifications** | WhatsApp | 0.1GB | 0.2GB |
 | | | | |
@@ -1036,7 +1035,7 @@ Data lives on the external drive by default, or on the internal SSD when
 │   └── Music/                          # Future: Lidarr
 │
 ├── Books/                              # 350GB allocated
-│   ├── eBooks/                         # Audiobookshelf + LazyLibrarian ebook library
+│   ├── eBooks/                         # Audiobookshelf ebook library (BookTool saves here)
 │   └── Audiobooks/                     # Audiobookshelf audiobook library
 │       └── Author Name/                # Organized by author
 │           └── Book Title/
@@ -1056,7 +1055,6 @@ Data lives on the external drive by default, or on the internal SSD when
 │   │   ├── Movies/                     # Radarr picks up from here
 │   │   ├── TV/                         # Sonarr picks up from here
 │   │   ├── Anime/                      # Radarr/Sonarr picks up anime
-│   │   └── Books/                      # LazyLibrarian/BookTool picks up from here
 │   └── Incomplete/                     # qBittorrent in-progress
 │
 └── Backups/                            # 200GB allocated
@@ -1136,8 +1134,8 @@ Data lives on the external drive by default, or on the internal SSD when
 | Data Type | If Drive Fails... | Backup Needed? |
 |-----------|-------------------|----------------|
 | **Movies/TV** | Re-download via Radarr/Sonarr (automated) | ❌ No |
-| **Audiobooks** | Re-download via LazyLibrarian/BookTool | ❌ No |
-| **eBooks** | Re-download via LazyLibrarian/BookTool | ❌ No |
+| **Audiobooks** | Re-download via Butler (BookTool) | ❌ No |
+| **eBooks** | Re-download via Butler (BookTool) | ❌ No |
 | **Photos** | **GONE FOREVER** - irreplaceable memories | ⚠️ Optional (user choice) |
 | **Documents** | **GONE FOREVER** - personal/work files | ⚠️ Optional (user choice) |
 | **Service configs** | Hours of reconfiguration work | ✅ Local backup (free) |
@@ -1177,7 +1175,7 @@ Data lives on the external drive by default, or on the internal SSD when
 | Databases | Restore from local backup on Mac SSD | Minutes |
 | Docker configs | Restore from Git repo or local backup | Minutes |
 | Movies/TV | Radarr/Sonarr auto-re-downloads | Days (background) |
-| Audiobooks/eBooks | Re-download via LazyLibrarian/BookTool | Hours (background) |
+| Audiobooks/eBooks | Re-download via Butler (BookTool) | Hours (background) |
 
 **Total downtime:** A few hours to get services running. Library rebuilds in background over days.
 
@@ -1237,7 +1235,6 @@ This does NOT protect against: Mac Mini theft/fire (use cloud for that).
 | 2283 | Immich | LAN + Cloudflare Tunnel |
 | 8080 | Nextcloud | LAN + Cloudflare Tunnel |
 | 13378 | Audiobookshelf | LAN + Cloudflare Tunnel |
-| 5299 | LazyLibrarian | LAN + Cloudflare Tunnel |
 | 7880 | LiveKit | LAN + Cloudflare Tunnel |
 | 7878 | Radarr | LAN only |
 | 8989 | Sonarr | LAN only |
@@ -1256,20 +1253,20 @@ This does NOT protect against: Mac Mini theft/fire (use cloud for that).
 │                     INTERNAL SERVICE MESH                           │
 └─────────────────────────────────────────────────────────────────────┘
 
-  Prowlarr ──────┬──────┬──────┬────── (Indexer sync)
+  Prowlarr ──────┬──────┬──────┬────── (Indexer sync / search)
                  │      │      │
                  ▼      ▼      ▼
-              Radarr  Sonarr  LazyLibrarian
+              Radarr  Sonarr  Butler BookTool
                  │      │      │
                  └──────┴──────┘
                         │
                         ▼
-                  qBittorrent ──────► /Downloads/Complete/
-                        │
-          ┌─────────────┼─────────────┐
-          ▼             ▼             ▼
-      Jellyfin    Audiobookshelf   LazyLibrarian
-      (Movies/TV) (Books+Audio)   (organizes→ABS)
+                  qBittorrent ──► /Downloads/Complete/ (films, TV)
+                        │     └─► /Books/eBooks, /Books/Audiobooks (books)
+                 ┌──────┴──────┐
+                 ▼             ▼
+             Jellyfin    Audiobookshelf
+            (Movies/TV)  (Books+Audio)
 
   Home Assistant ◄────► Butler Agent ◄────► All Services
                               │
@@ -1301,8 +1298,6 @@ This does NOT protect against: Mac Mini theft/fire (use cloud for that).
 
 ### Phase 4: Books & Audio (Day 3-4)
 - [ ] Deploy Audiobookshelf
-- [ ] Deploy LazyLibrarian
-- [ ] Configure LazyLibrarian connections (Prowlarr, qBittorrent)
 - [ ] Write ebook reading setup guide (#110)
 
 ### Phase 5: Photos & Files (Day 4-5)
@@ -1374,7 +1369,7 @@ This does NOT protect against: Mac Mini theft/fire (use cloud for that).
 | Disney+ | £7.99 | Replaced by Jellyfin |
 | iCloud 2TB | £6.99 | No longer required (optional user choice) |
 | Google One 200GB | £2.49 | Replaced by Nextcloud |
-| Kindle Unlimited | £9.99 | Replaced by Audiobookshelf + LazyLibrarian |
+| Kindle Unlimited | £9.99 | Replaced by Audiobookshelf + Butler's book search |
 | Audible | £7.99 | Replaced by Audiobookshelf |
 | Smart Home (various) | ~£5.00 | Replaced by haaska (free) |
 | **Gross Savings** | **~£51.44/month** | All services replaced |
@@ -1444,7 +1439,6 @@ All software used in this project with links to official sources.
 | Software | Homepage | Purpose | License |
 |----------|----------|---------|---------|
 | [Audiobookshelf](https://www.audiobookshelf.org/) | [audiobookshelf.org](https://www.audiobookshelf.org/) | Ebook + audiobook library, reading, streaming | GPL-3.0 |
-| [LazyLibrarian](https://lazylibrarian.gitlab.io/) | [GitLab](https://gitlab.com/LazyLibrarian/LazyLibrarian) | Book search, download management, library organization | GPL-3.0 |
 
 ### Photos & Files
 

@@ -1,8 +1,7 @@
 """Auto-provision user accounts on downstream apps.
 
 Called during onboarding to create per-user accounts on Jellyfin,
-Audiobookshelf, Nextcloud, Immich, Home Assistant, and LazyLibrarian
-using the credentials the user chose during the onboarding wizard.
+Audiobookshelf, Nextcloud, Immich and Home Assistant using the credentials the user chose during the onboarding wizard.
 """
 
 from __future__ import annotations
@@ -47,8 +46,6 @@ ADMIN_SERVICES: list[str] = ["radarr", "sonarr", "prowlarr", "dispatcharr"]
 
 # NOTE: The following services are NOT auto-provisioned:
 # - Seerr: uses Jellyfin SSO — users log in with their Jellyfin credentials.
-# - LazyLibrarian: multi-user login is broken upstream (CherryPy sessions are not
-#   configured when user_accounts=True), causing a 500 on login. Skipped until fixed.
 
 
 def _services_for_user(permissions: list[str]) -> list[str]:

@@ -74,8 +74,6 @@ services:
       - NEXTCLOUD_URL=${NEXTCLOUD_URL:-http://nextcloud:80}
       - NEXTCLOUD_ADMIN_USER=${NEXTCLOUD_ADMIN_USER:-}
       - NEXTCLOUD_ADMIN_PASSWORD=${NEXTCLOUD_ADMIN_PASSWORD:-}
-      # LazyLibrarian (user provisioning via SQLite)
-      - LAZYLIBRARIAN_DB_PATH=/mnt/lazylibrarian/lazylibrarian.db
       # WhatsApp Gateway (outbound notifications)
       - WHATSAPP_GATEWAY_URL=${WHATSAPP_GATEWAY_URL:-}
       # Features & limits
@@ -110,7 +108,6 @@ services:
       - ./migrations:/app/migrations:ro
       - ${DRIVE_PATH:-/Volumes/HomeServer}:/mnt/external
       - /private/var/empty:/mnt/host-ssd:ro
-      - lazylibrarian-config:/mnt/lazylibrarian
     ports:
       - "8000:8000"
     networks:
@@ -142,8 +139,3 @@ services:
 networks:
   homeserver:
     external: true
-
-volumes:
-  lazylibrarian-config:
-    external: true
-    name: lazylibrarian-config

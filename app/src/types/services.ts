@@ -30,7 +30,7 @@ export interface Service {
   guide?: ServiceGuide
 }
 
-export type ServiceCategory = 'media' | 'books' | 'photos' | 'files' | 'smart-home' | 'admin'
+export type ServiceCategory = 'media' | 'photos' | 'files' | 'smart-home' | 'admin'
 
 export interface ServiceStatus {
   id: string

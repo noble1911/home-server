@@ -11,7 +11,7 @@ interface ServiceDetailProps {
 }
 
 /** Map service config IDs to credential service keys used by the backend.
- *  LazyLibrarian and Bazarr have no per-user login, so no account section. */
+ *  Bazarr has no per-user login, so no account section. */
 const CREDENTIAL_KEY_MAP: Record<string, string> = {
   'jellyfin': 'jellyfin',
   'seerr': 'jellyfin', // Seerr signs in with the Jellyfin login

@@ -1,6 +1,6 @@
 # Step 9: Deploy Books Stack
 
-Deploy Audiobookshelf (ebooks + audiobooks) and LazyLibrarian (book search + download management).
+Deploy Audiobookshelf (ebooks + audiobooks). New books come from asking Butler, which downloads them straight into the library folders.
 
 ## Automated
 
@@ -28,7 +28,6 @@ docker compose ps
 | Service | URL | Purpose |
 |---------|-----|---------|
 | Audiobookshelf | http://localhost:13378 | Ebook + audiobook library, reading, streaming |
-| LazyLibrarian | http://localhost:5299 | Book search, download management, library organization |
 
 ## Initial Configuration
 
@@ -48,63 +47,36 @@ docker compose ps
    - Offline downloads via mobile app
    - Sleep timer and playback speed control
 
-### LazyLibrarian
-
-1. Open http://localhost:5299
-2. **Config > Downloaders > qBittorrent:**
-   - Host: `qbittorrent`
-   - Port: `8081`
-   - Username: `admin`
-   - Password: (your qBittorrent password)
-3. **Config > Processing:**
-   - eBook destination: `/books`
-   - Audiobook destination: `/audiobooks`
-4. **In Prowlarr** (http://localhost:9696):
-   - Settings > Apps > Add > LazyLibrarian
-   - URL: `http://lazylibrarian:5299`
-   - API Key: (from LazyLibrarian Config > Interface)
-
 ## Volume Mappings
 
 | Service | Container Path | Host Path |
 |---------|----------------|-----------|
 | Audiobookshelf | `/audiobooks` | `/Volumes/HomeServer/Books/Audiobooks` |
 | Audiobookshelf | `/books` | `/Volumes/HomeServer/Books/eBooks` |
-| LazyLibrarian | `/audiobooks` | `/Volumes/HomeServer/Books/Audiobooks` |
-| LazyLibrarian | `/books` | `/Volumes/HomeServer/Books/eBooks` |
-| LazyLibrarian | `/downloads` | `/Volumes/HomeServer/Downloads` |
+| qBittorrent | `/audiobooks` | `/Volumes/HomeServer/Books/Audiobooks` |
+| qBittorrent | `/ebooks` | `/Volumes/HomeServer/Books/eBooks` |
 
 ## The Book Download Flow
 
-```
-Search in LazyLibrarian (or ask Butler AI)
-       ↓
-Prowlarr provides indexers
-       ↓
-qBittorrent downloads to /Downloads
-       ↓
-LazyLibrarian organizes files by author/title
-       ↓
-Files moved to /books or /audiobooks
-       ↓
-ABS shows book in library (ebook reader + mobile apps)
-```
-
-Butler's BookTool can also trigger downloads via voice/chat:
+Ask Butler by chat or voice:
 ```
 "Find me the new Dune audiobook"
        ↓
-BookTool → Open Library (metadata) → Prowlarr (torrent) → qBittorrent
+BookTool → Open Library (metadata) → Prowlarr (torrent search)
        ↓
-LazyLibrarian picks up completed download → organizes → ABS import
+qBittorrent saves straight into /ebooks or /audiobooks
+       ↓
+Audiobookshelf shows the book in its library (ebook reader + mobile apps)
 ```
+
+LazyLibrarian used to sit alongside this; it was removed on 2026-10-30
+(not useful, and it had no working login).
 
 ## Docker Commands
 
 ```bash
 # View logs
 docker logs audiobookshelf
-docker logs lazylibrarian
 
 # Restart
 cd docker/books-stack
@@ -117,16 +89,14 @@ docker compose up -d
 
 ## Troubleshooting
 
-### LazyLibrarian search returns no results
+### Butler can't find a book
 
-- Verify Prowlarr has synced indexers to LazyLibrarian (Prowlarr > Settings > Apps)
 - Check that Prowlarr has indexers configured (see [Prowlarr Indexer Setup](./prowlarr-indexers.md))
 - Try a broader search query
 
 ### Downloads stuck or failing
 
 - Check qBittorrent at http://localhost:8081 for download status
-- Verify qBittorrent connection in LazyLibrarian Config > Downloaders
 - Check torrent indexer health in Prowlarr
 
 ### Audiobookshelf not detecting books

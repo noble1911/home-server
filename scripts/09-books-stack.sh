@@ -1,5 +1,5 @@
 #!/bin/bash
-# Step 9: Deploy Books Stack (Audiobookshelf + LazyLibrarian)
+# Step 9: Deploy Books Stack (Audiobookshelf)
 set -e
 
 GREEN='\033[0;32m'
@@ -94,25 +94,6 @@ fi
 
 echo ""
 echo -e "${GREEN}✓${NC} Books stack deployed and configured"
-echo ""
-echo -e "${YELLOW}LazyLibrarian Setup Required:${NC}"
-echo ""
-echo "  Open LazyLibrarian at http://localhost:5299 and configure:"
-echo ""
-echo "  1. Config > Downloaders > qBittorrent:"
-echo "     - Host: qbittorrent"
-echo "     - Port: 8081"
-echo "     - Username: admin"
-echo "     - Password: (your qBittorrent password)"
-echo ""
-echo "  2. Config > Processing:"
-echo "     - eBook destination: /books"
-echo "     - Audiobook destination: /audiobooks"
-echo ""
-echo "  3. In Prowlarr (http://localhost:9696):"
-echo "     - Settings > Apps > Add > LazyLibrarian"
-echo "     - URL: http://lazylibrarian:5299"
-echo "     - API Key: (from LazyLibrarian Config > Interface)"
 echo ""
 echo -e "${YELLOW}Next:${NC} Deploy photos stack with:"
 echo "  ./scripts/10-photos-files.sh"

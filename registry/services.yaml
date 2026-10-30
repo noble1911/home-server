@@ -80,7 +80,6 @@ services:
 
   # ── home-server: books-stack ─────────────────────────────────────
   - { name: audiobookshelf, project: home-server, container: audiobookshelf, host_port: 13378 }
-  - { name: lazylibrarian,  project: home-server, container: lazylibrarian,  host_port: 5299 }
 
   # ── home-server: smart-home-stack ────────────────────────────────
   - { name: homeassistant,  project: home-server, container: homeassistant,  host_port: 8123 }

@@ -73,7 +73,6 @@ All methods above work from outside your home network using Cloudflare Tunnel.
 | Service | Remote URL |
 |---------|-----------|
 | Audiobookshelf | `https://books.yourdomain.com` |
-| LazyLibrarian | `https://lazylibrarian.yourdomain.com` |
 
 Replace `yourdomain.com` with the domain you configured in your Cloudflare Tunnel.
 
@@ -107,5 +106,5 @@ Replace `yourdomain.com` with the domain you configured in your Cloudflare Tunne
 
 ## Related Guides
 
-- [Step 9: Books Stack](./09-books-stack.md) — Audiobookshelf and LazyLibrarian setup
+- [Step 9: Books Stack](./09-books-stack.md) — Audiobookshelf setup
 - [Prowlarr Indexer Setup](./prowlarr-indexers.md) — Configure indexers for book search
