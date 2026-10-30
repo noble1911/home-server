@@ -62,6 +62,8 @@ services:
       - SEERR_URL=${SEERR_URL:-http://seerr:5055}
       - DISPATCHARR_URL=${DISPATCHARR_URL:-http://dispatcharr:9191}
       - SEERR_API_KEY=${SEERR_API_KEY:-}
+      # Services tab: admin tools are linked at http://<LAN_HOST>:<port>
+      - LAN_HOST=${LAN_HOST:-}
       # Immich (photo management + user provisioning)
       - IMMICH_URL=${IMMICH_URL:-http://immich-server:2283}
       - IMMICH_API_KEY=${IMMICH_API_KEY:-}
