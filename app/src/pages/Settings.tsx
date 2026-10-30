@@ -36,6 +36,19 @@ interface AdminUserListResponse {
   users: AdminUser[]
 }
 
+interface LinkResult {
+  service: string
+  status: 'linked' | 'already' | 'not_found' | 'unavailable'
+  error?: string
+}
+
+const LINK_STATUS_TEXT: Record<LinkResult['status'], string> = {
+  linked: 'linked',
+  already: 'already linked',
+  not_found: 'no account with this username',
+  unavailable: "couldn't check",
+}
+
 export default function Settings() {
   const { logout, role } = useAuthStore()
   const { profile, updateProfile, updateButlerName, updateSoul, updateNotifications, clearAllFacts, clearProfile, isLoading } = useUserStore()
@@ -74,6 +87,9 @@ export default function Settings() {
   const [adminReprovisioning, setAdminReprovisioning] = useState(false)
   const [adminReprovisionError, setAdminReprovisionError] = useState<string | null>(null)
   const [adminReprovisionSuccess, setAdminReprovisionSuccess] = useState(false)
+  const [isLinking, setIsLinking] = useState(false)
+  const [linkResults, setLinkResults] = useState<LinkResult[] | null>(null)
+  const [linkError, setLinkError] = useState<string | null>(null)
 
   // Service credentials state
   const [serviceCredentials, setServiceCredentials] = useState<ServiceCredential[]>([])
@@ -416,6 +432,20 @@ export default function Settings() {
     }
   }
 
+  async function linkAccounts(userId: string) {
+    setIsLinking(true)
+    setLinkError(null)
+    setLinkResults(null)
+    try {
+      const data = await api.post<{ results: LinkResult[] }>(`/admin/users/${userId}/link-accounts`)
+      setLinkResults(data.results)
+    } catch (err) {
+      setLinkError(err instanceof Error ? err.message : 'Linking failed')
+    } finally {
+      setIsLinking(false)
+    }
+  }
+
   async function removeUser(userId: string) {
     setIsRemovingUser(true)
     setRemoveUserError(null)
@@ -474,6 +504,7 @@ export default function Settings() {
   }
 
   const selectedUser = adminUsers.find(u => u.id === selectedUserId)
+  const logins = summariseLogins(serviceCredentials)
   const allPermissions = Object.keys(PERMISSION_INFO) as ToolPermission[]
 
   const googleConnection = connections.find(c => c.provider === 'google')
@@ -584,11 +615,11 @@ export default function Settings() {
               </div>
 
               {/* Change service password */}
-              {!credentialsLoading && serviceCredentials.length > 0 && (
+              {!credentialsLoading && serviceCredentials.some(c => !c.shared) && (
                 <div className="pt-4 border-t border-butler-700">
-                  <label className="block text-sm text-butler-300 mb-1">Service Password</label>
+                  <label className="block text-sm text-butler-300 mb-1">Password</label>
                   <p className="text-xs text-butler-500 mb-3">
-                    Change your password across Jellyfin, Audiobookshelf, Nextcloud, and other services.
+                    Sets one password on every app under Your Logins.
                   </p>
                   <div className="space-y-2">
                     <input
@@ -712,56 +743,90 @@ export default function Settings() {
           {!credentialsLoading && serviceCredentials.length > 0 && (
             <section className="card p-4">
               <h2 className="text-sm font-medium text-butler-400 uppercase tracking-wide mb-4">
-                My Service Accounts
+                Your Logins
                 <span className="text-butler-600 ml-2 text-xs normal-case">synced</span>
               </h2>
-              <p className="text-xs text-butler-500 mb-3">
-                Use these credentials to log into apps directly (web UI or mobile app).
-              </p>
-              <div className="space-y-3">
-                {serviceCredentials.map(cred => {
-                  const info = SERVICE_DISPLAY_NAMES[cred.service] || { label: cred.service, description: '' }
-                  const showPassword = visiblePasswords.has(cred.service)
-                  return (
-                    <div key={cred.service} className="p-3 bg-butler-800 rounded-lg">
-                      <div className="flex items-center justify-between mb-2">
-                        <div>
-                          <div className="text-sm text-butler-100">{info.label}</div>
-                          <div className="text-xs text-butler-500">{info.description}</div>
-                        </div>
-                        {cred.status === 'failed' && (
-                          <span className="px-2 py-0.5 rounded text-xs bg-red-900/50 text-red-300">Failed</span>
-                        )}
+              {logins.main && (
+                <>
+                  <p className="text-xs text-butler-500 mb-3">
+                    One login for these apps, on the web or in their mobile apps.
+                  </p>
+                  <div className="p-3 bg-butler-800 rounded-lg space-y-1.5">
+                    <CredentialRow label="Username" value={logins.main.username} />
+                    {logins.main.password ? (
+                      <SecretRow
+                        value={logins.main.password}
+                        shown={visiblePasswords.has('main')}
+                        onToggle={() => togglePasswordVisibility('main')}
+                      />
+                    ) : (
+                      <CredentialRow label="Password" value="Not stored yet: set one above" />
+                    )}
+                    <div className="text-xs text-butler-400 pt-1">
+                      Works for {logins.main.services.map(c => serviceLabel(c.service)).join(' · ')}
+                    </div>
+                    {logins.main.otherUsernames.map(c => (
+                      <div key={c.service} className="text-xs text-butler-500">
+                        {serviceLabel(c.service)} signs in with <span className="font-mono">{c.username}</span>
                       </div>
-                      {cred.status === 'active' && (
-                        <div className="space-y-1.5">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-butler-400">Username</span>
-                            <span className="font-mono text-xs text-butler-200">{cred.username}</span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-butler-400">Password</span>
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono text-xs text-butler-200">
-                                {showPassword ? cred.password : '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022'}
-                              </span>
-                              <button
-                                onClick={() => togglePasswordVisibility(cred.service)}
-                                className="text-xs text-accent hover:text-accent/80"
-                              >
-                                {showPassword ? 'Hide' : 'Show'}
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                      {cred.status === 'failed' && cred.errorMessage && (
-                        <div className="text-xs text-red-400 mt-1">{cred.errorMessage}</div>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {logins.different.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  <p className="text-xs text-amber-300">
+                    These have a different password. Setting your password above brings them back in line.
+                  </p>
+                  {logins.different.map(cred => (
+                    <div key={cred.service} className="p-3 bg-butler-800 rounded-lg space-y-1.5">
+                      <div className="text-sm text-butler-100">{serviceLabel(cred.service)}</div>
+                      <CredentialRow label="Username" value={cred.username} />
+                      {cred.password && (
+                        <SecretRow
+                          value={cred.password}
+                          shown={visiblePasswords.has(cred.service)}
+                          onToggle={() => togglePasswordVisibility(cred.service)}
+                        />
                       )}
                     </div>
-                  )
-                })}
-              </div>
+                  ))}
+                </div>
+              )}
+
+              {logins.failed.map(cred => (
+                <div key={cred.service} className="mt-3 p-3 bg-butler-800 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-butler-100">{serviceLabel(cred.service)}</div>
+                    <span className="px-2 py-0.5 rounded text-xs bg-red-900/50 text-red-300">Failed</span>
+                  </div>
+                  {cred.errorMessage && (
+                    <div className="text-xs text-red-400 mt-1">{cred.errorMessage}</div>
+                  )}
+                </div>
+              ))}
+
+              {logins.shared.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-butler-700 space-y-2">
+                  <p className="text-xs text-butler-500">
+                    Shared accounts. Butler and the download apps use these, so they don't change with your password.
+                  </p>
+                  {logins.shared.map(cred => (
+                    <div key={cred.service} className="p-3 bg-butler-800 rounded-lg space-y-1.5">
+                      <div className="text-sm text-butler-100">{serviceLabel(cred.service)}</div>
+                      <CredentialRow label="Username" value={cred.username} />
+                      {cred.password && (
+                        <SecretRow
+                          value={cred.password}
+                          shown={visiblePasswords.has(cred.service)}
+                          onToggle={() => togglePasswordVisibility(cred.service)}
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {/* Retry failed services */}
               {serviceCredentials.some(c => c.status === 'failed') && (
@@ -1344,13 +1409,13 @@ export default function Settings() {
                   <label className="block text-sm text-butler-300 mb-2">Select User</label>
                   <select
                     value={selectedUserId || ''}
-                    onChange={(e) => setSelectedUserId(e.target.value || null)}
+                    onChange={(e) => { setSelectedUserId(e.target.value || null); setLinkResults(null); setLinkError(null) }}
                     className="input w-full"
                   >
                     <option value="">Choose a user...</option>
                     {adminUsers.map(u => (
                       <option key={u.id} value={u.id}>
-                        {u.name} {u.role === 'admin' ? '(admin)' : ''}
+                        {u.name}{u.username ? ` · ${u.username}` : ''} {u.role === 'admin' ? '(admin)' : ''}
                       </option>
                     ))}
                   </select>
@@ -1381,6 +1446,34 @@ export default function Settings() {
                         </button>
                       )
                     })}
+
+                    <div className="pt-3 mt-3 border-t border-butler-700 space-y-2">
+                      <CredentialRow label="Username" value={selectedUser.username || 'not set'} />
+                      <p className="text-xs text-butler-500">
+                        Finds logins this user already has (made by hand, or before Butler set them up) so password changes reach them.
+                      </p>
+                      {linkError && <div className="text-xs text-red-400">{linkError}</div>}
+                      {linkResults && (
+                        <div className="space-y-0.5">
+                          {linkResults.map(r => (
+                            <div key={r.service} className={`text-xs ${
+                              r.status === 'linked' ? 'text-green-400'
+                                : r.status === 'already' ? 'text-butler-400'
+                                  : r.status === 'not_found' ? 'text-butler-500' : 'text-amber-300'
+                            }`}>
+                              {serviceLabel(r.service)}: {LINK_STATUS_TEXT[r.status]}{r.error ? ` (${r.error})` : ''}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <button
+                        onClick={() => linkAccounts(selectedUser.id)}
+                        disabled={isLinking || !selectedUser.username}
+                        className="w-full btn bg-butler-700 text-butler-300 hover:bg-butler-600 text-sm disabled:opacity-50"
+                      >
+                        {isLinking ? 'Looking...' : 'Link Existing Accounts'}
+                      </button>
+                    </div>
 
                     {selectedUser.role !== 'admin' && (
                       <div className="pt-3 mt-3 border-t border-butler-700 space-y-2">
@@ -1477,6 +1570,66 @@ function SettingsTabs({ tab, onChange, isAdmin }: {
           {t.label}
         </button>
       ))}
+    </div>
+  )
+}
+
+function serviceLabel(service: string): string {
+  return SERVICE_DISPLAY_NAMES[service]?.label || service
+}
+
+/**
+ * Group the user's logins by password: the most common one is "your login"
+ * (normally all of them, since password changes go to every service). Linked
+ * accounts whose password Butler doesn't hold yet count as one group.
+ */
+function summariseLogins(credentials: ServiceCredential[]) {
+  const own = credentials.filter(c => c.status === 'active' && !c.shared)
+  const byPassword = new Map<string, ServiceCredential[]>()
+  for (const c of own) {
+    const key = c.password ?? ''
+    byPassword.set(key, [...(byPassword.get(key) ?? []), c])
+  }
+  // Largest group wins; on a tie prefer one with a stored password
+  const groups = [...byPassword.entries()].sort((a, b) => b[1].length - a[1].length || (b[0] ? 1 : 0) - (a[0] ? 1 : 0))
+  const [mainPassword, mainServices] = groups[0] ?? ['', []]
+  const usernameCounts = new Map<string, number>()
+  for (const c of mainServices) usernameCounts.set(c.username, (usernameCounts.get(c.username) ?? 0) + 1)
+  const username = [...usernameCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? ''
+  return {
+    main: mainServices.length
+      ? {
+          username,
+          password: mainPassword || null,
+          services: mainServices,
+          otherUsernames: mainServices.filter(c => c.username !== username),
+        }
+      : null,
+    different: groups.slice(1).flatMap(([, creds]) => creds),
+    failed: credentials.filter(c => c.status !== 'active'),
+    shared: credentials.filter(c => c.shared),
+  }
+}
+
+function CredentialRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-xs text-butler-400">{label}</span>
+      <span className="font-mono text-xs text-butler-200 truncate">{value}</span>
+    </div>
+  )
+}
+
+function SecretRow({ value, shown, onToggle }: { value: string; shown: boolean; onToggle: () => void }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-xs text-butler-400">Password</span>
+      <div className="flex items-center gap-2 min-w-0">
+        <span className="font-mono text-xs text-butler-200 truncate">{shown ? value : '\u2022'.repeat(12)}</span>
+        <button onClick={onToggle} className="text-xs text-accent hover:text-accent/80 shrink-0">
+          {shown ? 'Hide' : 'Show'}
+        </button>
+      </div>
     </div>
   )
 }

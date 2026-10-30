@@ -6,6 +6,7 @@ DELETE /api/admin/invite-codes/{code}           — Revoke an unused code
 GET    /api/admin/users                         — List all users with permissions
 PUT    /api/admin/users/{user_id}/permissions   — Update a user's tool permissions
 POST   /api/admin/users/{user_id}/reprovision   — Re-provision service accounts
+POST   /api/admin/users/{user_id}/link-accounts — Link logins made outside onboarding
 DELETE /api/admin/users/{user_id}               — Delete a user + their service accounts
 GET    /api/admin/model                         — Butler's chat model and the choices
 PUT    /api/admin/model                         — Choose the chat model
@@ -29,6 +30,7 @@ from tools import DatabasePool
 from ..deps import ALL_PERMISSION_GROUPS, DEFAULT_PERMISSIONS, get_admin_user, get_db_pool
 from .. import iptv, model_settings
 from ..config import settings
+from ..account_links import link_existing_accounts
 from ..crypto import decrypt_password
 from ..provisioning import deprovision_user_accounts, provision_user_accounts
 
@@ -179,7 +181,7 @@ async def list_users(
     """List all users with their roles and permissions. Admin only."""
     db = pool.pool
     rows = await db.fetch(
-        "SELECT id, name, role, permissions FROM butler.users "
+        "SELECT id, name, role, permissions, service_username FROM butler.users "
         "WHERE id NOT IN ('default', 'system') ORDER BY created_at"
     )
     users = []
@@ -191,6 +193,7 @@ async def list_users(
         users.append(
             AdminUserInfo(
                 id=r["id"], name=r["name"], role=r["role"], permissions=perms,
+                username=r["service_username"],
             )
         )
     return AdminUserListResponse(users=users)
@@ -249,6 +252,20 @@ async def admin_reprovision_user(
         user_id, row["service_username"], password, permissions, pool
     )
     return {"status": "ok", "serviceAccounts": results}
+
+
+@router.post("/users/{user_id}/link-accounts")
+async def admin_link_accounts(
+    user_id: str,
+    admin_id: str = Depends(get_admin_user),
+    pool: DatabasePool = Depends(get_db_pool),
+):
+    """Link a user's existing logins (made outside onboarding) so password changes reach them."""
+    try:
+        results = await link_existing_accounts(user_id, pool)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"status": "ok", "results": results}
 
 
 @router.delete("/users/{user_id}", status_code=204)

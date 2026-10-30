@@ -58,7 +58,17 @@ See `services.yaml` for the full machine-readable port map (the source of truth 
 | `butler-api.noblehaus.uk` | `butler-api:8000` |
 | ~~`esp-gateway.noblehaus.uk`~~ | **Not routed:** the hostname has no DNS record (checked 2026-10-07). The gateway runs on the LAN at `:8770`; add this route in the dashboard if ESP devices need it from outside. |
 | `games.noblehaus.uk` | `games-gateway:80` — every game, under its own path (`docs/17-games.md`). **New games need no route of their own.** |
-| _…(add the rest from the dashboard: photos, jellyfin, ha, etc.)_ | |
+| `jellyfin.noblehaus.uk` | Jellyfin (native app, `:8096`) |
+| `requests.noblehaus.uk` | `seerr:5055` |
+| `books.noblehaus.uk` | `audiobookshelf:13378` |
+| `lazylibrarian.noblehaus.uk` | `lazylibrarian:5299`. **Has no login** (multi-user is broken upstream), so it is open to anyone who finds it |
+| `photos.noblehaus.uk` | `immich-server:2283` |
+| `files.noblehaus.uk` | `nextcloud:80` |
+| `ha.noblehaus.uk` | `homeassistant:8123`. Needs HA's `http.trusted_proxies` (docs/11-smart-home.md) or every request gets 400 |
+
+Checked from outside on 2026-10-30. Radarr, Sonarr, Prowlarr, Bazarr, qBittorrent and Dispatcharr
+have **no** public hostname: they're home-network only, and the Services tab links them for admins
+at `http://<LAN_HOST>:<port>` (`LAN_HOST` in `butler/.env`).
 
 > `doctor.sh` can verify host ports against live containers, but it **cannot** see
 > dashboard tunnel routes — those must be mirrored here by hand.

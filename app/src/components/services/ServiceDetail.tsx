@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { Service } from '../../types/services'
 import type { ServiceCredential } from '../../types/user'
@@ -10,18 +10,26 @@ interface ServiceDetailProps {
   onClose: () => void
 }
 
-/** Map service config IDs to credential service keys used by the backend */
+/** Map service config IDs to credential service keys used by the backend.
+ *  LazyLibrarian and Bazarr have no per-user login, so no account section. */
 const CREDENTIAL_KEY_MAP: Record<string, string> = {
   'jellyfin': 'jellyfin',
+  'seerr': 'jellyfin', // Seerr signs in with the Jellyfin login
   'audiobookshelf': 'audiobookshelf',
-  'lazylibrarian': 'lazylibrarian',
   'immich': 'immich',
   'nextcloud': 'nextcloud',
+  'home-assistant': 'homeassistant',
+  'radarr': 'radarr',
+  'sonarr': 'sonarr',
+  'prowlarr': 'prowlarr',
+  'dispatcharr': 'dispatcharr',
+  'qbittorrent': 'qbittorrent',
 }
 
 export default function ServiceDetail({ service, credentials, onClose }: ServiceDetailProps) {
   const navigate = useNavigate()
   const panelRef = useRef<HTMLDivElement>(null)
+  const [showSharedPassword, setShowSharedPassword] = useState(false)
 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
@@ -222,14 +230,30 @@ export default function ServiceDetail({ service, credentials, onClose }: Service
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-butler-400">Password</span>
-                    <button
-                      onClick={() => navigate('/settings')}
-                      className="text-xs text-accent hover:text-accent/80"
-                    >
-                      View in Settings
-                    </button>
+                    {cred.shared ? (
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs text-butler-200">
+                          {showSharedPassword ? cred.password : '\u2022'.repeat(12)}
+                        </span>
+                        <button
+                          onClick={() => setShowSharedPassword(v => !v)}
+                          className="text-xs text-accent hover:text-accent/80"
+                        >
+                          {showSharedPassword ? 'Hide' : 'Show'}
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => navigate('/settings')}
+                        className="text-xs text-accent hover:text-accent/80"
+                      >
+                        {service.id === 'seerr' ? 'Your Jellyfin password' : 'Your Butler password'}
+                      </button>
+                    )}
                   </div>
-                  {credDisplay && (
+                  {cred.shared ? (
+                    <div className="text-xs text-butler-500 mt-1">Shared account, not changed with your password</div>
+                  ) : credDisplay && (
                     <div className="text-xs text-green-400/70 mt-1">Account ready</div>
                   )}
                 </div>

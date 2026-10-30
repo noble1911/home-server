@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import functools
 import logging
 import re
 from contextlib import asynccontextmanager
@@ -18,6 +19,7 @@ import aiohttp
 
 from tools import DatabasePool
 
+from . import iptv
 from .config import settings
 from .crypto import decrypt_password, encrypt_password
 
@@ -34,6 +36,15 @@ PERMISSION_SERVICE_MAP: dict[str, list[str]] = {
 # Services everyone gets (regardless of permissions)
 UNIVERSAL_SERVICES: list[str] = ["nextcloud"]
 
+# Single-login admin tools (home network only). They aren't provisioned per
+# user: an admin's existing login is linked (api/account_links.py) so that
+# changing the admin's password reaches them too. Not here on purpose:
+# - qBittorrent: a shared service account that Butler, Radarr and Sonarr sign
+#   in with; changing it would break downloads.
+# - Bazarr: runs without a login.
+# - Seerr: users sign in with their Jellyfin login.
+ADMIN_SERVICES: list[str] = ["radarr", "sonarr", "prowlarr", "dispatcharr"]
+
 # NOTE: The following services are NOT auto-provisioned:
 # - Seerr: uses Jellyfin SSO — users log in with their Jellyfin credentials.
 # - LazyLibrarian: multi-user login is broken upstream (CherryPy sessions are not
@@ -46,6 +57,16 @@ def _services_for_user(permissions: list[str]) -> list[str]:
     for perm in permissions:
         services.update(PERMISSION_SERVICE_MAP.get(perm, []))
     return sorted(services)
+
+
+def services_for_account(role: str, permissions: list[str]) -> list[str]:
+    """Every service a user should have a login on: admins get them all."""
+    if role == "admin":
+        return sorted(
+            {s for group in PERMISSION_SERVICE_MAP.values() for s in group}
+            | set(UNIVERSAL_SERVICES) | set(ADMIN_SERVICES)
+        )
+    return _services_for_user(permissions)
 
 
 def _service_is_configured(service: str) -> bool:
@@ -64,6 +85,10 @@ def _service_is_configured(service: str) -> bool:
         "homeassistant": bool(
             settings.home_assistant_url and settings.home_assistant_token
         ),
+        "radarr": bool(settings.radarr_url and settings.radarr_api_key),
+        "sonarr": bool(settings.sonarr_url and settings.sonarr_api_key),
+        "prowlarr": bool(settings.prowlarr_url and settings.prowlarr_api_key),
+        "dispatcharr": bool(settings.dispatcharr_url),
     }
     return checks.get(service, False)
 
@@ -543,6 +568,8 @@ async def update_service_passwords(
         external_id = row["external_id"]
         username = row["username"]
         changer = _PASSWORD_CHANGERS.get(service)
+        if service == "dispatcharr":
+            changer = functools.partial(iptv.change_account_password, pool, user_id)
         if not changer or not _service_is_configured(service):
             results.append({"service": service, "status": "skipped", "error": "Not configured"})
             continue
@@ -635,10 +662,46 @@ async def _change_password_homeassistant(external_id: str, _username: str, new_p
         })
 
 
+async def _change_password_arr(
+    name: str, base_url: str, api_key: str, api_version: str, username: str, new_password: str,
+) -> None:
+    """Radarr/Sonarr/Prowlarr: the single forms login lives in the host settings."""
+    async with aiohttp.ClientSession(timeout=_HTTP_TIMEOUT) as session:
+        headers = {"X-Api-Key": api_key}
+        async with session.get(f"{base_url}/api/{api_version}/config/host", headers=headers) as resp:
+            if resp.status != 200:
+                raise RuntimeError(f"{name} settings unavailable: HTTP {resp.status}")
+            host = await resp.json()
+        host.update({"username": username, "password": new_password, "passwordConfirmation": new_password})
+        async with session.put(
+            f"{base_url}/api/{api_version}/config/host/{host['id']}", json=host, headers=headers,
+        ) as resp:
+            if resp.status not in (200, 202):
+                raise RuntimeError(f"{name} password change failed: HTTP {resp.status} - {await resp.text()}")
+
+
+async def _change_password_radarr(_external_id: str, username: str, new_password: str) -> None:
+    await _change_password_arr("Radarr", settings.radarr_url, settings.radarr_api_key, "v3", username, new_password)
+
+
+async def _change_password_sonarr(_external_id: str, username: str, new_password: str) -> None:
+    await _change_password_arr("Sonarr", settings.sonarr_url, settings.sonarr_api_key, "v3", username, new_password)
+
+
+async def _change_password_prowlarr(_external_id: str, username: str, new_password: str) -> None:
+    await _change_password_arr(
+        "Prowlarr", settings.prowlarr_url, settings.prowlarr_api_key, "v1", username, new_password,
+    )
+
+
 _PASSWORD_CHANGERS: dict[str, Callable[[str, str, str], Awaitable[None]]] = {
     "jellyfin": _change_password_jellyfin,
     "audiobookshelf": _change_password_audiobookshelf,
     "nextcloud": _change_password_nextcloud,
     "immich": _change_password_immich,
     "homeassistant": _change_password_homeassistant,
+    "radarr": _change_password_radarr,
+    "sonarr": _change_password_sonarr,
+    "prowlarr": _change_password_prowlarr,
+    # dispatcharr: iptv.change_account_password (needs the DB pool)
 }

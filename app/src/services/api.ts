@@ -240,6 +240,8 @@ export interface ServiceStatus {
 export interface SystemHealthResponse {
   services: ServiceStatus[]
   summary: { total: number; healthy: number }
+  /** The server's home-network address, for the admin tools' links */
+  lanHost?: string
 }
 
 export interface StorageVolume {

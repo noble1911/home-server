@@ -5,12 +5,17 @@ import type { Service } from '../types/services'
 import type { ServiceCategory } from '../types/services'
 import type { ServiceCredential } from '../types/user'
 import { getSystemHealth, api, type ServiceStatus } from '../services/api'
-import { services as defaultServices, categoryLabels, applyHealthStatus } from '../config/services'
+import { servicesFor, categoryLabels, applyHealthStatus } from '../config/services'
+import { useAuthStore } from '../stores/authStore'
+import { useUserStore } from '../stores/userStore'
 
 const REFRESH_INTERVAL = 60_000
 
 export default function Services() {
+  const isAdmin = useAuthStore(s => s.role === 'admin')
+  const permissions = useUserStore(s => s.profile?.permissions) ?? []
   const [healthData, setHealthData] = useState<ServiceStatus[] | null>(null)
+  const [lanHost, setLanHost] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [selectedService, setSelectedService] = useState<Service | null>(null)
   const [credentials, setCredentials] = useState<ServiceCredential[]>([])
@@ -19,6 +24,7 @@ export default function Services() {
     try {
       const data = await getSystemHealth()
       setHealthData(data.services)
+      setLanHost(data.lanHost || null)
       setError('')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch service status')
@@ -37,9 +43,10 @@ export default function Services() {
       .catch(() => setCredentials([]))
   }, [])
 
+  const available = servicesFor(isAdmin, permissions, lanHost)
   const services = healthData
-    ? applyHealthStatus(defaultServices, healthData)
-    : defaultServices
+    ? applyHealthStatus(available, healthData)
+    : available
 
   const categories = [...new Set(services.map(s => s.category))] as ServiceCategory[]
 

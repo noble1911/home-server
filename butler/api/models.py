@@ -82,6 +82,7 @@ class AdminUserInfo(BaseModel):
     name: str
     role: str
     permissions: list[str]
+    username: str | None = None
 
 
 class AdminUserListResponse(BaseModel):
@@ -188,6 +189,8 @@ class ServiceCredential(BaseModel):
     status: str  # "active", "failed", "decrypt_error"
     errorMessage: str | None = None
     createdAt: str
+    # A shared service account (qBittorrent), not the user's own login
+    shared: bool = False
 
 
 class ServiceCredentialsResponse(BaseModel):

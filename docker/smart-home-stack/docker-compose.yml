@@ -46,6 +46,11 @@ volumes:
   homeassistant-config:
     name: homeassistant-config
 
+# --- Remote access (ha.noblehaus.uk) ---
+# The Cloudflare tunnel is a reverse proxy: without an `http:` block that trusts
+# the homeserver network, HA answers every tunnelled request with 400. See
+# docs/11-smart-home.md ("Remote access through the Cloudflare tunnel").
+
 # --- Butler Webhook Integration ---
 # To enable event-driven automations from HA to Butler, add the following
 # to your Home Assistant configuration.yaml (inside the HA config volume):

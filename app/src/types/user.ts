@@ -121,6 +121,8 @@ export interface ServiceCredential {
   status: 'active' | 'failed' | 'decrypt_error'
   errorMessage?: string
   createdAt: string
+  /** A shared service account (qBittorrent), not the user's own login */
+  shared?: boolean
 }
 
 export const SERVICE_DISPLAY_NAMES: Record<string, { label: string; description: string }> = {
@@ -130,6 +132,11 @@ export const SERVICE_DISPLAY_NAMES: Record<string, { label: string; description:
   immich: { label: 'Immich', description: 'Photo Management' },
   lazylibrarian: { label: 'LazyLibrarian', description: 'Book Search & Downloads' },
   homeassistant: { label: 'Home Assistant', description: 'Smart Home Control' },
+  radarr: { label: 'Radarr', description: 'Movie downloads' },
+  sonarr: { label: 'Sonarr', description: 'TV downloads' },
+  prowlarr: { label: 'Prowlarr', description: 'Indexers' },
+  dispatcharr: { label: 'Dispatcharr', description: 'Live TV & guide' },
+  qbittorrent: { label: 'qBittorrent', description: 'Torrent client' },
 }
 
 export interface AdminUser {
@@ -137,6 +144,7 @@ export interface AdminUser {
   name: string
   role: UserRole
   permissions: ToolPermission[]
+  username?: string | null
 }
 
 export const PERMISSION_INFO: Record<ToolPermission, { label: string; description: string }> = {

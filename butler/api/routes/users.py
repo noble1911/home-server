@@ -23,6 +23,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 
 from tools import DatabasePool, Tool, WhatsAppTool
 
+from ..config import settings
 from ..crypto import decrypt_password
 from ..deps import get_current_user, get_db_pool, get_tools
 from ..models import (
@@ -337,6 +338,18 @@ async def get_service_credentials(
         if row["error_message"]:
             cred["errorMessage"] = row["error_message"]
         credentials.append(cred)
+
+    # Admins also see qBittorrent's shared account (Butler and the *arr apps use it)
+    role = await db.fetchval("SELECT role FROM butler.users WHERE id = $1", user_id)
+    if role == "admin" and settings.qbittorrent_url and settings.qbittorrent_password:
+        credentials.append({
+            "service": "qbittorrent",
+            "username": settings.qbittorrent_username,
+            "password": settings.qbittorrent_password,
+            "status": "active",
+            "createdAt": "",
+            "shared": True,
+        })
 
     return {"credentials": credentials}
 

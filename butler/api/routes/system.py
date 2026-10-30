@@ -46,7 +46,7 @@ async def system_health(
     """Service health statuses for all monitored services."""
     health_tool = tools.get("server_health")
     if not isinstance(health_tool, ServerHealthTool):
-        return {"services": [], "summary": {"total": 0, "healthy": 0}}
+        return {"services": [], "summary": {"total": 0, "healthy": 0}, "lanHost": settings.lan_host}
 
     probes = await asyncio.gather(
         *(health_tool._probe(name, svc) for name, svc in health_tool._services.items())
@@ -66,6 +66,8 @@ async def system_health(
     return {
         "services": services,
         "summary": {"total": len(services), "healthy": healthy},
+        # Where the home-network-only admin tools live (Services tab links)
+        "lanHost": settings.lan_host,
     }
 
 

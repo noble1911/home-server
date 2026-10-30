@@ -71,6 +71,10 @@ class Settings(BaseSettings):
     seerr_url: str = ""
     seerr_api_key: str = ""
 
+    # The server's address on the home network (e.g. 192.168.1.117): the
+    # Services tab links admin tools that have no public hostname here.
+    lan_host: str = ""
+
 
     # Sonarr (TV series management)
     sonarr_url: str = ""

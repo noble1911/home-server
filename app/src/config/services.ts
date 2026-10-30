@@ -3,29 +3,49 @@ import type { ServiceStatus } from '../services/api'
 
 /**
  * Maps backend health-check service names to frontend service IDs.
- * Only user-facing services are included — infrastructure services
- * (radarr, sonarr, prowlarr, etc.) are shown on the Dashboard instead.
+ * Infrastructure without a page of its own (flaresolverr, databases) is
+ * shown on the Dashboard instead.
  */
 const SERVICE_NAME_MAP: Record<string, string> = {
   'jellyfin': 'jellyfin',
   'audiobookshelf': 'audiobookshelf',
-  'lazylibrarian': 'lazylibrarian', // kept for health status display only
+  'lazylibrarian': 'lazylibrarian',
   'immich-server': 'immich',
   'nextcloud': 'nextcloud',
   'homeassistant': 'home-assistant',
   'seerr': 'seerr',
+  'radarr': 'radarr',
+  'sonarr': 'sonarr',
+  'prowlarr': 'prowlarr',
+  'bazarr': 'bazarr',
+  'qbittorrent': 'qbittorrent',
+  'dispatcharr': 'dispatcharr',
 }
 
-// Set VITE_TUNNEL_DOMAIN (e.g. "noblehaus.uk") for Cloudflare Tunnel access.
-// Each service resolves to https://{subdomain}.{domain}.
-// Individual VITE_<SERVICE>_URL overrides still take priority.
-const TUNNEL_DOMAIN = import.meta.env.VITE_TUNNEL_DOMAIN || ''
+/**
+ * The public domain the app is being used through: "noblehaus.uk" when it's
+ * loaded from butler.noblehaus.uk. Worked out at runtime, so a build made
+ * without VITE_TUNNEL_DOMAIN can't point every service at
+ * butler.noblehaus.uk:<port>. Null on the home network (an IP, localhost or
+ * a .local name), where services are reached by port instead.
+ */
+function publicDomain(): string | null {
+  if (import.meta.env.VITE_TUNNEL_DOMAIN) return import.meta.env.VITE_TUNNEL_DOMAIN
+  if (typeof window === 'undefined') return null
+  const host = window.location.hostname
+  const labels = host.split('.')
+  if (host === 'localhost' || host.endsWith('.local') || /^[\d.]+$/.test(host) || labels.length < 3) return null
+  return labels.slice(1).join('.')
+}
 
+// Each service resolves to https://{subdomain}.{domain}; individual
+// VITE_<SERVICE>_URL overrides still take priority.
 function serviceUrl(envVar: string, port: number, tunnelSubdomain: string): string {
   const explicit = import.meta.env[envVar]
   if (explicit) return explicit
-  if (TUNNEL_DOMAIN) return `https://${tunnelSubdomain}.${TUNNEL_DOMAIN}`
-  // Fall back to current hostname — works on LAN without any config
+  const domain = publicDomain()
+  if (domain) return `https://${tunnelSubdomain}.${domain}`
+  // On the home network: same host, the service's own port
   const host = typeof window !== 'undefined' ? window.location.hostname : 'localhost'
   return `http://${host}:${port}`
 }
@@ -42,6 +62,7 @@ const seerrUrl = serviceUrl('VITE_SEERR_URL', 5055, 'requests')
 export const services: Service[] = [
   {
     id: 'jellyfin',
+    access: 'media',
     name: 'Jellyfin',
     description: 'Movies & TV Shows',
     icon: '🎬',
@@ -69,6 +90,7 @@ export const services: Service[] = [
   },
   {
     id: 'seerr',
+    access: 'media',
     name: 'Seerr',
     description: 'Media Requests',
     icon: '🎬',
@@ -92,6 +114,7 @@ export const services: Service[] = [
   },
   {
     id: 'audiobookshelf',
+    access: 'media',
     name: 'Audiobookshelf',
     description: 'Ebooks & Audiobooks',
     icon: '🎧',
@@ -120,6 +143,7 @@ export const services: Service[] = [
   },
   {
     id: 'lazylibrarian',
+    access: 'media',
     name: 'LazyLibrarian',
     description: 'Book Search & Downloads',
     icon: '📚',
@@ -143,6 +167,7 @@ export const services: Service[] = [
   },
   {
     id: 'immich',
+    access: 'media',
     name: 'Immich',
     description: 'Photo Backup',
     icon: '📷',
@@ -170,6 +195,7 @@ export const services: Service[] = [
   },
   {
     id: 'nextcloud',
+    access: 'everyone',
     name: 'Nextcloud',
     description: 'Files & Documents',
     icon: '📁',
@@ -197,6 +223,7 @@ export const services: Service[] = [
   },
   {
     id: 'home-assistant',
+    access: 'home',
     name: 'Home Assistant',
     description: 'Smart Home Control',
     icon: '🏠',
@@ -224,12 +251,61 @@ export const services: Service[] = [
   },
 ]
 
+/** Admin tools with no public hostname: linked on the home network only. */
+const adminTools: Service[] = [
+  adminTool('radarr', 'Radarr', 'Movie downloads', '🎥', 7878,
+    'Finds and downloads movies, including the ones requested in Seerr or through Butler.'),
+  adminTool('sonarr', 'Sonarr', 'TV downloads', '📺', 8989,
+    'Finds and downloads TV episodes, including the ones requested in Seerr or through Butler.'),
+  adminTool('prowlarr', 'Prowlarr', 'Indexers', '🔎', 9696,
+    'Manages the torrent indexers that Radarr, Sonarr and Butler\'s book search use.'),
+  adminTool('bazarr', 'Bazarr', 'Subtitles', '💬', 6767,
+    'Downloads subtitles for movies and TV. It has no sign-in.'),
+  adminTool('qbittorrent', 'qBittorrent', 'Torrent client', '⬇️', 8081,
+    'Does the downloading. Sign in with its shared account (below); Butler, Radarr and Sonarr use it too, so it isn\'t changed with your password.'),
+  adminTool('dispatcharr', 'Dispatcharr', 'Live TV & guide', '📡', 9191,
+    'Feeds IPTV channels and the TV guide to Jellyfin Live TV. Set the provider in Settings → Admin.'),
+]
+
+function adminTool(id: string, name: string, description: string, icon: string, port: number, whatItDoes: string): Service {
+  return {
+    id, name, description, icon, port,
+    url: '',
+    category: 'admin',
+    access: 'admin',
+    guide: {
+      whatItDoes,
+      steps: [
+        'Only reachable from the home network',
+        id === 'bazarr' || id === 'qbittorrent'
+          ? 'Open it from this page while you\'re at home'
+          : 'Sign in with your Butler username and password',
+      ],
+    },
+  }
+}
+
+/**
+ * The services this user can use, with links resolved. Admins see every one,
+ * including the home-network admin tools (at http://<lanHost>:<port>); others
+ * see what their permissions give them.
+ */
+export function servicesFor(isAdmin: boolean, permissions: string[], lanHost?: string | null): Service[] {
+  const allowed = (s: Service) =>
+    isAdmin || s.access === 'everyone' || (s.access !== 'admin' && permissions.includes(s.access))
+  // On the home network the page's own host is the server; through the tunnel it isn't
+  const host = lanHost || (publicDomain() ? '' : window.location.hostname)
+  const tools = host ? adminTools.map(t => ({ ...t, url: `http://${host}:${t.port}` })) : []
+  return [...services, ...tools].filter(allowed)
+}
+
 export const categoryLabels: Record<ServiceCategory, string> = {
   'media': 'Media',
   'books': 'Books',
   'photos': 'Photos',
   'files': 'Files',
   'smart-home': 'Smart Home',
+  'admin': 'Admin tools · home network',
 }
 
 /**

@@ -101,6 +101,24 @@ The guide covers: AWS account setup, Lambda deployment, Alexa skill creation, ac
 
 ## Home Assistant Configuration
 
+### Remote access through the Cloudflare tunnel
+
+`ha.noblehaus.uk` reaches Home Assistant through `cloudflared`, a reverse proxy.
+Home Assistant refuses proxied requests with **400: Bad Request** (and logs "A request
+from a reverse proxy was received … but your HTTP integration is not set-up for reverse
+proxies") until it is told to trust it. Add this to `configuration.yaml` (in the
+`homeassistant-config` volume) and restart Home Assistant:
+
+```yaml
+http:
+  use_x_forwarded_for: true
+  trusted_proxies:
+    - 192.168.97.0/24  # the `homeserver` Docker network (cloudflared); check with
+                       # docker network inspect homeserver
+```
+
+Alexa (haaska) goes through the same hostname, so it needs this too.
+
 ### Exposing Entities to Alexa
 
 In Home Assistant, only entities in your "Exposed" list work with Alexa.

@@ -1,3 +1,5 @@
+import type { ToolPermission } from './user'
+
 export interface MobileApp {
   name: string
   ios?: string
@@ -20,11 +22,15 @@ export interface Service {
   url: string
   mobileUrl?: string // Deep link for mobile apps
   category: ServiceCategory
+  /** Who sees it: everyone, holders of a permission, or admins only */
+  access: 'everyone' | 'admin' | ToolPermission
+  /** Home-network port (admin tools, linked as http://<lanHost>:<port>) */
+  port?: number
   status?: 'online' | 'offline' | 'unknown'
   guide?: ServiceGuide
 }
 
-export type ServiceCategory = 'media' | 'books' | 'photos' | 'files' | 'smart-home'
+export type ServiceCategory = 'media' | 'books' | 'photos' | 'files' | 'smart-home' | 'admin'
 
 export interface ServiceStatus {
   id: string

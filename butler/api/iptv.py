@@ -238,6 +238,32 @@ async def _login(
         return (await resp.json())["access"]
 
 
+async def change_account_password(
+    pool: DatabasePool, user_id: str, external_id: str, username: str, new_password: str,
+) -> None:
+    """Set a Dispatcharr user's password, as part of an admin's password change.
+
+    Signs in before the change (the old password is still valid), then keeps the
+    IPTV sync working if its saved Dispatcharr login is this same account.
+    """
+    base = settings.dispatcharr_url.rstrip("/")
+    provider = await get_provider(pool) or {}
+    async with aiohttp.ClientSession(timeout=_HTTP_TIMEOUT) as session:
+        token = await _login(session, base, pool, provider, user_id)
+        async with session.patch(
+            f"{base}/api/accounts/users/{external_id}/",
+            json={"password": new_password},
+            headers={"Authorization": f"Bearer {token}"},
+        ) as resp:
+            if resp.status != 200:
+                raise DispatcharrError(f"Dispatcharr password change failed: HTTP {resp.status} - {await resp.text()}")
+    if provider.get("dispatcharr_username") == username:
+        await pool.pool.execute(
+            "UPDATE butler.iptv_provider SET dispatcharr_password_encrypted = $1 WHERE id = 1",
+            encrypt_password(new_password),
+        )
+
+
 async def _service_login(pool: DatabasePool, admin_id: str) -> tuple[str, str]:
     """The admin's service username and password.
 
