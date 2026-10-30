@@ -44,6 +44,8 @@ class RedeemInviteResponse(BaseModel):
     hasCompletedOnboarding: bool
     role: str = "user"
     username: str | None = None
+    # Password reset only: how each linked app took the new password
+    passwordResults: list[dict] | None = None
 
 
 class RefreshTokenRequest(BaseModel):

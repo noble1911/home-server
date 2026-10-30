@@ -20,7 +20,7 @@ import uuid
 from collections import defaultdict, deque
 
 import jwt as pyjwt
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from tools import DatabasePool
 
@@ -49,11 +49,13 @@ from ..passwords import (
     set_user_password,
     verify_password_async,
 )
+from ..ratelimit import _client_ip
 
 router = APIRouter()
 
-# Failed sign-ins per username: the per-IP auth limit alone would let someone
-# rotate addresses against one account.
+# Failed sign-ins per (username, client IP). Per username alone, anyone could
+# keep a known user locked out by failing on purpose; per IP alone is the
+# general auth limit. This blocks only whoever is guessing.
 _FAILED_LOGIN_LIMIT = 5
 _FAILED_LOGIN_WINDOW = 15 * 60  # seconds
 _failed_logins: dict[str, deque[float]] = defaultdict(deque)
@@ -110,11 +112,13 @@ def _new_user_id() -> str:
 @router.post("/login", response_model=RedeemInviteResponse)
 async def login(
     req: LoginRequest,
+    request: Request,
     pool: DatabasePool = Depends(get_db_pool),
 ):
     """Sign in with the username and password chosen at onboarding."""
     username = req.username.strip().lower()
-    if _recent_failures(username) >= _FAILED_LOGIN_LIMIT:
+    attempt_key = f"{username}|{_client_ip(request)}"
+    if _recent_failures(attempt_key) >= _FAILED_LOGIN_LIMIT:
         raise HTTPException(429, "Too many attempts. Wait a few minutes and try again.")
 
     db = pool.pool
@@ -124,10 +128,10 @@ async def login(
     )
     ok = await verify_password_async(req.password, user["password_hash"] if user else _DUMMY_HASH)
     if not user or not user["password_hash"] or not ok:
-        _failed_logins[username].append(time.monotonic())
+        _failed_logins[attempt_key].append(time.monotonic())
         raise HTTPException(401, "Incorrect username or password")
 
-    _failed_logins.pop(username, None)
+    _failed_logins.pop(attempt_key, None)
     return await _issue_tokens(db, user["id"])
 
 
@@ -224,19 +228,29 @@ async def reset_password(
         raise HTTPException(400, "This account has no username yet. Ask an admin to set one.")
 
     user_id = row["user_id"]
+    code_hash = hash_code(req.code)
+    # Claim the code first so it can't be used twice at once...
     used = await db.execute(
         "UPDATE butler.password_reset_codes SET used_at = NOW() WHERE code_hash = $1 AND used_at IS NULL",
-        hash_code(req.code),
+        code_hash,
     )
     if used == "UPDATE 0":
         raise HTTPException(401, "That reset code was just used")
-    await set_user_password(user_id, req.newPassword, pool)
+    try:
+        results = await set_user_password(user_id, req.newPassword, pool)
+    except Exception:
+        # ...but give it back if the change didn't happen, so it can be retried
+        await db.execute("UPDATE butler.password_reset_codes SET used_at = NULL WHERE code_hash = $1", code_hash)
+        raise
     # Whoever had the old password shouldn't stay signed in
     await db.execute(
         "UPDATE butler.refresh_tokens SET revoked_at = NOW() WHERE user_id = $1 AND revoked_at IS NULL",
         user_id,
     )
-    return await _issue_tokens(db, user_id)
+    response = await _issue_tokens(db, user_id)
+    # Apps that refused it (e.g. Nextcloud's breached-password check) keep the old one
+    response.passwordResults = results
+    return response
 
 
 @router.post("/refresh", response_model=RedeemInviteResponse)

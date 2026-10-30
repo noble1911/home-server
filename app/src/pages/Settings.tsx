@@ -107,6 +107,7 @@ export default function Settings() {
   const [reprovisionError, setReprovisionError] = useState<string | null>(null)
 
   // Service password change state
+  const [currentPassword, setCurrentPassword] = useState('')
   const [newServicePassword, setNewServicePassword] = useState('')
   const [confirmServicePassword, setConfirmServicePassword] = useState('')
   const [passwordChangeLoading, setPasswordChangeLoading] = useState(false)
@@ -277,9 +278,10 @@ export default function Settings() {
     try {
       const data = await api.put<{ results: { service: string; status: string; error?: string }[] }>(
         '/user/service-password',
-        { newPassword: newServicePassword }
+        { newPassword: newServicePassword, currentPassword }
       )
       setPasswordChangeResults([{ service: 'butler', status: 'updated' }, ...data.results])
+      setCurrentPassword('')
       setNewServicePassword('')
       setConfirmServicePassword('')
       await Promise.all([fetchServiceCredentials(), fetchProfile()])
@@ -662,6 +664,16 @@ export default function Settings() {
                     Your Butler sign-in, and the same password on every app under Your Logins.
                   </p>
                   <div className="space-y-2">
+                    {profile.hasPassword && (
+                      <input
+                        type="password"
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
+                        placeholder="Current password"
+                        autoComplete="current-password"
+                        className="input w-full text-sm"
+                      />
+                    )}
                     <input
                       type="password"
                       value={newServicePassword}
@@ -683,6 +695,7 @@ export default function Settings() {
                       onClick={changeServicePassword}
                       disabled={
                         passwordChangeLoading ||
+                        (profile.hasPassword && !currentPassword) ||
                         !newServicePassword ||
                         newServicePassword.length < 10 ||
                         newServicePassword !== confirmServicePassword

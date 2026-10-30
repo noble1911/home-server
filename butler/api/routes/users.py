@@ -19,6 +19,8 @@ from __future__ import annotations
 import json
 import logging
 
+import asyncpg
+
 from fastapi import APIRouter, Depends, HTTPException, Response
 
 from tools import DatabasePool, Tool, WhatsAppTool
@@ -39,7 +41,7 @@ from ..models import (
     UserProfile,
 )
 from ..oauth import revoke_google_token
-from ..passwords import MIN_PASSWORD_LENGTH, hash_password_async, set_user_password
+from ..passwords import MIN_PASSWORD_LENGTH, hash_password_async, set_user_password, verify_password_async
 from ..crypto import encrypt_password
 from ..provisioning import (
     deprovision_user_accounts,
@@ -264,17 +266,12 @@ async def complete_onboarding(
     soul_dict = req.soul.model_dump(exclude_none=True)
     soul_dict["butler_name"] = req.butlerName
 
-    await db.execute(
-        """
-        UPDATE butler.users SET name = $2, soul = $3::jsonb, email = $4 WHERE id = $1
-        """,
-        user_id,
-        req.name,
-        soul_dict,
-        req.email or None,
-    )
+    # A login, once set, changes only in Settings (with the current password)
+    if await db.fetchval("SELECT password_hash IS NOT NULL FROM butler.users WHERE id = $1", user_id):
+        raise HTTPException(409, "Your login is already set up. Change your password in Settings.")
 
-    # The login for Butler and the apps: usernames are unique, any case
+    # Check the username before saving anything: saving the name first marks
+    # the account onboarded, which would kill its invite code with no login set
     taken = await db.fetchval(
         "SELECT 1 FROM butler.users WHERE lower(service_username) = lower($1) AND id <> $2",
         req.serviceUsername, user_id,
@@ -282,13 +279,20 @@ async def complete_onboarding(
     if taken:
         raise HTTPException(409, "That username is taken. Choose another.")
 
-    # Butler's sign-in hash, plus the encrypted copy kept for re-provisioning
-    await db.execute(
-        "UPDATE butler.users SET service_username = $2, service_password_encrypted = $3, "
-        "password_hash = $4 WHERE id = $1",
-        user_id, req.serviceUsername, encrypt_password(req.servicePassword),
-        await hash_password_async(req.servicePassword),
-    )
+    # Everything in one write, so the account is never half set up. Also the
+    # sign-in hash, plus the encrypted copy kept for re-provisioning.
+    try:
+        await db.execute(
+            """UPDATE butler.users
+               SET name = $2, soul = $3::jsonb, email = $4, service_username = $5,
+                   service_password_encrypted = $6, password_hash = $7
+               WHERE id = $1""",
+            user_id, req.name, soul_dict, req.email or None, req.serviceUsername,
+            encrypt_password(req.servicePassword), await hash_password_async(req.servicePassword),
+        )
+    except asyncpg.UniqueViolationError:
+        # Someone took it between the check and the write
+        raise HTTPException(409, "That username is taken. Choose another.")
 
     # Get user permissions (default to ["media", "home"] for new users)
     raw_perms = await db.fetchval(
@@ -395,10 +399,17 @@ async def change_service_password(
     user_id: str = Depends(get_current_user),
     pool: DatabasePool = Depends(get_db_pool),
 ):
-    """Change the user's password: Butler sign-in and every linked app."""
+    """Change the user's password: Butler sign-in and every linked app.
+
+    Once a password is set, the current one is required, so a stolen access
+    token can't take the account over.
+    """
     new_password = req.get("newPassword")
     if not new_password or len(new_password) < MIN_PASSWORD_LENGTH:
         raise HTTPException(400, f"Password must be at least {MIN_PASSWORD_LENGTH} characters")
+    current_hash = await pool.pool.fetchval("SELECT password_hash FROM butler.users WHERE id = $1", user_id)
+    if current_hash and not await verify_password_async(req.get("currentPassword") or "", current_hash):
+        raise HTTPException(403, "Your current password is wrong")
 
     results = await set_user_password(user_id, new_password, pool)
     return {"status": "ok", "results": results}

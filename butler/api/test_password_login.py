@@ -130,6 +130,22 @@ def test_repeated_failures_lock_the_username():
     assert r.status_code == 429
 
 
+def test_lockout_only_blocks_the_guesser():
+    db = FakeDb({
+        "lower(service_username) = $1": {"id": "user_1", "password_hash": PASSWORD_HASH},
+        "SELECT name, role, service_username": ISSUED_USER,
+    })
+    client = _client(db)
+    with patch.object(auth_routes, "_client_ip", return_value="203.0.113.9"):
+        for _ in range(auth_routes._FAILED_LOGIN_LIMIT):
+            client.post("/api/auth/login", json={"username": "ron", "password": "nope"})
+        assert client.post("/api/auth/login", json={"username": "ron", "password": "nope"}).status_code == 429
+    # The real user, elsewhere, still gets in
+    with patch.object(auth_routes, "_client_ip", return_value="192.168.1.50"):
+        r = client.post("/api/auth/login", json={"username": "ron", "password": "correct horse"})
+    assert r.status_code == 200
+
+
 # ── Invites ─────────────────────────────────────────────────────────
 
 
@@ -218,6 +234,27 @@ def test_reset_code_sets_password_and_signs_out_elsewhere():
     assert any("refresh_tokens SET revoked_at" in sql for sql, _ in db.executed)
 
 
+def test_reset_reports_apps_that_refused_the_password():
+    db = FakeDb({
+        "FROM butler.password_reset_codes rc": {"user_id": "user_1", "service_username": "ron"},
+        "SELECT name, role, service_username": ISSUED_USER,
+    })
+    results = [{"service": "nextcloud", "status": "failed", "error": "breached"}]
+    with patch.object(auth_routes, "set_user_password", AsyncMock(return_value=results)):
+        r = _client(db).post("/api/auth/reset-password", json={"code": "K7QM-2XRP", "newPassword": "a much longer one"})
+    assert r.json()["passwordResults"] == results
+
+
+def test_failed_reset_gives_the_code_back():
+    db = FakeDb({"FROM butler.password_reset_codes rc": {"user_id": "user_1", "service_username": "ron"}})
+    client = TestClient(_client(db).app, raise_server_exceptions=False)
+    with patch.object(auth_routes, "set_user_password", AsyncMock(side_effect=RuntimeError("db down"))):
+        r = client.post("/api/auth/reset-password", json={"code": "K7QM-2XRP", "newPassword": "a much longer one"})
+    assert r.status_code == 500
+    assert any("used_at = NULL" in sql for sql, _ in db.executed)
+    assert not any("refresh_tokens" in sql for sql, _ in db.executed)
+
+
 def test_reset_code_wrong_or_expired():
     db = FakeDb({"FROM butler.password_reset_codes rc": None})
     r = _client(db).post("/api/auth/reset-password", json={"code": "NOPE-NOPE", "newPassword": "a much longer one"})
@@ -228,3 +265,39 @@ def test_reset_needs_ten_characters():
     db = FakeDb({"FROM butler.password_reset_codes rc": {"user_id": "user_1", "service_username": "ron"}})
     r = _client(db).post("/api/auth/reset-password", json={"code": "K7QM-2XRP", "newPassword": "short"})
     assert r.status_code == 400
+
+
+# ── Changing the password in Settings ───────────────────────────────
+
+
+def _users_client(db: FakeDb) -> TestClient:
+    from .routes import users as users_routes
+
+    app = FastAPI()
+    app.include_router(users_routes.router, prefix="/api")
+    pool = MagicMock()
+    pool.pool = db
+    app.dependency_overrides[users_routes.get_db_pool] = lambda: pool
+    app.dependency_overrides[users_routes.get_current_user] = lambda: "user_1"
+    return TestClient(app)
+
+
+def test_changing_a_set_password_needs_the_current_one():
+    from .routes import users as users_routes
+
+    db = FakeDb({"SELECT password_hash FROM butler.users": PASSWORD_HASH})
+    with patch.object(users_routes, "set_user_password", AsyncMock(return_value=[])) as set_pw:
+        client = _users_client(db)
+        wrong = client.put("/api/user/service-password", json={"newPassword": "a much longer one", "currentPassword": "nope"})
+        right = client.put("/api/user/service-password", json={"newPassword": "a much longer one", "currentPassword": "correct horse"})
+    assert wrong.status_code == 403 and right.status_code == 200
+    set_pw.assert_awaited_once()
+
+
+def test_first_password_needs_no_current_one():
+    from .routes import users as users_routes
+
+    db = FakeDb({"SELECT password_hash FROM butler.users": None})
+    with patch.object(users_routes, "set_user_password", AsyncMock(return_value=[])):
+        r = _users_client(db).put("/api/user/service-password", json={"newPassword": "a much longer one"})
+    assert r.status_code == 200

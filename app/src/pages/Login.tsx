@@ -2,12 +2,15 @@ import { useState } from 'react'
 import { useAuthStore } from '../stores/authStore'
 import { api } from '../services/api'
 import type { AuthTokens, UserRole } from '../types/user'
+import { SERVICE_DISPLAY_NAMES } from '../types/user'
 
 interface AuthResponse {
   tokens: AuthTokens
   hasCompletedOnboarding: boolean
   role: UserRole
   username?: string | null
+  /** Reset only: how each linked app took the new password */
+  passwordResults?: { service: string; status: string; error?: string }[] | null
 }
 
 /** Sign in with your login; an invite code only creates a new account, and a
@@ -25,6 +28,8 @@ export default function Login() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+  // A reset some apps refused: show which before going in
+  const [resetDone, setResetDone] = useState<AuthResponse | null>(null)
 
   const { setTokens, setRole, setOnboardingComplete } = useAuthStore()
 
@@ -55,7 +60,9 @@ export default function Login() {
       } else if (mode === 'invite') {
         signedIn(await api.post<AuthResponse>('/auth/redeem-invite', { code: code.trim().toUpperCase() }))
       } else {
-        signedIn(await api.post<AuthResponse>('/auth/reset-password', { code: code.trim(), newPassword }))
+        const response = await api.post<AuthResponse>('/auth/reset-password', { code: code.trim(), newPassword })
+        if (response.passwordResults?.some(r => r.status !== 'updated')) setResetDone(response)
+        else signedIn(response)
       }
     } catch (err) {
       // Dev-only mock code — stripped from production builds by Vite
@@ -87,6 +94,23 @@ export default function Login() {
           <p className="text-butler-400 mt-1">Your AI Home Assistant</p>
         </div>
 
+        {resetDone ? (
+          <div className="space-y-4">
+            <p className="text-sm text-butler-200">
+              Your password is set{resetDone.username ? <> for <span className="font-mono">{resetDone.username}</span></> : null}.
+              Some apps didn't take it, so they keep your old password for now:
+            </p>
+            <div className="space-y-1">
+              {resetDone.passwordResults?.filter(r => r.status !== 'updated').map(r => (
+                <div key={r.service} className="text-xs text-amber-300">
+                  {SERVICE_DISPLAY_NAMES[r.service]?.label || r.service}: {r.error || r.status}
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-butler-500">You can try another password later in Settings.</p>
+            <button onClick={() => signedIn(resetDone)} className="btn btn-primary w-full py-3">Continue</button>
+          </div>
+        ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
           {mode === 'signin' && (
             <>
@@ -200,8 +224,9 @@ export default function Login() {
               : mode === 'signin' ? 'Sign In' : mode === 'invite' ? 'Create Account' : 'Set Password & Sign In'}
           </button>
         </form>
+        )}
 
-        <div className="flex flex-col items-center gap-2 mt-8 text-sm">
+        {!resetDone && <div className="flex flex-col items-center gap-2 mt-8 text-sm">
           {mode !== 'signin' && (
             <button onClick={() => switchMode('signin')} className="text-accent hover:text-accent/80">
               Sign in with your username
@@ -217,7 +242,7 @@ export default function Login() {
               New here? Have an invite code?
             </button>
           )}
-        </div>
+        </div>}
       </div>
     </div>
   )
