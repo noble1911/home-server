@@ -1,4 +1,4 @@
-"""Tests for the Home Assistant provisioning helpers (no network)."""
+"""Tests for the provisioning helpers: Home Assistant and Nextcloud (no network)."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from .provisioning import _ha_error, _ha_ws_call
+from .provisioning import _ha_error, _ha_ws_call, _ocs_error
 
 
 class TestHaError:
@@ -46,3 +46,22 @@ class TestHaWsCall:
         with pytest.raises(RuntimeError) as ei:
             await _ha_ws_call(ws, 1, {"type": "x"})
         assert "bob" not in str(ei.value)
+
+
+class TestOcsError:
+    """Nextcloud OCS v1 replies HTTP 200 even when it refuses a change."""
+
+    def test_success_codes(self):
+        assert _ocs_error({"ocs": {"meta": {"statuscode": 100}}}) is None
+        assert _ocs_error({"ocs": {"meta": {"statuscode": 200}}}) is None
+
+    def test_refused_password_is_an_error(self):
+        data = {"ocs": {"meta": {"statuscode": 403, "message": "Password needs to be at least 10 characters long."}}}
+        assert _ocs_error(data) == "Nextcloud OCS error: Password needs to be at least 10 characters long."
+
+    def test_breached_password_message(self):
+        data = {"ocs": {"meta": {"statuscode": 403, "message": "Password is present in compromised password list"}}}
+        assert "known data breach" in _ocs_error(data)
+
+    def test_missing_meta(self):
+        assert _ocs_error({}) == "Nextcloud OCS error: Unknown"

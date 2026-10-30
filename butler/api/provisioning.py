@@ -273,17 +273,28 @@ async def _provision_nextcloud(username: str, password: str) -> str:
                 raise RuntimeError(
                     f"Nextcloud user creation failed: HTTP {resp.status} - {body}"
                 )
-            data = await resp.json()
-            meta = data.get("ocs", {}).get("meta", {})
-            if meta.get("statuscode") not in (100, 200):
-                msg = meta.get("message", "Unknown")
-                if "compromised" in msg.lower() or "hibp" in msg.lower() or "breach" in msg.lower():
-                    raise RuntimeError(
-                        "Password rejected by Nextcloud: it appears in a known data breach. "
-                        "Please choose a different password."
-                    )
-                raise RuntimeError(f"Nextcloud OCS error: {msg}")
+            error = _ocs_error(await resp.json())
+            if error:
+                raise RuntimeError(error)
             return username
+
+
+def _ocs_error(data: dict) -> str | None:
+    """The failure in an OCS v1 response, or None if it succeeded.
+
+    OCS v1 answers HTTP 200 even when it refuses a request (e.g. a password
+    too short for Nextcloud's policy); the outcome is ocs.meta.statuscode.
+    """
+    meta = data.get("ocs", {}).get("meta", {})
+    if meta.get("statuscode") in (100, 200):
+        return None
+    msg = meta.get("message") or "Unknown"
+    if "compromised" in msg.lower() or "hibp" in msg.lower() or "breach" in msg.lower():
+        return (
+            "Password rejected by Nextcloud: it appears in a known data breach. "
+            "Please choose a different password."
+        )
+    return f"Nextcloud OCS error: {msg}"
 
 
 async def _provision_immich(username: str, password: str, *, email: str | None = None) -> str:
@@ -598,6 +609,9 @@ async def _change_password_nextcloud(_external_id: str, username: str, new_passw
         ) as resp:
             if resp.status != 200:
                 raise RuntimeError(f"Nextcloud password change failed: HTTP {resp.status}")
+            error = _ocs_error(await resp.json())
+            if error:
+                raise RuntimeError(error)
 
 
 async def _change_password_immich(external_id: str, _username: str, new_password: str) -> None:

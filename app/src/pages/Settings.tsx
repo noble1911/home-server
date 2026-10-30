@@ -225,7 +225,7 @@ export default function Settings() {
 
   async function changeServicePassword() {
     if (newServicePassword !== confirmServicePassword) return
-    if (newServicePassword.length < 6) return
+    if (newServicePassword.length < 10) return
     setPasswordChangeLoading(true)
     setPasswordChangeResults(null)
     try {
@@ -542,7 +542,7 @@ export default function Settings() {
                       type="password"
                       value={newServicePassword}
                       onChange={(e) => setNewServicePassword(e.target.value)}
-                      placeholder="New password (min 6 chars)"
+                      placeholder="New password (min 10 chars)"
                       className="input w-full text-sm"
                     />
                     <input
@@ -560,7 +560,7 @@ export default function Settings() {
                       disabled={
                         passwordChangeLoading ||
                         !newServicePassword ||
-                        newServicePassword.length < 6 ||
+                        newServicePassword.length < 10 ||
                         newServicePassword !== confirmServicePassword
                       }
                       className="w-full btn bg-butler-700 text-butler-300 hover:bg-butler-600 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
