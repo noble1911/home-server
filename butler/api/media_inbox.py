@@ -353,7 +353,7 @@ async def refresh_jellyfin() -> bool:
     try:
         async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as s:
             async with s.post(f"{settings.jellyfin_url}/Library/Refresh",
-                              headers={"X-Emby-Token": settings.jellyfin_api_key}) as r:
+                              headers={"Authorization": f'MediaBrowser Token="{settings.jellyfin_api_key}"'}) as r:
                 return r.status in (200, 204)
     except Exception as e:
         logger.warning("Jellyfin refresh failed: %s", e)
